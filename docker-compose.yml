@@ -1,0 +1,81 @@
+services:
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+      target: builder
+    volumes:
+      - ./api:/app
+      - /app/node_modules
+    command: npm run start:dev
+    # Porta não exposta publicamente — comunicacao interna apenas
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/orbit?schema=public
+      - MINIO_ENDPOINT=minio
+      - MINIO_PORT=9000
+      - MINIO_USE_SSL=false
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET=orbit
+    depends_on:
+      - db
+      - minio
+    networks:
+      - orbit-internal
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=/api
+    ports:
+      - "3090:3090"
+    environment:
+      - NODE_ENV=production
+      - PORT=3090
+    depends_on:
+      - api
+    networks:
+      - orbit-internal
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    # Porta nao exposta publicamente — comunicacao interna apenas
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: orbit
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    networks:
+      - orbit-internal
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    # Porta nao exposta publicamente — comunicacao interna apenas
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio-data:/data
+    networks:
+      - orbit-internal
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  orbit-internal:
+    driver: bridge
+
+volumes:
+  db-data:
+  minio-data:

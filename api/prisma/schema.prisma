@@ -1,0 +1,461 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum Visibility {
+  PUBLIC
+  DEPARTMENT
+  PRIVATE
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  BLOCKED
+  DONE
+}
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum RecruitmentStage {
+  RECEIVED
+  SCREENING
+  INTERVIEW
+  OFFER
+  HIRED
+  REJECTED
+}
+
+enum SystemPermission {
+  USERS_VIEW
+  USERS_CREATE
+  USERS_READ
+  USERS_UPDATE
+  USERS_DELETE
+  ROLES_VIEW
+  ROLES_CREATE
+  ROLES_READ
+  ROLES_UPDATE
+  ROLES_DELETE
+  DEPARTMENTS_VIEW
+  DEPARTMENTS_CREATE
+  DEPARTMENTS_READ
+  DEPARTMENTS_UPDATE
+  DEPARTMENTS_DELETE
+  ANNOUNCEMENTS_VIEW
+  ANNOUNCEMENTS_CREATE
+  ANNOUNCEMENTS_READ
+  ANNOUNCEMENTS_UPDATE
+  ANNOUNCEMENTS_DELETE
+  EVENTS_VIEW
+  EVENTS_CREATE
+  EVENTS_READ
+  EVENTS_UPDATE
+  EVENTS_DELETE
+  TASKS_VIEW
+  TASKS_CREATE
+  TASKS_READ
+  TASKS_UPDATE
+  TASKS_DELETE
+  RECRUITMENT_VIEW
+  RECRUITMENT_CREATE
+  RECRUITMENT_READ
+  RECRUITMENT_UPDATE
+  RECRUITMENT_DELETE
+  PROJECTS_VIEW
+  PROJECTS_CREATE
+  PROJECTS_READ
+  PROJECTS_UPDATE
+  PROJECTS_DELETE
+  RESOURCES_VIEW
+  RESOURCES_CREATE
+  RESOURCES_READ
+  RESOURCES_UPDATE
+  RESOURCES_DELETE
+  BOARDS_VIEW
+  BOARDS_CREATE
+  BOARDS_READ
+  BOARDS_UPDATE
+  BOARDS_DELETE
+  INVENTORY_VIEW
+  INVENTORY_CREATE
+  INVENTORY_READ
+  INVENTORY_UPDATE
+  INVENTORY_DELETE
+  PLANS_VIEW
+  PLANS_CREATE
+  PLANS_READ
+  PLANS_UPDATE
+  PLANS_DELETE
+  PLANS_APPROVE
+  FILES_UPLOAD
+  DEBTS_VIEW
+  DEBTS_CREATE
+  DEBTS_READ
+  DEBTS_UPDATE
+  DEBTS_DELETE
+}
+
+enum PlanStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum DebtType {
+  INCOME
+  OUTCOME
+}
+
+enum DebtStatus {
+  PENDING
+  COMPLETED
+}
+
+model Department {
+  id                      String                       @id @default(uuid())
+  name                    String                       @unique
+  description             String?
+  users                   User[]
+  boardDepartments        BoardDepartment[]
+  projects                Project[]
+  eventDepartments        EventDepartment[]
+  announcementDepartments AnnouncementDepartment[]
+  resourceDepartments     ResourceDepartment[]
+  inventoryItems          InventoryItem[]
+  plans                   Plan[]                       @relation("PlanDepartment")
+  candidateChoices        CandidateDepartmentChoice[]
+  createdAt               DateTime                     @default(now())
+  updatedAt               DateTime                     @updatedAt
+}
+
+model User {
+  id                   String                  @id @default(uuid())
+  name                 String
+  email                String                  @unique
+  password             String
+  status               UserStatus              @default(ACTIVE)
+  departmentId         String
+  department           Department              @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  userRoles            UserRole[]
+  userSettings         UserSettings?
+  taskAssignees        TaskAssignee[]
+  projectMembers       ProjectMember[]
+  announcementsTarget        Announcement[]          @relation("AnnouncementTarget")
+  announcementsCreated        Announcement[]          @relation("AnnouncementCreatedBy")
+  recruitmentComments         RecruitmentComment[]    @relation("RecruitmentCommentCreatedBy")
+  notifications        Notification[]          @relation("NotificationTarget")
+  auditLogs            AuditLog[]              @relation("AuditLogPerformedBy")
+  inventoryPurchased   InventoryItem[]         @relation("InventoryPurchasedBy")
+  plansCreated         Plan[]                  @relation("PlanCreatedBy")
+  plansApproved        Plan[]                  @relation("PlanApprovedBy")
+  debtsCreated         Debt[]                  @relation("DebtCreatedBy")
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+}
+
+model Role {
+  id          String             @id @default(uuid())
+  name        String             @unique
+  description String?
+  permissions SystemPermission[] @default([])
+  userRoles   UserRole[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+}
+
+model UserRole {
+  userId     String
+  roleId     String
+  assignedAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+}
+
+model UserSettings {
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  darkMode           Boolean  @default(false)
+  emailNotifications  Boolean  @default(true)
+  inAppNotifications  Boolean  @default(true)
+  language           String   @default("en")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model Board {
+  id              String            @id @default(uuid())
+  name            String
+  description     String?
+  boardDepartments BoardDepartment[]
+  tasks           Task[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+model BoardDepartment {
+  boardId      String
+  departmentId String
+  board        Board      @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@id([boardId, departmentId])
+}
+
+model Project {
+  id             String           @id @default(uuid())
+  departmentId   String
+  department     Department       @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  name           String
+  description    String?
+  status         ProjectStatus    @default(PLANNING)
+  deadline       DateTime?
+  tasks          Task[]
+  projectMembers ProjectMember[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+}
+
+model ProjectMember {
+  projectId String
+  userId    String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, userId])
+}
+
+model Task {
+  id            String         @id @default(uuid())
+  title         String
+  description   String?
+  deadline      DateTime?
+  priority      Priority       @default(MEDIUM)
+  status        TaskStatus     @default(TODO)
+  boardId       String?
+  projectId     String?
+  board         Board?         @relation(fields: [boardId], references: [id], onDelete: SetNull)
+  project       Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  taskAssignees TaskAssignee[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model TaskAssignee {
+  taskId String
+  userId String
+  task   Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, userId])
+}
+
+model Candidate {
+  id                String                       @id @default(uuid())
+  name              String
+  email             String
+  course            String?
+  year              Int?
+  cvUrl             String?
+  notes             String?
+  stage             RecruitmentStage             @default(RECEIVED)
+  comments          RecruitmentComment[]
+  departmentChoices CandidateDepartmentChoice[]
+  createdAt         DateTime                     @default(now())
+  updatedAt         DateTime                     @updatedAt
+}
+
+model CandidateDepartmentChoice {
+  id           String     @id @default(uuid())
+  candidateId  String
+  candidate    Candidate  @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
+  priority     Int
+
+  @@unique([candidateId, priority])
+  @@unique([candidateId, departmentId])
+}
+
+model RecruitmentComment {
+  id          String    @id @default(uuid())
+  candidateId String
+  createdById String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  createdBy   User      @relation("RecruitmentCommentCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  content     String
+  createdAt   DateTime  @default(now())
+}
+
+model Announcement {
+  id                      String                    @id @default(uuid())
+  createdById             String?
+  createdBy               User?                     @relation("AnnouncementCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  targetUserId            String?
+  targetUser              User?                     @relation("AnnouncementTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  title                   String
+  content                 String
+  type                    String                    @default("ANNOUNCEMENT")
+  visibility              Visibility                @default(PUBLIC)
+  read                    Boolean                   @default(false)
+  pinned                  Boolean                   @default(false)
+  announcementDepartments AnnouncementDepartment[]
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+}
+
+model AnnouncementDepartment {
+  announcementId String
+  departmentId   String
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  department     Department   @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@id([announcementId, departmentId])
+}
+
+model Resource {
+  id                   String                 @id @default(uuid())
+  title                String
+  url                  String
+  category             String?
+  description          String?
+  visibility           Visibility             @default(PUBLIC)
+  resourceDepartments  ResourceDepartment[]
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+}
+
+model ResourceDepartment {
+  resourceId   String
+  departmentId String
+  resource     Resource   @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@id([resourceId, departmentId])
+}
+
+model Event {
+  id               String            @id @default(uuid())
+  title            String
+  description      String?
+  location         String?
+  startDate        DateTime
+  endDate          DateTime
+  visibility       Visibility        @default(PUBLIC)
+  eventDepartments EventDepartment[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+}
+
+model EventDepartment {
+  eventId      String
+  departmentId String
+  event        Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, departmentId])
+}
+
+model Notification {
+  id           String   @id @default(uuid())
+  targetUserId String
+  targetUser   User     @relation("NotificationTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  type         String
+  content      String
+  read         Boolean  @default(false)
+  createdAt    DateTime @default(now())
+}
+
+model AuditLog {
+  id            String   @id @default(uuid())
+  performedById String
+  performedBy   User     @relation("AuditLogPerformedBy", fields: [performedById], references: [id], onDelete: Restrict)
+  action        String
+  entity        String
+  entityId      String
+  createdAt     DateTime @default(now())
+}
+
+model InventoryItem {
+  id            String      @id @default(uuid())
+  name          String
+  description   String?
+  value         Decimal     @db.Decimal(10, 2)
+  purchaseDate  DateTime?
+  warrantyDate  DateTime?
+  photoKey      String?
+  quantity      Int         @default(1)
+  purchasedBy   User?       @relation("InventoryPurchasedBy", fields: [purchasedById], references: [id])
+  purchasedById String?
+  department    Department? @relation(fields: [departmentId], references: [id])
+  departmentId  String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model Plan {
+  id            String     @id @default(uuid())
+  name          String
+  description   String?
+  status        PlanStatus @default(PENDING)
+  deadline      DateTime?
+  fileKey       String?
+  department    Department @relation("PlanDepartment", fields: [departmentId], references: [id])
+  departmentId  String
+  createdBy     User       @relation("PlanCreatedBy", fields: [createdById], references: [id])
+  createdById   String
+  approvedBy    User?      @relation("PlanApprovedBy", fields: [approvedById], references: [id])
+  approvedById  String?
+  approvedAt    DateTime?
+  rejectionNote String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+model Debt {
+  id               String    @id @default(uuid())
+  description      String
+  value            Decimal   @db.Decimal(10, 2)
+  type             DebtType
+  status           DebtStatus @default(PENDING)
+  occurredAt       DateTime   @default(now())
+  completedAt      DateTime?
+  debtorName       String?
+  debtorContact    String?
+  creditorName     String?
+  creditorContact  String?
+  fileKeys         String[]  @default([])
+  receivingAccount String?   @db.VarChar(64)
+  depositAccount   String?   @db.VarChar(64)
+  createdById      String?
+  createdBy        User?     @relation("DebtCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
