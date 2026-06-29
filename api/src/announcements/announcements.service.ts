@@ -20,7 +20,6 @@ export class AnnouncementsService {
     const {
       departmentIds,
       targetUserIds,
-      performedById,
       content,
       description,
       createdById,
@@ -48,16 +47,6 @@ export class AnnouncementsService {
           pinned: pinned ?? false,
         })),
       });
-      if (performedById) {
-        this.prisma.auditLog.create({
-          data: {
-            performedById,
-            action: 'CREATE_ANNOUNCEMENT',
-            entity: 'Announcement',
-            entityId: 'bulk',
-          },
-        }).catch(() => {});
-      }
       return result;
     }
 
@@ -82,18 +71,6 @@ export class AnnouncementsService {
           : {}),
       },
       include: this.include,
-    }).then((a) => {
-      if (performedById) {
-        this.prisma.auditLog.create({
-          data: {
-            performedById,
-            action: 'CREATE_ANNOUNCEMENT',
-            entity: 'Announcement',
-            entityId: a.id,
-          },
-        }).catch(() => {});
-      }
-      return a;
     });
   }
 
@@ -207,12 +184,12 @@ export class AnnouncementsService {
   }
 
   async update(id: string, data: any) {
-    const { departmentIds, performedById, targetUserIds, ...updateData } = data;
+    const { departmentIds, targetUserIds, ...updateData } = data;
     return this.prisma.$transaction(async (tx) => {
       if (departmentIds !== undefined) {
         await tx.announcementDepartment.deleteMany({ where: { announcementId: id } });
       }
-      const a = await tx.announcement.update({
+      return tx.announcement.update({
         where: { id },
         data: {
           ...updateData,
@@ -228,12 +205,6 @@ export class AnnouncementsService {
         },
         include: this.include,
       });
-      if (performedById) {
-        await tx.auditLog.create({
-          data: { performedById, action: 'UPDATE_ANNOUNCEMENT', entity: 'Announcement', entityId: id },
-        }).catch(() => {});
-      }
-      return a;
     });
   }
 

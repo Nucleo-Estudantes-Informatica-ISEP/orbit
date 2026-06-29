@@ -1,8 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcryptjs';
+
+const CRITICAL_PERMISSIONS = ['USERS_CREATE', 'USERS_UPDATE', 'ROLES_CREATE', 'ROLES_UPDATE'];
 
 const userSelect = {
   id: true,
@@ -134,7 +136,52 @@ export class UsersService {
     return updatedUser;
   }
 
-  async remove(id: string) {
+  async remove(id: string, requestingUserId: string) {
+    if (id === requestingUserId) {
+      throw new ForbiddenException('Não te podes apagar a ti próprio.');
+    }
+
+    const target = await this.prisma.user.findUnique({
+      where: { id },
+      include: {
+        userRoles: {
+          include: { role: { select: { permissions: true } } },
+        },
+      },
+    });
+    if (!target) throw new NotFoundException('User not found');
+
+    const targetPermissions = new Set(target.userRoles.flatMap((ur) => ur.role.permissions));
+    const hasCritical = CRITICAL_PERMISSIONS.some((p) => targetPermissions.has(p as any));
+
+    if (hasCritical) {
+      const criticalUsers = await this.prisma.user.findMany({
+        where: { status: 'ACTIVE' },
+        include: {
+          userRoles: {
+            include: { role: { select: { permissions: true } } },
+          },
+        },
+      });
+
+      const countWithCritical = criticalUsers.filter((u) =>
+        CRITICAL_PERMISSIONS.some((p) =>
+          u.userRoles.some((ur) => ur.role.permissions.includes(p as any)),
+        ),
+      ).length;
+
+      if (countWithCritical <= 1) {
+        throw new ForbiddenException(
+          'Não é possível apagar o último utilizador com permissões críticas.',
+        );
+      }
+    }
+
+    await this.prisma.plan.updateMany({
+      where: { createdById: id },
+      data: { createdById: requestingUserId },
+    });
+
     return this.prisma.user.delete({ where: { id } });
   }
 

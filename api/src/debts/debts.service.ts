@@ -15,6 +15,9 @@ export class DebtsService {
 
   create(data: any) {
     const { performedById, ...rest } = data;
+    if (rest.occurredAt && typeof rest.occurredAt === 'string' && rest.occurredAt.length === 10) {
+      rest.occurredAt = new Date(rest.occurredAt).toISOString();
+    }
     return this.prisma.debt.create({
       data: {
         ...rest,
@@ -41,6 +44,9 @@ export class DebtsService {
 
   async update(id: string, data: any) {
     const { performedById, ...rest } = data;
+    if (rest.occurredAt && typeof rest.occurredAt === 'string' && rest.occurredAt.length === 10) {
+      rest.occurredAt = new Date(rest.occurredAt).toISOString();
+    }
     const nextStatus = rest.status;
     return this.prisma.debt.update({
       where: { id },

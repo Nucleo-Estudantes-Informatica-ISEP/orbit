@@ -16,7 +16,7 @@ export class AuditLogsController {
   }
 
   @Get()
-  @Permissions('USERS_READ')
+  @Permissions('AUDITS_READ')
   findAll() {
     return this.svc.findAll();
   }

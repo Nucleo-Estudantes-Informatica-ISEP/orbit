@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useLocale } from '@/lib/locale-context';
 
 interface SplashScreenProps {
   duration?: number;
@@ -9,6 +10,7 @@ interface SplashScreenProps {
 }
 
 export default function SplashScreen({ duration = 1000, onComplete, spinnerSize = 'md' }: SplashScreenProps) {
+  const { t } = useLocale();
   const [isVisible, setIsVisible] = useState(true);
   const spinnerDimensions = spinnerSize === 'sm' ? 'h-6 w-6' : spinnerSize === 'lg' ? 'h-12 w-12' : 'h-8 w-8';
 
@@ -33,7 +35,7 @@ export default function SplashScreen({ duration = 1000, onComplete, spinnerSize 
           className={`rounded-full border-4 border-black border-t-transparent animate-spin ${spinnerDimensions}`}
           aria-hidden
         />
-        <div className="text-base font-medium text-black">Loading...</div>
+        <div className="text-base font-medium text-black">{t('common.loading')}</div>
       </div>
     </div>
   );

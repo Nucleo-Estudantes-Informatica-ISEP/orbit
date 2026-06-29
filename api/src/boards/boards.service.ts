@@ -6,7 +6,7 @@ export class BoardsService {
   constructor(private prisma: PrismaService) {}
 
   create(data: { name: string; description?: string; departmentIds?: string[] }) {
-    const { departmentIds, performedById, ...boardData } = data as any;
+    const { departmentIds, ...boardData } = data as any;
 
     return this.prisma.board.create({
       data: {
@@ -21,18 +21,6 @@ export class BoardsService {
             }
           : {}),
       },
-    }).then((b) => {
-      if (performedById) {
-        this.prisma.auditLog.create({
-          data: {
-            performedById,
-            action: 'CREATE_BOARD',
-            entity: 'Board',
-            entityId: b.id,
-          },
-        }).catch(() => {});
-      }
-      return b;
     });
   }
 
@@ -58,7 +46,7 @@ export class BoardsService {
   }
 
   update(id: string, data: Partial<{ name: string; description?: string; departmentIds?: string[] }>) {
-    const { departmentIds, performedById, ...boardData } = data as any;
+    const { departmentIds, ...boardData } = data as any;
 
     return this.prisma.board.update({
       where: { id },
@@ -75,18 +63,6 @@ export class BoardsService {
             }
           : {}),
       },
-    }).then((b) => {
-      if (performedById) {
-        this.prisma.auditLog.create({
-          data: {
-            performedById,
-            action: 'UPDATE_BOARD',
-            entity: 'Board',
-            entityId: b.id,
-          },
-        }).catch(() => {});
-      }
-      return b;
     });
   }
 

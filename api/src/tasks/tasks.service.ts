@@ -61,11 +61,6 @@ export class TasksService {
       },
       include: this.include,
     }).then((t) => {
-      if (performedById) {
-        this.prisma.auditLog.create({
-          data: { performedById, action: 'CREATE_TASK', entity: 'Task', entityId: t.id },
-        }).catch(() => {});
-      }
       if (normalizedAssigneeIds.length > 0) {
         this.announcements.createManyForUsers(
           normalizedAssigneeIds,
@@ -120,11 +115,6 @@ export class TasksService {
       },
       include: this.include,
     }).then((t) => {
-      if (performedById) {
-        this.prisma.auditLog.create({
-          data: { performedById, action: 'UPDATE_TASK', entity: 'Task', entityId: t.id },
-        }).catch(() => {});
-      }
       if (assigneeIds !== undefined) {
         const newlyAssignedUserIds: string[] = nextAssigneeIds.filter((userId) => !previousAssigneeIds.includes(userId));
         if (newlyAssignedUserIds.length > 0) {

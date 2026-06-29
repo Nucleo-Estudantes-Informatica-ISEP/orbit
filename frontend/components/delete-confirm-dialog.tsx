@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { useLocale } from '@/lib/locale-context';
 import { AlertCircle, Loader2 } from 'lucide-react';
 
 interface DeleteConfirmDialogProps {
@@ -32,6 +33,7 @@ export function DeleteConfirmDialog({
   onConfirm,
   isDangerous = false,
 }: DeleteConfirmDialogProps) {
+  const { t } = useLocale();
   const handleConfirm = async () => {
     await onConfirm();
   };
@@ -51,7 +53,7 @@ export function DeleteConfirmDialog({
         </DialogHeader>
 
         <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-3 text-sm text-destructive">
-          This action cannot be undone.
+          {t('common.cannotUndo')}
         </div>
 
         <DialogFooter className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -61,7 +63,7 @@ export function DeleteConfirmDialog({
             disabled={isLoading}
             className="border-border/50 w-full"
           >
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             variant={isDangerous ? 'destructive' : 'default'}
@@ -72,10 +74,10 @@ export function DeleteConfirmDialog({
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Deleting...
+                {t('common.deleting')}
               </>
             ) : (
-              'Delete'
+              t('common.delete')
             )}
           </Button>
         </DialogFooter>

@@ -18,6 +18,15 @@ export async function apiFetch<T = unknown>(
       ...(options.headers ?? {}),
     },
   });
+  if (res.status === 401) {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_user');
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login';
+    }
+    throw new Error('Sessão expirada. Por favor, faz login novamente.');
+  }
+
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
     throw new Error(text || `HTTP ${res.status}`);
@@ -45,6 +54,14 @@ export const api = {
       headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       body: formData,
     });
+    if (res.status === 401) {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_user');
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
+      throw new Error('Sessão expirada. Por favor, faz login novamente.');
+    }
     if (!res.ok) {
       const text = await res.text().catch(() => res.statusText);
       throw new Error(text || `HTTP ${res.status}`);

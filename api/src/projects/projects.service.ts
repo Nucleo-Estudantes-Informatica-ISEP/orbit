@@ -15,16 +15,6 @@ export class ProjectsService {
       data: createData,
       include: this.include,
     }).then((p) => {
-      if (performedById) {
-        this.prisma.auditLog.create({
-          data: {
-            performedById: performedById,
-            action: 'CREATE_PROJECT',
-            entity: 'Project',
-            entityId: p.id,
-          },
-        }).catch(() => {});
-      }
       this.announcements.createForDepartmentUsers(
         [p.departmentId],
         'PROJECT_CREATED',
@@ -54,32 +44,11 @@ export class ProjectsService {
 
   update(id: string, data: any) {
     const { performedById, ...updateData } = data as any;
-    return this.prisma.project.update({ where: { id }, data: updateData, include: this.include }).then((p) => {
-      if (performedById) {
-        this.prisma.auditLog.create({
-          data: {
-            performedById,
-            action: 'UPDATE_PROJECT',
-            entity: 'Project',
-            entityId: p.id,
-          },
-        }).catch(() => {});
-      }
-      return p;
-    });
+    return this.prisma.project.update({ where: { id }, data: updateData, include: this.include });
   }
 
   remove(id: string) {
-    return this.prisma.project.delete({ where: { id } }).then((p) => {
-      return this.prisma.auditLog.create({
-        data: {
-          performedById: (p as any).performedById ?? null,
-          action: 'DELETE_PROJECT',
-          entity: 'Project',
-          entityId: p.id,
-        },
-      }).catch(() => p).then(() => p);
-    });
+    return this.prisma.project.delete({ where: { id } });
   }
 
   addMember(projectId: string, userId: string) {

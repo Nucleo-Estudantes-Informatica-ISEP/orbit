@@ -13,7 +13,7 @@ export class RecruitmentService {
   };
 
   create(data: any) {
-    const { performedById, departmentChoices, ...createData } = data;
+    const { departmentChoices, ...createData } = data;
     return this.prisma.candidate.create({
       data: {
         ...createData,
@@ -22,13 +22,6 @@ export class RecruitmentService {
           : undefined,
       },
       include: this.include,
-    }).then((c) => {
-      if (performedById) {
-        this.prisma.auditLog.create({
-          data: { performedById, action: 'CREATE_CANDIDATE', entity: 'Candidate', entityId: c.id },
-        }).catch(() => {});
-      }
-      return c;
     });
   }
 
@@ -43,7 +36,7 @@ export class RecruitmentService {
   }
 
   async update(id: string, data: any) {
-    const { performedById, departmentChoices, ...updateData } = data;
+    const { departmentChoices, ...updateData } = data;
     if (departmentChoices) {
       await this.prisma.candidateDepartmentChoice.deleteMany({ where: { candidateId: id } });
       if (departmentChoices.length) {
@@ -56,24 +49,10 @@ export class RecruitmentService {
       where: { id },
       data: updateData,
       include: this.include,
-    }).then((c) => {
-      if (performedById) {
-        this.prisma.auditLog.create({
-          data: { performedById, action: 'UPDATE_CANDIDATE', entity: 'Candidate', entityId: c.id },
-        }).catch(() => {});
-      }
-      return c;
     });
   }
 
   remove(id: string) {
-    return this.prisma.candidate.delete({ where: { id } }).then((c) => {
-      this.prisma.auditLog
-        .create({
-          data: { performedById: (c as any).performedById ?? null, action: 'DELETE_CANDIDATE', entity: 'Candidate', entityId: c.id },
-        })
-        .catch(() => {});
-      return c;
-    });
+    return this.prisma.candidate.delete({ where: { id } });
   }
 }

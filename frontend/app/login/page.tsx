@@ -181,11 +181,11 @@ export default function LoginPage() {
               <p>{t('login.footer')}</p>
               <p>
                 <Link href="/privacy" className="hover:text-foreground underline underline-offset-2">
-                  Privacy Policy
+                  {t('home.privacy')}
                 </Link>
                 <span className="mx-2">&middot;</span>
                 <Link href="/terms" className="hover:text-foreground underline underline-offset-2">
-                  Terms of Service
+                  {t('home.terms')}
                 </Link>
               </p>
             </div>

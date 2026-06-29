@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useLocale } from '@/lib/locale-context';
 import { AlertCircle, Loader2 } from 'lucide-react';
 
 interface Department {
@@ -28,6 +29,7 @@ interface EditDepartmentDialogProps {
 }
 
 export function EditDepartmentDialog({ department, open, onOpenChange, onSave }: EditDepartmentDialogProps) {
+  const { t } = useLocale();
   const isAddMode = !department;
 
   const [formData, setFormData] = useState({
@@ -57,7 +59,7 @@ export function EditDepartmentDialog({ department, open, onOpenChange, onSave }:
     setError('');
 
     if (!formData.name || !formData.name.trim()) {
-      setError('Department name is required');
+      setError(t('departments.nameRequired'));
       return;
     }
 
@@ -69,7 +71,7 @@ export function EditDepartmentDialog({ department, open, onOpenChange, onSave }:
         description: formData.description.trim() || undefined,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : `Failed to ${isAddMode ? 'create' : 'save'} department`);
+      setError(err instanceof Error ? err.message : isAddMode ? t('departments.failedToCreate') : t('departments.failedToSave'));
     } finally {
       setIsLoading(false);
     }
@@ -80,12 +82,12 @@ export function EditDepartmentDialog({ department, open, onOpenChange, onSave }:
       <DialogContent className="sm:max-w-[500px] bg-background border-border/40">
         <DialogHeader>
           <DialogTitle className="text-foreground">
-            {isAddMode ? 'Add New Department' : 'Edit Department'}
+            {isAddMode ? t('departments.addNew') : t('departments.edit')}
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
             {isAddMode
-              ? 'Create a new department for your organization.'
-              : 'Update department information.'}
+              ? t('departments.createDescription')
+              : t('departments.editDescription')}
           </DialogDescription>
         </DialogHeader>
 
@@ -99,13 +101,13 @@ export function EditDepartmentDialog({ department, open, onOpenChange, onSave }:
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
             <Label htmlFor="name" className="text-foreground">
-              Department Name
+              {t('common.name')}
             </Label>
             <Input
               id="name"
               value={formData.name}
               onChange={(e) => handleChange('name', e.target.value)}
-              placeholder="e.g. Engineering"
+              placeholder={t('departments.namePlaceholder')}
               disabled={isLoading}
               className="bg-background border-border/50 focus-visible:ring-primary/50"
             />
@@ -113,13 +115,13 @@ export function EditDepartmentDialog({ department, open, onOpenChange, onSave }:
 
           <div className="grid gap-2">
             <Label htmlFor="description" className="text-foreground">
-              Description
+              {t('common.description')}
             </Label>
             <Input
               id="description"
               value={formData.description}
               onChange={(e) => handleChange('description', e.target.value)}
-              placeholder="Brief description of this department"
+              placeholder={t('departments.descriptionPlaceholder')}
               disabled={isLoading}
               className="bg-background border-border/50 focus-visible:ring-primary/50"
             />
@@ -133,16 +135,16 @@ export function EditDepartmentDialog({ department, open, onOpenChange, onSave }:
             disabled={isLoading}
             className="border-border/50 w-full"
           >
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button onClick={handleSave} disabled={isLoading} className="w-full">
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {isAddMode ? 'Creating...' : 'Saving...'}
+                {isAddMode ? t('common.creating') : t('common.saving')}
               </>
             ) : (
-              isAddMode ? 'Create Department' : 'Save Changes'
+              isAddMode ? t('departments.createDepartment') : t('departments.saveChanges')
             )}
           </Button>
         </DialogFooter>

@@ -61,16 +61,6 @@ export class EventsService {
       data: prismaData,
       include: this.include,
     }).then((e) => {
-      if ((data as any).performedById) {
-        this.prisma.auditLog.create({
-          data: {
-            performedById: (data as any).performedById,
-            action: 'CREATE_EVENT',
-            entity: 'Event',
-            entityId: e.id,
-          },
-        }).catch(() => {});
-      }
       if (Array.isArray((data as any).departmentIds) && (data as any).departmentIds.length > 0) {
         this.announcements.createForDepartmentUsers(
           (data as any).departmentIds,

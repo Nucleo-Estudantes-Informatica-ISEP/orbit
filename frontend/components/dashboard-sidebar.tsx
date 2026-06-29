@@ -22,9 +22,11 @@ import {
   Package,
   ClipboardList,
   CreditCard,
+  History,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -67,7 +69,7 @@ export function DashboardSidebar({
 
   const router = useRouter();
   const pathname = usePathname();
-  const { logout } = useAuth();
+  const { user: authUser, logout } = useAuth();
   const { t } = useLocale();
   const canSeePeople = usePermission('USERS_VIEW') || usePermission('ROLES_VIEW') || usePermission('DEPARTMENTS_VIEW');
   const canSeeAnnouncements = usePermission('ANNOUNCEMENTS_VIEW');
@@ -79,6 +81,7 @@ export function DashboardSidebar({
   const canSeeInventory = usePermission('INVENTORY_VIEW');
   const canSeePlans = usePermission('PLANS_VIEW');
   const canSeeDebts = usePermission('DEBTS_VIEW');
+  const canSeeAudits = authUser?.permissions?.includes('AUDITS_READ') ?? false;
 
   const navItems = (...items: Array<NavItem | null>): NavItem[] => items.filter((item): item is NavItem => Boolean(item));
 
@@ -112,6 +115,7 @@ export function DashboardSidebar({
         canSeeInventory ? { icon: Package, label: t('nav.inventory'), href: '/dashboard/inventory' } : null,
         canSeePlans ? { icon: ClipboardList, label: t('nav.plans'), href: '/dashboard/plans' } : null,
         canSeeDebts ? { icon: CreditCard, label: t('nav.debts'), href: '/dashboard/debts' } : null,
+        canSeeAudits ? { icon: History, label: t('nav.auditLogs'), href: '/dashboard/audit-logs' } : null,
       ),
     },
   ].filter((group) => group.items.length > 0);
@@ -206,36 +210,38 @@ export function DashboardSidebar({
         <Separator className="bg-border/40" />
 
         {/* Navigation */}
-        <nav className="flex-1 p-3 overflow-y-auto space-y-4">
-          {navGroups.map((group) => (
-            <div key={group.label}>
-              {!isCollapsed && (
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 px-3 mb-1.5">
-                  {group.label}
-                </p>
-              )}
-              <div className="space-y-0.5">
-                {group.items.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={cn(
-                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-                      isActive(item.href)
-                        ? 'bg-primary/10 text-primary'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-                      isCollapsed && 'justify-center',
-                    )}
-                    title={isCollapsed ? item.label : undefined}
-                  >
-                    <item.icon className="h-5 w-5 shrink-0" />
-                    <span className={cn(isCollapsed ? 'md:hidden' : 'block')}>{item.label}</span>
-                  </Link>
-                ))}
+        <ScrollArea className="flex-1 px-3">
+          <div className="space-y-4 py-3">
+            {navGroups.map((group) => (
+              <div key={group.label}>
+                {!isCollapsed && (
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 px-3 mb-1.5">
+                    {group.label}
+                  </p>
+                )}
+                <div className="space-y-0.5">
+                  {group.items.map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={cn(
+                        'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                        isActive(item.href)
+                          ? 'bg-primary/10 text-primary'
+                          : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+                        isCollapsed && 'justify-center',
+                      )}
+                      title={isCollapsed ? item.label : undefined}
+                    >
+                      <item.icon className="h-5 w-5 shrink-0" />
+                      <span className={cn(isCollapsed ? 'md:hidden' : 'block')}>{item.label}</span>
+                    </Link>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
-        </nav>
+            ))}
+          </div>
+        </ScrollArea>
 
         <Separator className="bg-border/40" />
 

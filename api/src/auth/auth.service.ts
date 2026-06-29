@@ -57,8 +57,8 @@ export class AuthService {
 
   private signTokens(payload: { sub: string; email: string; roles: string[]; permissions: string[] }) {
     return {
-      access_token: this.jwtService.sign(payload, { expiresIn: '8h' }),
-      refresh_token: this.jwtService.sign(payload, { expiresIn: '7d' }),
+      access_token: this.jwtService.sign(payload, { expiresIn: '15m' }),
+      refresh_token: this.jwtService.sign(payload, { expiresIn: '15m' }),
     };
   }
 

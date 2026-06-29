@@ -47,7 +47,7 @@ export default function UsersTab() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<PeopleUser | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const { token } = useAuth();
+  const { user: currentUser, token } = useAuth();
   const canCreateUsers = usePermission('USERS_CREATE');
   const canUpdateUsers = usePermission('USERS_UPDATE');
   const canDeleteUsers = usePermission('USERS_DELETE');
@@ -74,7 +74,7 @@ export default function UsersTab() {
         })),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load users');
+      setError(err instanceof Error ? err.message : t('people.failedToLoad'));
     } finally {
       setIsLoading(false);
     }
@@ -90,7 +90,7 @@ export default function UsersTab() {
       setRoles(Array.isArray(rolesData) ? rolesData : []);
       setDepartments(Array.isArray(deptsData) ? deptsData : []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load reference data');
+      setError(err instanceof Error ? err.message : t('people.failedToLoadReference'));
     } finally {
       setIsReferenceLoading(false);
     }
@@ -140,7 +140,7 @@ export default function UsersTab() {
       setIsDeleteDialogOpen(false);
       setUserToDelete(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete user');
+      setError(err instanceof Error ? err.message : t('common.deleteError'));
     } finally {
       setIsDeleting(false);
     }
@@ -230,7 +230,7 @@ export default function UsersTab() {
                                 <Edit2 className="h-4 w-4" />
                               </Button>
                             )}
-                            {canDeleteUsers && (
+                            {canDeleteUsers && currentUser?.id !== user.id && (
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                                 onClick={() => { setUserToDelete(user); setIsDeleteDialogOpen(true); }}>
                                 <Trash2 className="h-4 w-4" />

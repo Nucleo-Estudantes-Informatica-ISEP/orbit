@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { CreateDepartmentDto } from './dto/create-department.dto';
 
@@ -24,7 +24,21 @@ export class DepartmentsService {
     return this.prisma.department.update({ where: { id }, data: dto });
   }
 
-  remove(id: string) {
+  async remove(id: string) {
+    const [userCount, projectCount, choiceCount, planCount, itemCount] = await Promise.all([
+      this.prisma.user.count({ where: { departmentId: id } }),
+      this.prisma.project.count({ where: { departmentId: id } }),
+      this.prisma.candidateDepartmentChoice.count({ where: { departmentId: id } }),
+      this.prisma.plan.count({ where: { departmentId: id } }),
+      this.prisma.inventoryItem.count({ where: { departmentId: id } }),
+    ]);
+
+    if (userCount > 0 || projectCount > 0 || choiceCount > 0 || planCount > 0 || itemCount > 0) {
+      throw new ConflictException(
+        'Departamento tem registos associados. Usa a opção de transferência para eliminar.',
+      );
+    }
+
     return this.prisma.department.delete({ where: { id } });
   }
 
@@ -46,13 +60,15 @@ export class DepartmentsService {
 
     if (!destinationDept) throw new NotFoundException('Destination department not found');
 
-    // Update all users from source department to destination department
-    await this.prisma.user.updateMany({
-      where: { departmentId: id },
-      data: { departmentId: destinationDepartmentId },
-    });
+    await this.prisma.$transaction([
+      this.prisma.user.updateMany({ where: { departmentId: id }, data: { departmentId: destinationDepartmentId } }),
+      this.prisma.project.updateMany({ where: { departmentId: id }, data: { departmentId: destinationDepartmentId } }),
+      this.prisma.candidateDepartmentChoice.updateMany({ where: { departmentId: id }, data: { departmentId: destinationDepartmentId } }),
+      this.prisma.plan.updateMany({ where: { departmentId: id }, data: { departmentId: destinationDepartmentId } }),
+      this.prisma.inventoryItem.updateMany({ where: { departmentId: id }, data: { departmentId: destinationDepartmentId } }),
+      this.prisma.department.delete({ where: { id } }),
+    ]);
 
-    // Delete the department
-    return this.prisma.department.delete({ where: { id } });
+    return { message: 'Department deleted successfully' };
   }
 }

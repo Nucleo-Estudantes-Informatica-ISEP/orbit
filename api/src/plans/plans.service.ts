@@ -19,17 +19,13 @@ export class PlansService {
 
   async create(dto: CreatePlanDto) {
     const { deadline, ...rest } = dto;
-    const plan = await this.prisma.plan.create({
+    return this.prisma.plan.create({
       data: {
         ...rest,
         ...(deadline ? { deadline: new Date(deadline) } : {}),
       },
       include: this.include,
     });
-    this.prisma.auditLog.create({
-      data: { performedById: dto.createdById, action: 'CREATE_PLAN', entity: 'Plan', entityId: plan.id },
-    }).catch(() => {});
-    return plan;
   }
 
   findAll(status?: string) {

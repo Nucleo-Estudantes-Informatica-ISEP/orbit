@@ -13,6 +13,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useLocale } from '@/lib/locale-context';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { formatSystemPermission, permissionGroups, systemPermissions, type SystemPermission } from '@/lib/system-permissions';
 
@@ -31,6 +32,7 @@ interface EditRoleDialogProps {
 }
 
 export function EditRoleDialog({ role, open, onOpenChange, onSave }: EditRoleDialogProps) {
+  const { t } = useLocale();
   const isAddMode = !role;
 
   const [formData, setFormData] = useState({
@@ -71,7 +73,7 @@ export function EditRoleDialog({ role, open, onOpenChange, onSave }: EditRoleDia
     setError('');
 
     if (!formData.name || !formData.name.trim()) {
-      setError('Role name is required');
+      setError(t('roles.nameRequired'));
       return;
     }
 
@@ -84,7 +86,7 @@ export function EditRoleDialog({ role, open, onOpenChange, onSave }: EditRoleDia
         permissions: formData.permissions,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : `Failed to ${isAddMode ? 'create' : 'save'} role`);
+      setError(err instanceof Error ? err.message : isAddMode ? t('roles.failedToCreate') : t('roles.failedToSave'));
     } finally {
       setIsLoading(false);
     }
@@ -95,12 +97,12 @@ export function EditRoleDialog({ role, open, onOpenChange, onSave }: EditRoleDia
       <DialogContent className="sm:max-w-[500px] bg-background border-border/40">
         <DialogHeader>
           <DialogTitle className="text-foreground">
-            {isAddMode ? 'Add New Role' : 'Edit Role'}
+            {isAddMode ? t('roles.addNew') : t('roles.edit')}
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
             {isAddMode
-              ? 'Create a new role for the platform.'
-              : 'Update role information.'}
+              ? t('roles.createDescription')
+              : t('roles.editDescription')}
           </DialogDescription>
         </DialogHeader>
 
@@ -114,13 +116,13 @@ export function EditRoleDialog({ role, open, onOpenChange, onSave }: EditRoleDia
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
             <Label htmlFor="name" className="text-foreground">
-              Role Name
+              {t('roles.nameLabel')}
             </Label>
             <Input
               id="name"
               value={formData.name}
               onChange={(e) => handleChange('name', e.target.value)}
-              placeholder="e.g. COORDINATOR"
+              placeholder={t('roles.namePlaceholder')}
               disabled={isLoading}
               className="bg-background border-border/50 focus-visible:ring-primary/50"
             />
@@ -128,20 +130,20 @@ export function EditRoleDialog({ role, open, onOpenChange, onSave }: EditRoleDia
 
           <div className="grid gap-2">
             <Label htmlFor="description" className="text-foreground">
-              Description
+              {t('common.description')}
             </Label>
             <Input
               id="description"
               value={formData.description}
               onChange={(e) => handleChange('description', e.target.value)}
-              placeholder="Brief description of this role"
+              placeholder={t('roles.descriptionPlaceholder')}
               disabled={isLoading}
               className="bg-background border-border/50 focus-visible:ring-primary/50"
             />
           </div>
 
           <div className="grid gap-2">
-            <Label className="text-foreground">Permissions</Label>
+            <Label className="text-foreground">{t('roles.permissions')}</Label>
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 type="button"
@@ -151,7 +153,7 @@ export function EditRoleDialog({ role, open, onOpenChange, onSave }: EditRoleDia
                 disabled={isLoading}
                 className="border-border/50"
               >
-                Select all
+                {t('roles.selectAll')}
               </Button>
               <Button
                 type="button"
@@ -160,7 +162,7 @@ export function EditRoleDialog({ role, open, onOpenChange, onSave }: EditRoleDia
                 onClick={() => setFormData((prev) => ({ ...prev, permissions: [] }))}
                 disabled={isLoading || formData.permissions.length === 0}
               >
-                Deselect all
+                {t('roles.deselectAll')}
               </Button>
             </div>
             <div className="space-y-4 rounded-lg border border-border/50 bg-muted/20 p-3 max-h-[360px] overflow-y-auto">
@@ -194,16 +196,16 @@ export function EditRoleDialog({ role, open, onOpenChange, onSave }: EditRoleDia
             disabled={isLoading}
             className="border-border/50 w-full"
           >
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button onClick={handleSave} disabled={isLoading} className="w-full">
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {isAddMode ? 'Creating...' : 'Saving...'}
+                {isAddMode ? t('common.creating') : t('common.saving')}
               </>
             ) : (
-              isAddMode ? 'Create Role' : 'Save Changes'
+              isAddMode ? t('roles.createRole') : t('roles.saveChanges')
             )}
           </Button>
         </DialogFooter>

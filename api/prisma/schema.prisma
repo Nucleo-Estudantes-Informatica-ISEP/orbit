@@ -118,6 +118,7 @@ enum SystemPermission {
   DEBTS_READ
   DEBTS_UPDATE
   DEBTS_DELETE
+  AUDITS_READ
 }
 
 enum PlanStatus {
@@ -307,9 +308,9 @@ model CandidateDepartmentChoice {
 model RecruitmentComment {
   id          String    @id @default(uuid())
   candidateId String
-  createdById String
+  createdById String?
   candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
-  createdBy   User      @relation("RecruitmentCommentCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdBy   User?     @relation("RecruitmentCommentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   content     String
   createdAt   DateTime  @default(now())
 }
@@ -395,8 +396,8 @@ model Notification {
 
 model AuditLog {
   id            String   @id @default(uuid())
-  performedById String
-  performedBy   User     @relation("AuditLogPerformedBy", fields: [performedById], references: [id], onDelete: Restrict)
+  performedById String?
+  performedBy   User?    @relation("AuditLogPerformedBy", fields: [performedById], references: [id], onDelete: SetNull)
   action        String
   entity        String
   entityId      String
@@ -412,7 +413,7 @@ model InventoryItem {
   warrantyDate  DateTime?
   photoKey      String?
   quantity      Int         @default(1)
-  purchasedBy   User?       @relation("InventoryPurchasedBy", fields: [purchasedById], references: [id])
+  purchasedBy   User?       @relation("InventoryPurchasedBy", fields: [purchasedById], references: [id], onDelete: SetNull)
   purchasedById String?
   department    Department? @relation(fields: [departmentId], references: [id])
   departmentId  String?
@@ -429,9 +430,9 @@ model Plan {
   fileKey       String?
   department    Department @relation("PlanDepartment", fields: [departmentId], references: [id])
   departmentId  String
-  createdBy     User       @relation("PlanCreatedBy", fields: [createdById], references: [id])
+  createdBy     User       @relation("PlanCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   createdById   String
-  approvedBy    User?      @relation("PlanApprovedBy", fields: [approvedById], references: [id])
+  approvedBy    User?      @relation("PlanApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
   approvedById  String?
   approvedAt    DateTime?
   rejectionNote String?

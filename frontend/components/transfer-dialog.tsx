@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { useLocale } from '@/lib/locale-context';
 import { AlertCircle, Loader2 } from 'lucide-react';
 
 interface TransferOption {
@@ -42,6 +43,7 @@ export function TransferDialog({
   isLoading = false,
   onConfirm,
 }: TransferDialogProps) {
+  const { t } = useLocale();
   const [selectedOption, setSelectedOption] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -78,19 +80,18 @@ export function TransferDialog({
         </DialogHeader>
 
         <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-3 text-sm text-amber-700 dark:text-amber-500">
-          <strong>{userCount} user{userCount !== 1 ? 's' : ''}</strong> {userCount === 1 ? 'is' : 'are'} currently associated with <strong>"{currentItemName}"</strong>. 
-          {userCount > 0 ? ' Please select where to transfer them.' : ''}
+          <strong>{userCount}</strong> {userCount === 1 ? t('transfer.userIsAssociated') : t('transfer.usersAssociated')} <strong>"{currentItemName}"</strong>.{userCount > 0 ? ` ${t('transfer.selectWhere')}` : ''}
         </div>
 
         {userCount > 0 && (
           <div className="grid gap-3">
             <div className="grid gap-2">
               <Label htmlFor="transfer-select" className="text-foreground">
-                Transfer to:
+                {t('transfer.to')}
               </Label>
               <Select value={selectedOption} onValueChange={setSelectedOption} disabled={isProcessing}>
                 <SelectTrigger id="transfer-select" className="bg-background border-border/50 focus-visible:ring-primary/50">
-                  <SelectValue placeholder="Select destination..." />
+                  <SelectValue placeholder={t('transfer.selectDestination')} />
                 </SelectTrigger>
                 <SelectContent>
                   {transferOptions.map((option) => (
@@ -111,7 +112,7 @@ export function TransferDialog({
             disabled={isProcessing}
             className="border-border/50 w-full"
           >
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             onClick={handleConfirm}
@@ -121,10 +122,10 @@ export function TransferDialog({
             {isProcessing ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Transferring...
+                {t('transfer.transferring')}
               </>
             ) : (
-              'Transfer & Delete'
+              t('transfer.transferAndDelete')
             )}
           </Button>
         </DialogFooter>

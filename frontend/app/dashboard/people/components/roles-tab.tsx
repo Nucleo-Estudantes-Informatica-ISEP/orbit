@@ -49,7 +49,7 @@ export default function RolesTab() {
       const data = await api.get<Role[]>('/roles');
       setRoles(Array.isArray(data) ? data : []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load roles');
+      setError(err instanceof Error ? err.message : t('roles.failedToLoad'));
     } finally {
       setIsLoading(false);
     }
@@ -81,7 +81,7 @@ export default function RolesTab() {
       setUserCountForRole(data.count || 0);
       setIsTransferDialogOpen(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to get user count');
+      setError(err instanceof Error ? err.message : t('roles.failedToGetUserCount'));
     } finally {
       setIsDeletingLoading(false);
     }
@@ -96,7 +96,7 @@ export default function RolesTab() {
       setIsTransferDialogOpen(false);
       setRoleToDelete(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete role');
+      setError(err instanceof Error ? err.message : t('roles.deleteError'));
     } finally {
       setIsDeletingLoading(false);
     }

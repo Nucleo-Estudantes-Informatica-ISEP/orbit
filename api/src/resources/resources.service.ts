@@ -28,18 +28,6 @@ export class ResourcesService {
           : {}),
       },
       include: this.include,
-    }).then((r) => {
-      if ((data as any).performedById) {
-        this.prisma.auditLog.create({
-          data: {
-            performedById: (data as any).performedById,
-            action: 'CREATE_RESOURCE',
-            entity: 'Resource',
-            entityId: r.id,
-          },
-        }).catch(() => {});
-      }
-      return r;
     });
   }
 

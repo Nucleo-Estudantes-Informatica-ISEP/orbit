@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   description: "Internal Operating System",
   icons: {
     icon: "/favicon.svg",
-    apple: "/logo-extended.svg",
+    apple: "/favicon.svg",
   },
 };
 

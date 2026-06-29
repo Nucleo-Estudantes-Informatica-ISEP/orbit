@@ -18,8 +18,8 @@ export class InventoryService {
   };
 
   async create(dto: CreateInventoryItemDto) {
-    const { performedById, value, purchaseDate, warrantyDate, ...rest } = dto;
-    const item = await this.prisma.inventoryItem.create({
+    const { value, purchaseDate, warrantyDate, ...rest } = dto;
+    return this.prisma.inventoryItem.create({
       data: {
         ...rest,
         value: new Decimal(value),
@@ -28,12 +28,6 @@ export class InventoryService {
       },
       include: this.include,
     });
-    if (performedById) {
-      this.prisma.auditLog.create({
-        data: { performedById, action: 'CREATE_INVENTORY_ITEM', entity: 'InventoryItem', entityId: item.id },
-      }).catch(() => {});
-    }
-    return item;
   }
 
   findAll() {
