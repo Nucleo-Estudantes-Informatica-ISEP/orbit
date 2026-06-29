@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Plus, Trash2, Pencil, ExternalLink, Upload, X, FileText, TrendingUp, TrendingDown, CreditCard } from 'lucide-react';
+import { Plus, Trash2, Pencil, ExternalLink, Upload, X, FileText, TrendingUp, TrendingDown, CreditCard, FileDown } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -76,6 +77,31 @@ export default function DebtsPage() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportParams, setExportParams] = useState({
+    dateFrom: '',
+    dateTo: '',
+    type: 'ALL' as 'ALL' | 'INCOME' | 'OUTCOME',
+    status: 'ALL' as 'ALL' | 'PENDING' | 'COMPLETED',
+    sortBy: 'occurredAt' as 'occurredAt' | 'value' | 'createdAt',
+    sortDir: 'desc' as 'asc' | 'desc',
+    groupBy: 'none' as 'none' | 'type' | 'status' | 'month',
+    includeSummary: true,
+    columns: {
+      description: true,
+      value: true,
+      type: true,
+      status: true,
+      date: true,
+      debtor: true,
+      creditor: true,
+      accounts: true,
+      files: true,
+      createdBy: true,
+      createdAt: true,
+    },
+  });
 
   const toDateInputValue = (value?: string | null) => (value ? new Date(value).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
 
@@ -201,6 +227,135 @@ export default function DebtsPage() {
     }
   };
 
+  const handleExport = () => {
+    let data = [...debts];
+
+    if (exportParams.dateFrom) {
+      data = data.filter((d) => new Date(d.occurredAt) >= new Date(exportParams.dateFrom));
+    }
+    if (exportParams.dateTo) {
+      const to = new Date(exportParams.dateTo);
+      to.setHours(23, 59, 59, 999);
+      data = data.filter((d) => new Date(d.occurredAt) <= to);
+    }
+    if (exportParams.type !== 'ALL') {
+      data = data.filter((d) => d.type === exportParams.type);
+    }
+    if (exportParams.status !== 'ALL') {
+      data = data.filter((d) => d.status === exportParams.status);
+    }
+
+    data.sort((a, b) => {
+      const dir = exportParams.sortDir === 'asc' ? 1 : -1;
+      if (exportParams.sortBy === 'value') return (Number(a.value) - Number(b.value)) * dir;
+      return (new Date(a[exportParams.sortBy]).getTime() - new Date(b[exportParams.sortBy]).getTime()) * dir;
+    });
+
+    if (data.length === 0) {
+      toast.error(t('debts.exportNoData'));
+      return;
+    }
+
+    if (exportParams.groupBy !== 'none') {
+      const groups = new Map<string, Debt[]>();
+      for (const d of data) {
+        let key = '';
+        if (exportParams.groupBy === 'type') key = d.type === 'INCOME' ? t('debts.income') : t('debts.outcome');
+        else if (exportParams.groupBy === 'status') key = d.status === 'COMPLETED' ? t('debts.statusCompleted') : t('debts.statusPending');
+        else if (exportParams.groupBy === 'month') key = new Date(d.occurredAt).toLocaleString('pt-PT', { year: 'numeric', month: 'long' });
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key)!.push(d);
+      }
+
+      const wsData: any[][] = [];
+      const cols = buildColumns();
+
+      wsData.push(cols);
+      let grandTotal = 0;
+      for (const [groupKey, items] of groups) {
+        wsData.push([`${groupKey}`, ...Array(cols.length - 1).fill('')]);
+        let groupTotal = 0;
+        for (const d of items) {
+          const row = buildRow(d);
+          wsData.push(row);
+          groupTotal += Number(d.value);
+        }
+        if (exportParams.includeSummary) {
+          wsData.push([t('debts.exportGroupTotal'), formatCurrency(groupTotal), ...Array(cols.length - 2).fill('')]);
+          grandTotal += groupTotal;
+        }
+        wsData.push([]);
+      }
+      if (exportParams.includeSummary) {
+        wsData.push([t('debts.exportGrandTotal'), formatCurrency(grandTotal)]);
+      }
+
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      colWidths(ws, cols);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, t('debts.title'));
+      XLSX.writeFile(wb, `dividas_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      setExportOpen(false);
+      return;
+    }
+
+    const cols = buildColumns();
+    const rows = data.map((d) => buildRow(d));
+    const wsData = [cols, ...rows];
+
+    if (exportParams.includeSummary) {
+      const total = data.reduce((s, d) => s + Number(d.value), 0);
+      wsData.push([]);
+      wsData.push([t('debts.exportGrandTotal'), formatCurrency(total)]);
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    colWidths(ws, cols);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, t('debts.title'));
+    XLSX.writeFile(wb, `dividas_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    setExportOpen(false);
+  };
+
+  const buildColumns = () => {
+    const c = exportParams.columns;
+    const cols: string[] = [];
+    if (c.description) cols.push(t('debts.exportColDescription'));
+    if (c.value) cols.push(t('debts.exportColValue'));
+    if (c.type) cols.push(t('debts.exportColType'));
+    if (c.status) cols.push(t('debts.exportColStatus'));
+    if (c.date) cols.push(t('debts.exportColDate'));
+    if (c.debtor) cols.push(t('debts.exportColDebtor'));
+    if (c.creditor) cols.push(t('debts.exportColCreditor'));
+    if (c.accounts) cols.push(t('debts.exportColAccounts'));
+    if (c.files) cols.push(t('debts.exportColFiles'));
+    if (c.createdBy) cols.push(t('debts.exportColCreatedBy'));
+    if (c.createdAt) cols.push(t('debts.exportColCreatedAt'));
+    return cols;
+  };
+
+  const buildRow = (d: Debt) => {
+    const c = exportParams.columns;
+    const row: (string | number)[] = [];
+    if (c.description) row.push(d.description);
+    if (c.value) row.push(Number(d.value));
+    if (c.type) row.push(d.type === 'INCOME' ? t('debts.income') : t('debts.outcome'));
+    if (c.status) row.push(d.status === 'COMPLETED' ? t('debts.statusCompleted') : t('debts.statusPending'));
+    if (c.date) row.push(new Date(d.occurredAt).toLocaleDateString('pt-PT'));
+    if (c.debtor) row.push(d.debtorName || (d.debtorContact ? `(${d.debtorContact})` : '—'));
+    if (c.creditor) row.push(d.creditorName || (d.creditorContact ? `(${d.creditorContact})` : '—'));
+    if (c.accounts) row.push([d.receivingAccount, d.depositAccount].filter(Boolean).join(' / ') || '—');
+    if (c.files) row.push((d.fileKeys ?? []).length > 0 ? d.fileKeys.length.toString() : '—');
+    if (c.createdBy) row.push(d.createdBy?.name || '—');
+    if (c.createdAt) row.push(new Date(d.createdAt).toLocaleDateString('pt-PT'));
+    return row;
+  };
+
+  const colWidths = (ws: XLSX.WorkSheet, cols: string[]) => {
+    const wscols = cols.map((h) => ({ wch: Math.max(h.length * 2, 12) }));
+    ws['!cols'] = wscols;
+  };
+
   const formatCurrency = (v: number) =>
     new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(v);
 
@@ -211,11 +366,16 @@ export default function DebtsPage() {
           <h1 className="text-2xl font-bold tracking-tight">{t('debts.title')}</h1>
           <p className="text-muted-foreground text-sm mt-1">{t('debts.subtitle')}</p>
         </div>
-        {canCreate && (
-          <Button onClick={openCreate}>
-            <Plus className="mr-2 h-4 w-4" />{t('debts.newDebt')}
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setExportOpen(true)}>
+            <FileDown className="mr-2 h-4 w-4" />{t('debts.export')}
           </Button>
-        )}
+          {canCreate && (
+            <Button onClick={openCreate}>
+              <Plus className="mr-2 h-4 w-4" />{t('debts.newDebt')}
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Summary cards */}
@@ -477,6 +637,132 @@ export default function DebtsPage() {
             <Button variant="outline" onClick={() => setModalOpen(false)}>{t('debts.cancel')}</Button>
             <Button onClick={handleSave} disabled={saving || uploading}>
               {saving ? t('debts.creating') : editTarget ? t('debts.save') : t('debts.create')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={exportOpen} onOpenChange={setExportOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t('debts.exportDialogTitle')}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>{t('debts.exportDateFrom')}</Label>
+                <Input type="date" value={exportParams.dateFrom} onChange={(e) => setExportParams((p) => ({ ...p, dateFrom: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t('debts.exportDateTo')}</Label>
+                <Input type="date" value={exportParams.dateTo} onChange={(e) => setExportParams((p) => ({ ...p, dateTo: e.target.value }))} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>{t('debts.exportColType')}</Label>
+                <Select value={exportParams.type} onValueChange={(v) => setExportParams((p) => ({ ...p, type: v as 'ALL' | 'INCOME' | 'OUTCOME' }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">{t('debts.filterAll')}</SelectItem>
+                    <SelectItem value="INCOME">{t('debts.income')}</SelectItem>
+                    <SelectItem value="OUTCOME">{t('debts.outcome')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t('debts.exportColStatus')}</Label>
+                <Select value={exportParams.status} onValueChange={(v) => setExportParams((p) => ({ ...p, status: v as 'ALL' | 'PENDING' | 'COMPLETED' }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">{t('debts.filterAll')}</SelectItem>
+                    <SelectItem value="PENDING">{t('debts.statusPending')}</SelectItem>
+                    <SelectItem value="COMPLETED">{t('debts.statusCompleted')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>{t('debts.exportSortBy')}</Label>
+                <Select value={exportParams.sortBy} onValueChange={(v) => setExportParams((p) => ({ ...p, sortBy: v as 'occurredAt' | 'value' | 'createdAt' }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="occurredAt">{t('debts.exportColDate')}</SelectItem>
+                    <SelectItem value="value">{t('debts.exportColValue')}</SelectItem>
+                    <SelectItem value="createdAt">{t('debts.exportColCreatedAt')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t('debts.exportSortDir')}</Label>
+                <Select value={exportParams.sortDir} onValueChange={(v) => setExportParams((p) => ({ ...p, sortDir: v as 'asc' | 'desc' }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="desc">{t('debts.exportDesc')}</SelectItem>
+                    <SelectItem value="asc">{t('debts.exportAsc')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t('debts.exportGroupBy')}</Label>
+                <Select value={exportParams.groupBy} onValueChange={(v) => setExportParams((p) => ({ ...p, groupBy: v as any }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">{t('debts.exportGroupNone')}</SelectItem>
+                    <SelectItem value="type">{t('debts.exportGroupType')}</SelectItem>
+                    <SelectItem value="status">{t('debts.exportGroupStatus')}</SelectItem>
+                    <SelectItem value="month">{t('debts.exportGroupMonth')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>{t('debts.exportColumns')}</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 rounded-lg border border-border/40 p-3">
+                {[
+                  { key: 'description', label: t('debts.exportColDescription') },
+                  { key: 'value', label: t('debts.exportColValue') },
+                  { key: 'type', label: t('debts.exportColType') },
+                  { key: 'status', label: t('debts.exportColStatus') },
+                  { key: 'date', label: t('debts.exportColDate') },
+                  { key: 'debtor', label: t('debts.exportColDebtor') },
+                  { key: 'creditor', label: t('debts.exportColCreditor') },
+                  { key: 'accounts', label: t('debts.exportColAccounts') },
+                  { key: 'files', label: t('debts.exportColFiles') },
+                  { key: 'createdBy', label: t('debts.exportColCreatedBy') },
+                  { key: 'createdAt', label: t('debts.exportColCreatedAt') },
+                ].map(({ key, label }) => (
+                  <label key={key} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={exportParams.columns[key as keyof typeof exportParams.columns]}
+                      onChange={(e) => setExportParams((p) => ({ ...p, columns: { ...p.columns, [key]: e.target.checked } }))}
+                      className="rounded border-border/40 accent-primary"
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={exportParams.includeSummary}
+                onChange={(e) => setExportParams((p) => ({ ...p, includeSummary: e.target.checked }))}
+                className="rounded border-border/40 accent-primary"
+              />
+              {t('debts.exportIncludeSummary')}
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExportOpen(false)}>{t('debts.cancel')}</Button>
+            <Button onClick={handleExport}>
+              <FileDown className="mr-2 h-4 w-4" />{t('debts.exportDownload')}
             </Button>
           </DialogFooter>
         </DialogContent>

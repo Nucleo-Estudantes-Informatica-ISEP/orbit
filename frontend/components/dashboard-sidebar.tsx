@@ -283,7 +283,7 @@ export function DashboardSidebar({
                 </div>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align={isCollapsed ? 'center' : 'start'} className="w-56" sideOffset={4}>
+            <DropdownMenuContent side={isCollapsed ? 'right' : 'bottom'} align={isCollapsed ? 'end' : 'start'} className="w-56 mb-1" sideOffset={8}>
               <div className="px-2 py-1.5 text-sm">
                 <p className="font-semibold">{userName}</p>
               </div>
