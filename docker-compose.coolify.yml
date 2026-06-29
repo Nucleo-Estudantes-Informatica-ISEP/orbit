@@ -27,7 +27,7 @@ services:
       context: ./api
       dockerfile: Dockerfile
     restart: unless-stopped
-    command: sh -c "npx prisma migrate deploy && node dist/main"
+    command: sh -c "npx prisma migrate deploy && node dist/src/main"
     environment:
       NODE_ENV: production
       PORT: "3000"

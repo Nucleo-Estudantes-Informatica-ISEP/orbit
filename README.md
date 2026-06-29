@@ -101,7 +101,7 @@ Configurável via variáveis de ambiente:
 
 ### Render
 
-A API corre como `node dist/main` após build. O Prisma migrate é executado no startup command.
+A API corre como `node dist/src/main` após build. O Prisma migrate é executado no startup command.
 
 ---
 
