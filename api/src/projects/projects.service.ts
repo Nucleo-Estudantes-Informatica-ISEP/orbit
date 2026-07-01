@@ -47,6 +47,9 @@ export class ProjectsService {
 
   update(id: string, data: any) {
     const { performedById, ...updateData } = data as any;
+    if (updateData.deadline && typeof updateData.deadline === 'string') {
+      updateData.deadline = new Date(updateData.deadline);
+    }
     return this.prisma.project.update({ where: { id }, data: updateData, include: this.include });
   }
 

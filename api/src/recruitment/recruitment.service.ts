@@ -13,7 +13,7 @@ export class RecruitmentService {
   };
 
   create(data: any) {
-    const { departmentChoices, ...createData } = data;
+    const { performedById, departmentChoices, ...createData } = data;
     return this.prisma.candidate.create({
       data: {
         ...createData,
@@ -36,7 +36,7 @@ export class RecruitmentService {
   }
 
   async update(id: string, data: any) {
-    const { departmentChoices, ...updateData } = data;
+    const { performedById, departmentChoices, ...updateData } = data;
     if (departmentChoices) {
       await this.prisma.candidateDepartmentChoice.deleteMany({ where: { candidateId: id } });
       if (departmentChoices.length) {
