@@ -12,6 +12,7 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3000
+      - APP_URL=http://localhost:3090
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/orbit?schema=public
       - MINIO_ENDPOINT=minio
       - MINIO_PORT=9000
@@ -19,6 +20,12 @@ services:
       - MINIO_ACCESS_KEY=minioadmin
       - MINIO_SECRET_KEY=minioadmin
       - MINIO_BUCKET=orbit
+      - SMTP_HOST=mail.nei-isep.org
+      - SMTP_PORT=465
+      - SMTP_SECURE=true
+      - SMTP_USER=noreply@nei-isep.org
+      - SMTP_PASS=${SMTP_PASS:?Set SMTP_PASS in .env}
+      - SMTP_FROM=ORBIT <noreply@nei-isep.org>
     depends_on:
       - db
       - minio

@@ -7,8 +7,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, LogIn, Mail, AlertCircle } from "lucide-react";
+import { ArrowLeft, LogIn, Mail, AlertCircle, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
+import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import LoadingScreen from '@/components/ui/loading-screen';
 import SplashScreen from '@/components/ui/splash-screen';
@@ -22,14 +23,34 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [resetSent, setResetSent] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showSplash, setShowSplash] = useState(false);
+
+  const exitResetMode = () => {
+    setIsResetMode(false);
+    setError("");
+    setResetSent(false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    setIsLoading(true);
 
+    if (isResetMode) {
+      setIsLoading(true);
+      try {
+        await api.post("/auth/forgot-password", { email });
+        setResetSent(true);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : t('login.resetError'));
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    setIsLoading(true);
     try {
       await login(email, password);
       setShowSplash(true);
@@ -75,19 +96,27 @@ export default function LoginPage() {
           </CardTitle>
           <CardDescription className="text-base text-muted-foreground">
             {isResetMode
-              ? t('login.resetDescription')
+              ? resetSent
+                ? t('login.resetSentDescription')
+                : t('login.resetDescription')
               : t('login.workspaceDescription')}
           </CardDescription>
         </CardHeader>
 
         <CardContent>
-          {error && !isResetMode && (
+          {error && (
             <div className="mb-4 flex items-center gap-3 rounded-lg bg-red-50 p-3 text-sm text-red-800 border border-red-200">
               <AlertCircle className="h-4 w-4 flex-shrink-0" />
               <span>{error}</span>
             </div>
           )}
-          
+
+          {isResetMode && resetSent ? (
+            <div className="flex flex-col items-center gap-3 py-4 text-center">
+              <CheckCircle2 className="h-10 w-10 text-emerald-500" />
+              <p className="text-sm text-muted-foreground">{t('login.resetSent')}</p>
+            </div>
+          ) : (
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2.5">
               <Label htmlFor="email" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -98,7 +127,7 @@ export default function LoginPage() {
                 type="email"
                 placeholder="name@nei-isep.org"
                 required
-                disabled={isLoading || authLoading || isResetMode}
+                disabled={isLoading || authLoading}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="h-11 bg-background"
@@ -118,6 +147,7 @@ export default function LoginPage() {
                     onClick={() => {
                       setIsResetMode(true);
                       setError("");
+                      setResetSent(false);
                     }}
                   >
                     {t('login.forgotPassword')}
@@ -139,7 +169,7 @@ export default function LoginPage() {
             <Button
               type="submit"
               className="w-full h-11 text-base text-primary-foreground mt-4 shadow-sm text-black"
-              disabled={isLoading || authLoading || isResetMode}
+              disabled={isLoading || authLoading}
             >
               {isLoading || authLoading ? (
                 <div className="flex items-center gap-2">
@@ -159,6 +189,7 @@ export default function LoginPage() {
               )}
             </Button>
           </form>
+          )}
         </CardContent>
 
         {/* Removed mt-2 and rounded-b-xl, pb-0 on parent Card fixes the spacing */}
@@ -168,10 +199,7 @@ export default function LoginPage() {
               type="button"
               variant="ghost"
               className="w-full text-sm text-muted-foreground hover:text-foreground"
-              onClick={() => {
-                setIsResetMode(false);
-                setError("");
-              }}
+              onClick={exitResetMode}
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
               {t('login.backToLogin')}

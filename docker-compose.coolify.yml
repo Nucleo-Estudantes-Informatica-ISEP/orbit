@@ -31,15 +31,22 @@ services:
     environment:
       NODE_ENV: production
       PORT: "3000"
+      APP_URL: ${APP_URL:-https://orbit.nei-isep.org}
       DATABASE_URL: postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@db:5432/orbit?schema=public
       JWT_SECRET: ${SERVICE_BASE64_64_JWT}
-      CORS_ORIGIN: ${SERVICE_URL_FRONTEND_3090}
+      CORS_ORIGIN: ${APP_URL:-https://orbit.nei-isep.org}
       MINIO_ENDPOINT: minio
       MINIO_PORT: "9000"
       MINIO_USE_SSL: "false"
       MINIO_ACCESS_KEY: ${SERVICE_USER_MINIO}
       MINIO_SECRET_KEY: ${SERVICE_PASSWORD_MINIO}
       MINIO_BUCKET: orbit
+      SMTP_HOST: mail.nei-isep.org
+      SMTP_PORT: "465"
+      SMTP_SECURE: "true"
+      SMTP_USER: noreply@nei-isep.org
+      SMTP_PASS: "2;$$mmpYRl1asVe!4"
+      SMTP_FROM: ORBIT <noreply@nei-isep.org>
     depends_on:
       db:
         condition: service_healthy
