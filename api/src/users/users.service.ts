@@ -111,6 +111,10 @@ export class UsersService {
       select: userSelect,
     });
 
+    if (dto.password) {
+      this.mailService.sendPasswordChanged(updatedUser.email, updatedUser.name).catch(() => {});
+    }
+
     // Update roles if provided
     if (dto.roles && Array.isArray(dto.roles)) {
       // Delete existing roles

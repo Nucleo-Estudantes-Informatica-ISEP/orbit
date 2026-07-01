@@ -67,7 +67,7 @@ export class PlansService {
       data: { status: 'APPROVED', approvedById, approvedAt: new Date() },
       include: this.include,
     });
-    this.notifyPlanCreator(plan.createdById, plan.title, 'APROVADO').catch(() => {});
+    this.notifyPlanCreator(plan.createdById, plan.name, 'APROVADO').catch(() => {});
     return result;
   }
 
@@ -82,7 +82,7 @@ export class PlansService {
       data: { status: 'REJECTED', approvedById, approvedAt: new Date(), rejectionNote: rejectionNote ?? null },
       include: this.include,
     });
-    this.notifyPlanCreator(plan.createdById, plan.title, 'REJEITADO').catch(() => {});
+    this.notifyPlanCreator(plan.createdById, plan.name, 'REJEITADO').catch(() => {});
     return result;
   }
 

@@ -201,4 +201,40 @@ export class MailService {
 
     await this.transporter.sendMail({ from: this.from, to, subject, text, html });
   }
+
+  async sendPasswordChanged(to: string, userName: string) {
+    const subject = 'ORBIT — Palavra-passe alterada';
+    const text = [
+      `Olá ${userName},`,
+      '',
+      'A palavra-passe da tua conta ORBIT foi alterada com sucesso.',
+      '',
+      'Se não foste tu a fazer esta alteração, contacta o administrador do sistema imediatamente.',
+      '',
+      'Acede em: https://orbit.nei-isep.org',
+    ].join('\n');
+
+    const html = `
+      <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto; color: #111;">
+        <h2 style="font-size: 18px;">Palavra-passe alterada</h2>
+        <p>Olá <strong>${userName}</strong>,</p>
+        <p>A palavra-passe da tua conta ORBIT foi alterada com sucesso.</p>
+        <div style="border: 1px solid #fbbf24; background: #fffbeb; border-radius: 8px; padding: 16px; margin: 16px 0;">
+          <p style="margin: 0; font-size: 13px; color: #92400e;">
+            <strong>⚠ Atenção:</strong> Se não foste tu a fazer esta alteração, contacta o administrador do sistema imediatamente.
+          </p>
+        </div>
+        <a href="https://orbit.nei-isep.org" style="display: inline-block; padding: 10px 18px; background: #111; color: #fff; text-decoration: none; border-radius: 6px;">
+          Aceder ao ORBIT
+        </a>
+      </div>
+    `;
+
+    if (!this.transporter) {
+      this.logger.log(`[DEV] Password changed notification for ${userName} <${to}>`);
+      return;
+    }
+
+    await this.transporter.sendMail({ from: this.from, to, subject, text, html });
+  }
 }
