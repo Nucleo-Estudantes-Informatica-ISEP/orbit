@@ -31,10 +31,10 @@ services:
     environment:
       NODE_ENV: production
       PORT: "3000"
-      APP_URL: ${SERVICE_URL_FRONTEND_3090}
+      APP_URL: ${APP_URL:-https://orbit.nei-isep.org}
       DATABASE_URL: postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@db:5432/orbit?schema=public
       JWT_SECRET: ${SERVICE_BASE64_64_JWT}
-      CORS_ORIGIN: ${SERVICE_URL_FRONTEND_3090}
+      CORS_ORIGIN: ${APP_URL:-https://orbit.nei-isep.org}
       MINIO_ENDPOINT: minio
       MINIO_PORT: "9000"
       MINIO_USE_SSL: "false"
@@ -45,7 +45,7 @@ services:
       SMTP_PORT: "465"
       SMTP_SECURE: "true"
       SMTP_USER: noreply@nei-isep.org
-      SMTP_PASS: ${SMTP_PASS:?Set SMTP_PASS in Coolify environment}
+      SMTP_PASS: "2;$$mmpYRl1asVe!4"
       SMTP_FROM: ORBIT <noreply@nei-isep.org>
     depends_on:
       db:
