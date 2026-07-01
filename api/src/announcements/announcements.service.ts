@@ -222,7 +222,7 @@ export class AnnouncementsService {
   }
 
   async update(id: string, data: any) {
-    const { departmentIds, targetUserIds, ...updateData } = data;
+    const { performedById, departmentIds, targetUserIds, ...updateData } = data;
     return this.prisma.$transaction(async (tx) => {
       if (departmentIds !== undefined) {
         await tx.announcementDepartment.deleteMany({ where: { announcementId: id } });
