@@ -30,6 +30,44 @@ export class MailService {
     return process.env.SMTP_FROM || 'ORBIT <noreply@nei-isep.org>';
   }
 
+  async sendWelcomeEmail(to: string, name: string, password: string) {
+    const subject = 'Bem-vindo ao ORBIT — as tuas credenciais de acesso';
+    const text = [
+      `Olá ${name},`,
+      '',
+      'A tua conta ORBIT foi criada com sucesso.',
+      '',
+      `Email: ${to}`,
+      `Password: ${password}`,
+      '',
+      'Recomendamos que alteres a tua palavra-passe após o primeiro login.',
+      'Acede em: https://orbit.nei-isep.org',
+    ].join('\n');
+
+    const html = `
+      <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto; color: #111;">
+        <h2 style="font-size: 18px;">Bem-vindo ao ORBIT</h2>
+        <p>Olá <strong>${name}</strong>,</p>
+        <p>A tua conta ORBIT foi criada com sucesso.</p>
+        <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+          <tr><td style="padding: 6px 12px; color: #555;">Email</td><td style="padding: 6px 12px; font-weight: 600;">${to}</td></tr>
+          <tr><td style="padding: 6px 12px; color: #555;">Password</td><td style="padding: 6px 12px; font-weight: 600;">${password}</td></tr>
+        </table>
+        <p style="font-size: 13px; color: #777;">Recomendamos que alteres a tua palavra-passe após o primeiro login.</p>
+        <a href="https://orbit.nei-isep.org" style="display: inline-block; padding: 10px 18px; background: #111; color: #fff; text-decoration: none; border-radius: 6px;">
+          Aceder ao ORBIT
+        </a>
+      </div>
+    `;
+
+    if (!this.transporter) {
+      this.logger.log(`[DEV] Welcome email for ${name} <${to}> — password: ${password}`);
+      return;
+    }
+
+    await this.transporter.sendMail({ from: this.from, to, subject, text, html });
+  }
+
   async sendPasswordReset(to: string, resetUrl: string) {
     const subject = 'ORBIT — Repor palavra-passe';
     const text = [

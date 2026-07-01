@@ -110,15 +110,13 @@ export default function AuditLogsPage() {
               </Table>
             </div>
 
-            {totalPages > 1 && (
-              <Pagination
-                page={page}
-                pageSize={pageSize}
-                total={logs.length}
-                onPageChange={setPage}
-                onPageSizeChange={setPageSize}
-              />
-            )}
+            <Pagination
+              page={page}
+              pageSize={pageSize}
+              total={logs.length}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
           </>
         )}
       </CardContent>

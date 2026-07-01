@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/commo
 import { PrismaService } from '../prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { MailService } from '../mail/mail.service';
 import * as bcrypt from 'bcryptjs';
 
 const CRITICAL_PERMISSIONS = ['USERS_CREATE', 'USERS_UPDATE', 'ROLES_CREATE', 'ROLES_UPDATE'];
@@ -36,7 +37,10 @@ const userSelect = {
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private mailService: MailService,
+  ) {}
 
   async create(dto: CreateUserDto) {
     const hashed = await bcrypt.hash(dto.password, 10);
@@ -50,6 +54,8 @@ export class UsersService {
       },
       select: userSelect,
     });
+
+    this.mailService.sendWelcomeEmail(dto.email, dto.name, dto.password).catch(() => {});
 
     if (dto.roles?.length) {
       const roles = await this.prisma.role.findMany({

@@ -14,6 +14,7 @@ import { useLocale } from '@/lib/locale-context';
 import { api } from '@/lib/api';
 import { EditDepartmentDialog } from '@/components/edit-department-dialog';
 import { TransferDialog } from '@/components/transfer-dialog';
+import { DeleteConfirmDialog } from '@/components/delete-confirm-dialog';
 
 interface Department {
   id: string;
@@ -29,6 +30,7 @@ export default function DepartmentsTab() {
   const [isDepartmentDialogOpen, setIsDepartmentDialogOpen] = useState(false);
   const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
   const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [departmentToDelete, setDepartmentToDelete] = useState<Department | null>(null);
   const [userCountForDepartment, setUserCountForDepartment] = useState(0);
   const [isDeletingLoading, setIsDeletingLoading] = useState(false);
@@ -88,7 +90,11 @@ export default function DepartmentsTab() {
     try {
       const data = await api.get<{ count: number }>(`/departments/${department.id}/users/count`);
       setUserCountForDepartment(data.count ?? 0);
-      setIsTransferDialogOpen(true);
+      if (data.count > 0) {
+        setIsTransferDialogOpen(true);
+      } else {
+        setIsDeleteConfirmOpen(true);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : t('common.saveError'));
     } finally {
@@ -103,6 +109,21 @@ export default function DepartmentsTab() {
       await api.post(`/departments/${departmentToDelete.id}/transfer-and-delete`, { destinationDepartmentId });
       setDepartments((cur) => cur.filter((d) => d.id !== departmentToDelete.id));
       setIsTransferDialogOpen(false);
+      setDepartmentToDelete(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('common.deleteError'));
+    } finally {
+      setIsDeletingLoading(false);
+    }
+  };
+
+  const handleDirectDelete = async () => {
+    if (!departmentToDelete) return;
+    setIsDeletingLoading(true);
+    try {
+      await api.del(`/departments/${departmentToDelete.id}`);
+      setDepartments((cur) => cur.filter((d) => d.id !== departmentToDelete.id));
+      setIsDeleteConfirmOpen(false);
       setDepartmentToDelete(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('common.deleteError'));
@@ -226,6 +247,16 @@ export default function DepartmentsTab() {
           .map((d) => ({ id: d.id, name: d.name }))}
         isLoading={isDeletingLoading}
         onConfirm={handleTransferAndDelete}
+      />
+
+      <DeleteConfirmDialog
+        open={isDeleteConfirmOpen}
+        onOpenChange={setIsDeleteConfirmOpen}
+        title={t('departments.confirmDelete')}
+        description={t('departments.confirmDeleteDescription')}
+        itemName={departmentToDelete?.name}
+        isLoading={isDeletingLoading}
+        onConfirm={handleDirectDelete}
       />
     </Card>
   );

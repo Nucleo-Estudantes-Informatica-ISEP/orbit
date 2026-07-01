@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Briefcase, Calendar, CheckSquare, ArrowRight, Clock, Megaphone, CreditCard,
+  TrendingUp, TrendingDown,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
@@ -49,9 +50,12 @@ interface Project {
 }
 
 interface Debt {
+  id: string;
   value: string | number;
   status: 'PENDING' | 'COMPLETED';
   type: 'INCOME' | 'OUTCOME';
+  description?: string;
+  createdAt: string;
 }
 
 const priorityColors: Record<string, string> = {
@@ -108,11 +112,13 @@ export default function DashboardPage() {
     });
   }, [user]);
 
-  const pendingDebts = debts.filter((debt) => debt.status !== 'COMPLETED');
-  const debtBalance = pendingDebts.reduce((sum, debt) => {
-    const value = Number(debt.value);
-    return sum + (debt.type === 'INCOME' ? value : -value);
-  }, 0);
+  const totalIncome = debts.filter((d) => d.type === 'INCOME').reduce((s, d) => s + Number(d.value), 0);
+  const totalOutcome = debts.filter((d) => d.type === 'OUTCOME').reduce((s, d) => s + Number(d.value), 0);
+  const debtBalance = totalIncome - totalOutcome;
+  const pendingCount = debts.filter((d) => d.status === 'PENDING').length;
+  const completedCount = debts.filter((d) => d.status === 'COMPLETED').length;
+  const maxFlow = Math.max(totalIncome, totalOutcome, 1);
+  const recentDebts = [...debts].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 5);
 
   const formatCurrency = (value: number) => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(value);
 
@@ -335,6 +341,111 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {canViewDebts && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+          {/* Income vs Outcome */}
+          <Card className="bg-background shadow-sm border-border/40">
+            <CardHeader>
+              <CardTitle className="text-sm">{t('dashboard.incomeOutcome')}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {loading ? (
+                <Skeleton className="h-20 w-full" />
+              ) : (
+                <>
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-green-500 font-medium">{t('debts.income')}</span>
+                      <span className="text-green-500 font-semibold">{formatCurrency(totalIncome)}</span>
+                    </div>
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${(totalIncome / maxFlow) * 100}%` }} />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-destructive font-medium">{t('debts.outcome')}</span>
+                      <span className="text-destructive font-semibold">{formatCurrency(totalOutcome)}</span>
+                    </div>
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full bg-destructive rounded-full transition-all" style={{ width: `${(totalOutcome / maxFlow) * 100}%` }} />
+                    </div>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Status breakdown */}
+          <Card className="bg-background shadow-sm border-border/40">
+            <CardHeader>
+              <CardTitle className="text-sm">{t('dashboard.debtStatus')}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {loading ? (
+                <Skeleton className="h-20 w-full" />
+              ) : (
+                <>
+                  <div className="flex items-center gap-3">
+                    <TrendingUp className="h-8 w-8 text-amber-500 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-muted-foreground">{t('debts.statusPending')}</p>
+                      <p className="text-lg font-bold">{pendingCount}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <CheckSquare className="h-8 w-8 text-emerald-500 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-muted-foreground">{t('debts.statusCompleted')}</p>
+                      <p className="text-lg font-bold">{completedCount}</p>
+                    </div>
+                  </div>
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                    <div className="h-full bg-amber-500 rounded-full transition-all" style={{ width: `${debts.length > 0 ? (pendingCount / debts.length) * 100 : 0}%` }} />
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Recent debts */}
+          <Card className="bg-background shadow-sm border-border/40">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-sm">{t('dashboard.recentDebts')}</CardTitle>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/dashboard/debts">
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-1.5">
+              {loading ? (
+                Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />)
+              ) : recentDebts.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">{t('dashboard.noDebts')}</p>
+              ) : (
+                recentDebts.map((d) => (
+                  <div key={d.id} className="flex items-center gap-2 py-1.5">
+                    {d.type === 'INCOME' ? (
+                      <TrendingUp className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                    ) : (
+                      <TrendingDown className="h-3.5 w-3.5 text-destructive shrink-0" />
+                    )}
+                    <span className="text-xs flex-1 truncate">{d.description || d.id.slice(0, 8)}</span>
+                    <span className={`text-xs font-semibold ${d.type === 'INCOME' ? 'text-green-500' : 'text-destructive'}`}>
+                      {d.type === 'OUTCOME' ? '−' : '+'}{formatCurrency(Number(d.value))}
+                    </span>
+                    <Badge variant={d.status === 'COMPLETED' ? 'default' : 'secondary'} className="text-[9px] h-4 px-1">
+                      {d.status === 'COMPLETED' ? (t('debts.statusCompleted').slice(0, 3)) : (t('debts.statusPending').slice(0, 3))}
+                    </Badge>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
