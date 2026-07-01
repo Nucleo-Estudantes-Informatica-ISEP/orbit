@@ -46,6 +46,7 @@ export class UsersService {
         email: dto.email,
         password: hashed,
         departmentId: dto.departmentId,
+        ...(dto.status ? { status: dto.status } : {}),
       },
       select: userSelect,
     });

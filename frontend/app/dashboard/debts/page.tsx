@@ -120,9 +120,8 @@ export default function DebtsPage() {
 
   const filtered = filter === 'ALL' ? debts : debts.filter((d) => d.type === filter);
 
-  const pendingDebts = debts.filter((d) => d.status !== 'COMPLETED');
-  const totalIncome = pendingDebts.filter((d) => d.type === 'INCOME').reduce((s, d) => s + Number(d.value), 0);
-  const totalOutcome = pendingDebts.filter((d) => d.type === 'OUTCOME').reduce((s, d) => s + Number(d.value), 0);
+  const totalIncome = debts.filter((d) => d.type === 'INCOME').reduce((s, d) => s + Number(d.value), 0);
+  const totalOutcome = debts.filter((d) => d.type === 'OUTCOME').reduce((s, d) => s + Number(d.value), 0);
 
   const openCreate = () => {
     setEditTarget(null);

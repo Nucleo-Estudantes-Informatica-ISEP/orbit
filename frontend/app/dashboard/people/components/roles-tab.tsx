@@ -32,8 +32,8 @@ export default function RolesTab() {
   const [error, setError] = useState('');
   const [isRoleDialogOpen, setIsRoleDialogOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
   const [userCountForRole, setUserCountForRole] = useState(0);
   const [isDeletingLoading, setIsDeletingLoading] = useState(false);
@@ -79,7 +79,11 @@ export default function RolesTab() {
     try {
       const data = await api.get<{ count: number }>(`/roles/${role.id}/users/count`);
       setUserCountForRole(data.count || 0);
-      setIsTransferDialogOpen(true);
+      if (data.count > 0) {
+        setIsTransferDialogOpen(true);
+      } else {
+        setIsDeleteConfirmOpen(true);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : t('roles.failedToGetUserCount'));
     } finally {
@@ -94,6 +98,21 @@ export default function RolesTab() {
       await api.post(`/roles/${roleToDelete.id}/transfer-and-delete`, { destinationRoleId });
       setRoles((current) => current.filter((role) => role.id !== roleToDelete.id));
       setIsTransferDialogOpen(false);
+      setRoleToDelete(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('roles.deleteError'));
+    } finally {
+      setIsDeletingLoading(false);
+    }
+  };
+
+  const handleDirectDelete = async () => {
+    if (!roleToDelete) return;
+    setIsDeletingLoading(true);
+    try {
+      await api.del(`/roles/${roleToDelete.id}`);
+      setRoles((current) => current.filter((role) => role.id !== roleToDelete.id));
+      setIsDeleteConfirmOpen(false);
       setRoleToDelete(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('roles.deleteError'));
@@ -223,6 +242,16 @@ export default function RolesTab() {
         transferOptions={roles.filter((r) => r.id !== roleToDelete?.id).map((r) => ({ id: r.id, name: r.name }))}
         isLoading={isDeletingLoading}
         onConfirm={handleTransferAndDelete}
+      />
+
+      <DeleteConfirmDialog
+        open={isDeleteConfirmOpen}
+        onOpenChange={setIsDeleteConfirmOpen}
+        title={t('people.confirmDeleteRole')}
+        description={t('people.confirmDeleteRoleDescription')}
+        itemName={roleToDelete?.name}
+        isLoading={isDeletingLoading}
+        onConfirm={handleDirectDelete}
       />
     </Card>
   );
