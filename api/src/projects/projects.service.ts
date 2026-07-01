@@ -9,8 +9,11 @@ export class ProjectsService {
     private announcements: AnnouncementsService,
   ) {}
 
-  create(data: { departmentId: string; name: string; description?: string; status?: string; deadline?: Date }) {
+  create(data: { departmentId: string; name: string; description?: string; status?: string; deadline?: Date | string }) {
     const { performedById, ...createData } = data as any;
+    if (createData.deadline && typeof createData.deadline === 'string') {
+      createData.deadline = new Date(createData.deadline);
+    }
     return this.prisma.project.create({
       data: createData,
       include: this.include,

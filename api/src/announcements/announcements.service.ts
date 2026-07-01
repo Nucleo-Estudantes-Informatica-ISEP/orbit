@@ -27,6 +27,7 @@ export class AnnouncementsService {
       content,
       description,
       createdById,
+      performedById,
       targetUserId,
       visibility,
       type,

@@ -18,7 +18,7 @@ export class InventoryService {
   };
 
   async create(dto: CreateInventoryItemDto) {
-    const { value, purchaseDate, warrantyDate, ...rest } = dto;
+    const { performedById, value, purchaseDate, warrantyDate, ...rest } = dto;
     return this.prisma.inventoryItem.create({
       data: {
         ...rest,
