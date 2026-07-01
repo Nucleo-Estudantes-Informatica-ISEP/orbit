@@ -79,6 +79,7 @@ const MANAGEMENT_PERMISSIONS = [
 const SYSTEM_PERMISSIONS = [
   'FILES_UPLOAD',
   'AUDITS_READ',
+  'CAN_BE_DELETED',
 ] as const;
 
 export const permissionGroups = [

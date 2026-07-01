@@ -51,11 +51,5 @@ export function usePermission(permission: string): boolean {
   // PLANS_APPROVE only for ADMIN (already handled above)
   if (permission === 'PLANS_APPROVE') return false;
 
-  if (user.roles?.includes('COORDINATOR')) {
-    if (action === 'CREATE' || action === 'UPDATE') return true;
-  }
-
-  // Note: do not auto-grant plan creation to regular USER role; require explicit permission
-
   return false;
 }

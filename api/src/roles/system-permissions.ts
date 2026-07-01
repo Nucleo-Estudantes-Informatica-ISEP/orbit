@@ -61,6 +61,7 @@ export enum SystemPermission {
   PLANS_DELETE = 'PLANS_DELETE',
   PLANS_APPROVE = 'PLANS_APPROVE',
   FILES_UPLOAD = 'FILES_UPLOAD',
+  CAN_BE_DELETED = 'CAN_BE_DELETED',
 }
 
 export const systemPermissionValues = Object.values(SystemPermission);

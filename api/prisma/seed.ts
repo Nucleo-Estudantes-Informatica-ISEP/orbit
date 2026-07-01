@@ -69,6 +69,7 @@ const ALL_PERMISSIONS: SystemPermission[] = [
   SystemPermission.DEBTS_VIEW, SystemPermission.DEBTS_CREATE, SystemPermission.DEBTS_READ,
   SystemPermission.DEBTS_UPDATE, SystemPermission.DEBTS_DELETE,
   SystemPermission.AUDITS_READ,
+  SystemPermission.CAN_BE_DELETED,
 ]
 
 const COORDINATOR_PERMISSIONS: SystemPermission[] = [

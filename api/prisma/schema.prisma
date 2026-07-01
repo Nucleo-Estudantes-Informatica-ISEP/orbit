@@ -119,6 +119,7 @@ enum SystemPermission {
   DEBTS_UPDATE
   DEBTS_DELETE
   AUDITS_READ
+  CAN_BE_DELETED
 }
 
 enum PlanStatus {

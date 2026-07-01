@@ -27,6 +27,7 @@ const userSelect = {
           id: true,
           name: true,
           description: true,
+          permissions: true,
         },
       },
     },
@@ -163,6 +164,10 @@ export class UsersService {
     if (!target) throw new NotFoundException('User not found');
 
     const targetPermissions = new Set(target.userRoles.flatMap((ur) => ur.role.permissions));
+    if (targetPermissions.has('CAN_BE_DELETED' as any)) {
+      throw new ForbiddenException('Este utilizador não pode ser apagado.');
+    }
+
     const hasCritical = CRITICAL_PERMISSIONS.some((p) => targetPermissions.has(p as any));
 
     if (hasCritical) {

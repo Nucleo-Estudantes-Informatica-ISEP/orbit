@@ -24,6 +24,7 @@ interface PeopleUser {
   department?: { id: string; name: string } | null;
   departmentId?: string;
   roles: string[];
+  permissions: string[];
   userRoles?: Array<{ role?: { id: string; name: string } | null }>;
   active: boolean;
   status?: string;
@@ -67,6 +68,7 @@ export default function UsersTab() {
           departmentId: user.departmentId,
           department: user.department,
           roles: user.userRoles?.map((ur: any) => ur.role?.name).filter(Boolean) ?? [],
+          permissions: user.userRoles?.flatMap((ur: any) => ur.role?.permissions ?? []) ?? [],
           userRoles: user.userRoles ?? [],
           active: user.status === 'ACTIVE',
           status: user.status,
@@ -230,7 +232,7 @@ export default function UsersTab() {
                                 <Edit2 className="h-4 w-4" />
                               </Button>
                             )}
-                            {canDeleteUsers && currentUser?.id !== user.id && (
+                            {canDeleteUsers && currentUser?.id !== user.id && !user.permissions.includes('CAN_BE_DELETED') && (
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                                 onClick={() => { setUserToDelete(user); setIsDeleteDialogOpen(true); }}>
                                 <Trash2 className="h-4 w-4" />
