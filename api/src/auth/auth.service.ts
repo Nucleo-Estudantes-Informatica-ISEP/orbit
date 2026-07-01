@@ -135,7 +135,7 @@ export class AuthService {
       },
     });
 
-    const appUrl = (process.env.APP_URL || 'http://localhost:3001').replace(/\/$/, '');
+    const appUrl = (process.env.APP_URL || 'http://localhost:3090').replace(/\/$/, '');
     const resetUrl = `${appUrl}/reset-password?token=${rawToken}`;
     await this.mailService.sendPasswordReset(user.email, resetUrl);
 
