@@ -1,10 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
+import { MailService } from '../mail/mail.service';
 import { CreateAnnouncementDto } from './dto/create-announcement.dto';
 
 @Injectable()
 export class AnnouncementsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private mailService: MailService,
+  ) {}
 
   private uniqueUserIds(userIds: Array<string | undefined | null>, excludeUserId?: string) {
     return [...new Set(userIds.filter((userId): userId is string => Boolean(userId && userId !== excludeUserId)))];
@@ -33,6 +37,7 @@ export class AnnouncementsService {
     } = data;
 
     const resolvedContent = content ?? description ?? '';
+    const title = (announcementData as any).title || resolvedContent.slice(0, 80);
 
     // PRIVATE with multiple target users → one announcement per user
     if (visibility === 'PRIVATE' && targetUserIds && targetUserIds.length > 0) {
@@ -47,10 +52,11 @@ export class AnnouncementsService {
           pinned: pinned ?? false,
         })),
       });
+      this.notifyUsers(targetUserIds, title, resolvedContent, 'privado').catch(() => {});
       return result;
     }
 
-    return this.prisma.announcement.create({
+    const announcement = await this.prisma.announcement.create({
       data: {
         ...announcementData,
         content: resolvedContent,
@@ -72,6 +78,37 @@ export class AnnouncementsService {
       },
       include: this.include,
     });
+
+    if (visibility === 'PRIVATE' && targetUserId) {
+      this.notifyUsers([targetUserId], title, resolvedContent, 'privado').catch(() => {});
+    } else if (visibility === 'DEPARTMENT' && departmentIds?.length) {
+      this.prisma.user.findMany({
+        where: { departmentId: { in: departmentIds } },
+        select: { id: true },
+      }).then((users) => {
+        const ids = users.map((u) => u.id);
+        if (ids.length > 0) this.notifyUsers(ids, title, resolvedContent, 'departamento').catch(() => {});
+      }).catch(() => {});
+    } else if (visibility === 'PUBLIC') {
+      this.prisma.user.findMany({
+        select: { id: true },
+      }).then((users) => {
+        const ids = users.map((u) => u.id);
+        if (ids.length > 0) this.notifyUsers(ids, title, resolvedContent, 'global').catch(() => {});
+      }).catch(() => {});
+    }
+
+    return announcement;
+  }
+
+  private async notifyUsers(userIds: string[], title: string, content: string, origin: string) {
+    const settings = await this.prisma.userSettings.findMany({
+      where: { userId: { in: userIds }, emailNotifications: true },
+      include: { user: { select: { name: true, email: true } } },
+    });
+    await Promise.all(settings.map((s) =>
+      this.mailService.sendAnnouncementNotification(s.user.email, s.user.name, title, content, origin),
+    ));
   }
 
   async findAll(userId: string, filters?: { page?: string; pageSize?: string; visibility?: string }) {

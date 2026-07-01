@@ -2,12 +2,14 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { Priority, TaskStatus } from '@prisma/client';
 import { AnnouncementsService } from '../announcements/announcements.service';
+import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class TasksService {
   constructor(
     private prisma: PrismaService,
     private announcements: AnnouncementsService,
+    private mailService: MailService,
   ) {}
 
   private readonly include = {
@@ -68,8 +70,8 @@ export class TasksService {
           `A task "${t.title}" foi atribuida a ti.`,
           performedById,
         ).catch(() => {});
+        this.sendTaskEmails(normalizedAssigneeIds, t.title, t.board?.name).catch(() => {});
       }
-      // TODO: enviar email quando uma task for atribuida a um utilizador.
       return t;
     });
   }
@@ -124,8 +126,8 @@ export class TasksService {
             `A task "${t.title}" foi atribuida a ti.`,
             performedById,
           ).catch(() => {});
+          this.sendTaskEmails(newlyAssignedUserIds, t.title, t.board?.name).catch(() => {});
         }
-        // TODO: enviar email quando uma task for atribuida ou reatribuida a um utilizador.
       }
       return t;
     });
@@ -133,5 +135,15 @@ export class TasksService {
 
   remove(id: string) {
     return this.prisma.task.delete({ where: { id } });
+  }
+
+  private async sendTaskEmails(userIds: string[], taskTitle: string, boardName?: string) {
+    const settings = await this.prisma.userSettings.findMany({
+      where: { userId: { in: userIds }, emailNotifications: true },
+      include: { user: { select: { name: true, email: true } } },
+    });
+    await Promise.all(settings.map((s) =>
+      this.mailService.sendTaskAssigned(s.user.email, s.user.name, taskTitle, boardName),
+    ));
   }
 }

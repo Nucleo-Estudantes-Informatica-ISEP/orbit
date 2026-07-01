@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { MinioService } from '../files/minio.service';
+import { MailService } from '../mail/mail.service';
 import { CreatePlanDto } from './dto/create-plan.dto';
 import { UpdatePlanDto } from './dto/update-plan.dto';
 
@@ -9,6 +10,7 @@ export class PlansService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly minio: MinioService,
+    private readonly mailService: MailService,
   ) {}
 
   private readonly include = {
@@ -60,11 +62,13 @@ export class PlansService {
     if (plan.status !== 'PENDING') {
       throw new BadRequestException('Apenas planos em estado PENDING podem ser aprovados');
     }
-    return this.prisma.plan.update({
+    const result = await this.prisma.plan.update({
       where: { id },
       data: { status: 'APPROVED', approvedById, approvedAt: new Date() },
       include: this.include,
     });
+    this.notifyPlanCreator(plan.createdById, plan.title, 'APROVADO').catch(() => {});
+    return result;
   }
 
   async reject(id: string, approvedById: string, rejectionNote?: string) {
@@ -73,11 +77,13 @@ export class PlansService {
     if (plan.status !== 'PENDING') {
       throw new BadRequestException('Apenas planos em estado PENDING podem ser rejeitados');
     }
-    return this.prisma.plan.update({
+    const result = await this.prisma.plan.update({
       where: { id },
       data: { status: 'REJECTED', approvedById, approvedAt: new Date(), rejectionNote: rejectionNote ?? null },
       include: this.include,
     });
+    this.notifyPlanCreator(plan.createdById, plan.title, 'REJEITADO').catch(() => {});
+    return result;
   }
 
   async remove(id: string) {
@@ -87,5 +93,15 @@ export class PlansService {
       await this.minio.deleteObject(plan.fileKey).catch(() => {});
     }
     return this.prisma.plan.delete({ where: { id } });
+  }
+
+  private async notifyPlanCreator(userId: string, planTitle: string, status: string) {
+    const settings = await this.prisma.userSettings.findUnique({
+      where: { userId },
+      include: { user: { select: { name: true, email: true } } },
+    });
+    if (settings?.emailNotifications && settings.user.email) {
+      await this.mailService.sendPlanStatusUpdate(settings.user.email, settings.user.name, planTitle, status);
+    }
   }
 }

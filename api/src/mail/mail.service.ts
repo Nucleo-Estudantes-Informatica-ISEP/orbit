@@ -68,6 +68,107 @@ export class MailService {
     await this.transporter.sendMail({ from: this.from, to, subject, text, html });
   }
 
+  async sendAnnouncementNotification(to: string, userName: string, title: string, content: string, origin: string) {
+    const subject = `[ORBIT] ${title}`;
+    const text = [
+      `Olá ${userName},`,
+      '',
+      `Foi publicado um novo anúncio (${origin}):`,
+      '',
+      title,
+      '',
+      content,
+      '',
+      'Acede ao ORBIT para veres mais detalhes.',
+    ].join('\n');
+
+    const html = `
+      <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto; color: #111;">
+        <p style="font-size: 14px; color: #555;">Olá <strong>${userName}</strong>,</p>
+        <p style="font-size: 13px; color: #777;">Foi publicado um novo anúncio (${origin}):</p>
+        <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin: 12px 0;">
+          <h3 style="margin: 0 0 8px; font-size: 15px;">${title}</h3>
+          <p style="margin: 0; font-size: 13px; color: #555; white-space: pre-wrap;">${content}</p>
+        </div>
+        <a href="https://orbit.nei-isep.org/dashboard/announcements" style="display: inline-block; padding: 10px 18px; background: #111; color: #fff; text-decoration: none; border-radius: 6px;">
+          Ver no ORBIT
+        </a>
+      </div>
+    `;
+
+    if (!this.transporter) {
+      this.logger.log(`[DEV] Announcement notification for ${userName} <${to}>: ${title}`);
+      return;
+    }
+    await this.transporter.sendMail({ from: this.from, to, subject, text, html });
+  }
+
+  async sendTaskAssigned(to: string, userName: string, taskTitle: string, boardName?: string) {
+    const subject = `[ORBIT] Task atribuída: ${taskTitle}`;
+    const where = boardName ? ` no board "${boardName}"` : '';
+    const text = [
+      `Olá ${userName},`,
+      '',
+      `Foi-te atribuída uma task${where}:`,
+      '',
+      taskTitle,
+      '',
+      'Acede ao ORBIT para veres a task.',
+    ].join('\n');
+
+    const html = `
+      <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto; color: #111;">
+        <p style="font-size: 14px; color: #555;">Olá <strong>${userName}</strong>,</p>
+        <p style="font-size: 13px; color: #777;">Foi-te atribuída uma task${where}:</p>
+        <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin: 12px 0;">
+          <p style="margin: 0; font-size: 14px; font-weight: 600;">${taskTitle}</p>
+        </div>
+        <a href="https://orbit.nei-isep.org/dashboard/tasks" style="display: inline-block; padding: 10px 18px; background: #111; color: #fff; text-decoration: none; border-radius: 6px;">
+          Ver no ORBIT
+        </a>
+      </div>
+    `;
+
+    if (!this.transporter) {
+      this.logger.log(`[DEV] Task assigned to ${userName} <${to}>: ${taskTitle}`);
+      return;
+    }
+    await this.transporter.sendMail({ from: this.from, to, subject, text, html });
+  }
+
+  async sendPlanStatusUpdate(to: string, userName: string, planName: string, status: string, rejectionNote?: string) {
+    const statusLabel = status === 'APPROVED' ? 'aprovado' : status === 'REJECTED' ? 'rejeitado' : status;
+    const subject = `[ORBIT] Plano ${statusLabel}: ${planName}`;
+    const text = [
+      `Olá ${userName},`,
+      '',
+      `O teu plano "${planName}" foi ${statusLabel}.`,
+      ...(rejectionNote ? ['', `Motivo: ${rejectionNote}`] : []),
+      '',
+      'Acede ao ORBIT para veres mais detalhes.',
+    ].join('\n');
+
+    const html = `
+      <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto; color: #111;">
+        <p style="font-size: 14px; color: #555;">Olá <strong>${userName}</strong>,</p>
+        <p style="font-size: 13px; color: #777;">O teu plano foi <strong>${statusLabel}</strong>:</p>
+        <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin: 12px 0;">
+          <p style="margin: 0; font-size: 14px; font-weight: 600;">${planName}</p>
+          ${rejectionNote ? `<p style="margin: 8px 0 0; font-size: 13px; color: #dc2626;">Motivo: ${rejectionNote}</p>` : ''}
+        </div>
+        <a href="https://orbit.nei-isep.org/dashboard/plans" style="display: inline-block; padding: 10px 18px; background: #111; color: #fff; text-decoration: none; border-radius: 6px;">
+          Ver no ORBIT
+        </a>
+      </div>
+    `;
+
+    if (!this.transporter) {
+      this.logger.log(`[DEV] Plan ${statusLabel} for ${userName} <${to}>: ${planName}`);
+      return;
+    }
+    await this.transporter.sendMail({ from: this.from, to, subject, text, html });
+  }
+
   async sendPasswordReset(to: string, resetUrl: string) {
     const subject = 'ORBIT — Repor palavra-passe';
     const text = [
