@@ -44,6 +44,22 @@ export const api = {
     apiFetch<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
   del: <T = unknown>(path: string) =>
     apiFetch<T>(path, { method: 'DELETE' }),
+  downloadPdf: async (path: string, filename: string) => {
+    const token = getToken();
+    const res = await fetch(`${API_BASE}${path}`, {
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    });
+    if (!res.ok) throw new Error(`Download failed: HTTP ${res.status}`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
   upload: async <T = unknown>(path: string, file: File): Promise<T> => {
     const token = getToken();
     const formData = new FormData();

@@ -616,5 +616,14 @@
   "debts.exportColAccounts": "Accounts",
   "debts.exportColFiles": "Files",
   "debts.exportColCreatedBy": "Created by",
-  "debts.exportColCreatedAt": "Created at"
+  "debts.exportColCreatedAt": "Created at",
+  "recruitment.exportAll": "Export All",
+  "recruitment.exportCandidate": "Export PDF",
+  "recruitment.clearPipeline": "Clear Pipeline",
+  "recruitment.clearPipelineTitle": "Clear Recruitment Pipeline",
+  "recruitment.clearPipelineDescription": "This action will delete ALL candidates, comments and department preferences. This operation is irreversible.",
+  "recruitment.clearPipelineType": "Type DELETE ALL to confirm:",
+  "recruitment.clearPipelinePlaceholder": "DELETE ALL",
+  "recruitment.clearPipelineConfirm": "Delete All",
+  "recruitment.pipelineCleared": "Recruitment pipeline cleared successfully."
 }

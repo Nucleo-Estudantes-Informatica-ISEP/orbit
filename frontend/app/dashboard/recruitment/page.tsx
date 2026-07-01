@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core';
-import { Plus, Mail, FileText, Trash2, MoreHorizontal, MessageSquare, History, X } from 'lucide-react';
+import { Plus, Mail, FileText, Trash2, MoreHorizontal, MessageSquare, History, X, Download, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -85,6 +85,7 @@ export default function RecruitmentPage() {
   const canCreate = usePermission('RECRUITMENT_CREATE');
   const canUpdate = usePermission('RECRUITMENT_UPDATE');
   const canDelete = usePermission('RECRUITMENT_DELETE');
+  const canRead = usePermission('RECRUITMENT_READ');
 
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -102,6 +103,9 @@ export default function RecruitmentPage() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [commentText, setCommentText] = useState('');
   const [commentSaving, setCommentSaving] = useState(false);
+
+  const [clearOpen, setClearOpen] = useState(false);
+  const [clearConfirm, setClearConfirm] = useState('');
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
@@ -180,6 +184,16 @@ export default function RecruitmentPage() {
     } catch (err: unknown) { toast.error(err instanceof Error ? err.message : 'Ocorreu um erro'); }
   };
 
+  const handleClearAll = async () => {
+    try {
+      await api.del('/candidates');
+      setCandidates([]);
+      setClearOpen(false);
+      setClearConfirm('');
+      toast.success(t('recruitment.pipelineCleared'));
+    } catch (err: unknown) { toast.error(err instanceof Error ? err.message : 'Ocorreu um erro'); }
+  };
+
   const handleAddComment = async () => {
     if (!commentText.trim() || !detailCandidate || !user) return;
     setCommentSaving(true);
@@ -215,11 +229,23 @@ export default function RecruitmentPage() {
           <h1 className="text-2xl font-bold tracking-tight">{t('recruitment.title')}</h1>
           <p className="text-muted-foreground text-sm mt-1">{t('recruitment.subtitle')}</p>
         </div>
-        {canCreate && (
-          <Button onClick={() => { setForm(emptyForm); setError(''); setCreateOpen(true); }}>
-            <Plus className="mr-2 h-4 w-4" />{t('recruitment.newCandidate')}
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {canCreate && (
+            <Button onClick={() => { setForm(emptyForm); setError(''); setCreateOpen(true); }}>
+              <Plus className="mr-2 h-4 w-4" />{t('recruitment.newCandidate')}
+            </Button>
+          )}
+          {canRead && (
+            <Button variant="outline" onClick={() => api.downloadPdf('/candidates/export/all', 'candidatos.pdf')}>
+              <Download className="mr-2 h-4 w-4" />{t('recruitment.exportAll')}
+            </Button>
+          )}
+          {canDelete && (
+            <Button variant="destructive" onClick={() => { setClearConfirm(''); setClearOpen(true); }}>
+              <Trash2 className="mr-2 h-4 w-4" />{t('recruitment.clearPipeline')}
+            </Button>
+          )}
+        </div>
       </div>
 
       {loading ? (
@@ -424,6 +450,11 @@ export default function RecruitmentPage() {
                     <Badge variant="outline" className={`text-[10px] shrink-0 ${stageConfig[detailCandidate.stage]}`}>
                       {t(STAGES.find((s) => s.id === detailCandidate.stage)?.label ?? '')}
                     </Badge>
+                    {canRead && (
+                      <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => api.downloadPdf(`/candidates/export/${detailCandidate.id}`, `candidato-${detailCandidate.id}.pdf`)} title={t('recruitment.exportCandidate')}>
+                        <Download className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               </DialogHeader>
@@ -513,6 +544,29 @@ export default function RecruitmentPage() {
               </Tabs>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+      {/* Clear Pipeline Confirmation */}
+      <Dialog open={clearOpen} onOpenChange={(o) => { if (!o) { setClearOpen(false); setClearConfirm(''); } }}>
+        <DialogContent className="w-full max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />{t('recruitment.clearPipelineTitle')}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">{t('recruitment.clearPipelineDescription')}</p>
+            <p className="text-sm font-medium">{t('recruitment.clearPipelineType')}</p>
+            <Input
+              value={clearConfirm}
+              onChange={(e) => setClearConfirm(e.target.value)}
+              placeholder={t('recruitment.clearPipelinePlaceholder')}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setClearOpen(false); setClearConfirm(''); }}>{t('common.cancel')}</Button>
+            <Button variant="destructive" onClick={handleClearAll} disabled={clearConfirm !== 'ELIMINAR TUDO'}>{t('recruitment.clearPipelineConfirm')}</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

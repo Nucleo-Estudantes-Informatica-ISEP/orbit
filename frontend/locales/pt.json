@@ -616,5 +616,14 @@
   "debts.exportColAccounts": "Contas",
   "debts.exportColFiles": "Ficheiros",
   "debts.exportColCreatedBy": "Criado por",
-  "debts.exportColCreatedAt": "Criado em"
+  "debts.exportColCreatedAt": "Criado em",
+  "recruitment.exportAll": "Exportar Todos",
+  "recruitment.exportCandidate": "Exportar PDF",
+  "recruitment.clearPipeline": "Limpar Pipeline",
+  "recruitment.clearPipelineTitle": "Limpar Pipeline de Recrutamento",
+  "recruitment.clearPipelineDescription": "Esta ação irá eliminar TODOS os candidatos, comentários e preferências de departamento. Esta operação é irreversível.",
+  "recruitment.clearPipelineType": "Escreve ELIMINAR TUDO para confirmar:",
+  "recruitment.clearPipelinePlaceholder": "ELIMINAR TUDO",
+  "recruitment.clearPipelineConfirm": "Eliminar Tudo",
+  "recruitment.pipelineCleared": "Pipeline de recrutamento limpa com sucesso."
 }
