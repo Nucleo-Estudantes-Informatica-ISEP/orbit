@@ -254,6 +254,7 @@ function TasksPage() {
                 title={t(col.label)}
                 count={tasksByStatus[col.id].length}
                 color={col.color}
+                maxVisible={7}
                 headerAction={canCreate ? (
                   <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openCreate(col.id)}>
                     <Plus className="h-3.5 w-3.5" />

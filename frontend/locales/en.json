@@ -625,5 +625,7 @@
   "recruitment.clearPipelineType": "Type DELETE ALL to confirm:",
   "recruitment.clearPipelinePlaceholder": "DELETE ALL",
   "recruitment.clearPipelineConfirm": "Delete All",
-  "recruitment.pipelineCleared": "Recruitment pipeline cleared successfully."
+  "recruitment.pipelineCleared": "Recruitment pipeline cleared successfully.",
+  "kanban.showMore": "Show more ({count})",
+  "kanban.showLess": "Show less"
 }

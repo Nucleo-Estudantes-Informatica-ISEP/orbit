@@ -625,5 +625,7 @@
   "recruitment.clearPipelineType": "Escreve ELIMINAR TUDO para confirmar:",
   "recruitment.clearPipelinePlaceholder": "ELIMINAR TUDO",
   "recruitment.clearPipelineConfirm": "Eliminar Tudo",
-  "recruitment.pipelineCleared": "Pipeline de recrutamento limpa com sucesso."
+  "recruitment.pipelineCleared": "Pipeline de recrutamento limpa com sucesso.",
+  "kanban.showMore": "Ver mais ({count})",
+  "kanban.showLess": "Mostrar menos"
 }
