@@ -23,6 +23,7 @@ import {
   ClipboardList,
   CreditCard,
   History,
+  AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -82,6 +83,7 @@ export function DashboardSidebar({
   const canSeePlans = usePermission('PLANS_VIEW');
   const canSeeDebts = usePermission('DEBTS_VIEW');
   const canSeeAudits = authUser?.permissions?.includes('AUDITS_READ') ?? false;
+  const canSeeIncidents = usePermission('INCIDENTS_VIEW');
 
   const navItems = (...items: Array<NavItem | null>): NavItem[] => items.filter((item): item is NavItem => Boolean(item));
 
@@ -115,6 +117,7 @@ export function DashboardSidebar({
         canSeeInventory ? { icon: Package, label: t('nav.inventory'), href: '/dashboard/inventory' } : null,
         canSeePlans ? { icon: ClipboardList, label: t('nav.plans'), href: '/dashboard/plans' } : null,
         canSeeDebts ? { icon: CreditCard, label: t('nav.debts'), href: '/dashboard/debts' } : null,
+        canSeeIncidents ? { icon: AlertTriangle, label: t('nav.incidents'), href: '/dashboard/incidents' } : null,
         canSeeAudits ? { icon: History, label: t('nav.auditLogs'), href: '/dashboard/audit-logs' } : null,
       ),
     },

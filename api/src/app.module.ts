@@ -17,11 +17,12 @@ import { FilesModule } from './files/files.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { PlansModule } from './plans/plans.module';
 import { DebtsModule } from './debts/debts.module';
+import { IncidentsModule } from './incidents/incidents.module';
 import { PrismaService } from './prisma.service';
 import { AuditLogInterceptor } from './audit-logs/audit-logs.interceptor';
 
 @Module({
-  imports: [UsersModule, DepartmentsModule, BoardsModule, TasksModule, RecruitmentModule, AuthModule, AnnouncementsModule, ResourcesModule, EventsModule, ProjectsModule, RolesModule, UserSettingsModule, AuditLogsModule, FilesModule, InventoryModule, PlansModule, DebtsModule],
+  imports: [UsersModule, DepartmentsModule, BoardsModule, TasksModule, RecruitmentModule, AuthModule, AnnouncementsModule, ResourcesModule, EventsModule, ProjectsModule, RolesModule, UserSettingsModule, AuditLogsModule, FilesModule, InventoryModule, PlansModule, DebtsModule, IncidentsModule],
   controllers: [],
   providers: [
     PrismaService,

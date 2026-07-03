@@ -69,6 +69,8 @@ const ALL_PERMISSIONS: SystemPermission[] = [
   SystemPermission.DEBTS_VIEW, SystemPermission.DEBTS_CREATE, SystemPermission.DEBTS_READ,
   SystemPermission.DEBTS_UPDATE, SystemPermission.DEBTS_DELETE,
   SystemPermission.AUDITS_READ,
+  SystemPermission.INCIDENTS_VIEW, SystemPermission.INCIDENTS_CREATE, SystemPermission.INCIDENTS_READ,
+  SystemPermission.INCIDENTS_UPDATE, SystemPermission.INCIDENTS_DELETE,
   SystemPermission.CAN_BE_DELETED,
 ]
 
@@ -87,6 +89,7 @@ const COORDINATOR_PERMISSIONS: SystemPermission[] = [
   SystemPermission.PLANS_VIEW, SystemPermission.PLANS_CREATE, SystemPermission.PLANS_READ, SystemPermission.PLANS_UPDATE,
   SystemPermission.FILES_UPLOAD,
   SystemPermission.DEBTS_VIEW, SystemPermission.DEBTS_CREATE, SystemPermission.DEBTS_READ, SystemPermission.DEBTS_UPDATE, SystemPermission.DEBTS_DELETE,
+  SystemPermission.INCIDENTS_VIEW, SystemPermission.INCIDENTS_CREATE, SystemPermission.INCIDENTS_READ, SystemPermission.INCIDENTS_UPDATE,
   SystemPermission.AUDITS_READ,
 ]
 
