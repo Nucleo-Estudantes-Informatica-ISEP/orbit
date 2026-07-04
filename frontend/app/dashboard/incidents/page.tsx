@@ -241,7 +241,7 @@ export default function IncidentsPage() {
 
   const canEditIncident = (status: string) => canUpdate && status !== 'CLOSED' && status !== 'RESOLVED';
 
-  const priorityCardBorder = (p: string) => p === 'URGENT' ? 'border-l-red-500' : p === 'HIGH' ? 'border-l-orange-400' : p === 'MEDIUM' ? 'border-l-amber-300' : 'border-l-blue-300';
+  const statusCardBorder = (s: string) => s === 'OPEN' ? 'border-l-blue-500' : s === 'ANALYZING' ? 'border-l-indigo-500' : s === 'RESOLVING' ? 'border-l-amber-500' : s === 'RESOLVED' ? 'border-l-green-500' : 'border-l-muted-foreground/30';
 
   return (
     <div className="space-y-6">
@@ -296,7 +296,7 @@ export default function IncidentsPage() {
           {paginate(filtered).map((d) => (
             <div
               key={d.id}
-              className={cn('rounded-xl border bg-card shadow-sm p-4 space-y-3 cursor-pointer hover:shadow-md transition-shadow border-l-4', priorityCardBorder(d.priority))}
+              className={cn('rounded-xl border bg-card shadow-sm p-4 space-y-3 cursor-pointer hover:shadow-md transition-shadow border-l-4', statusCardBorder(d.status))}
               onClick={() => openDetail(d)}
             >
               <div className="flex items-start justify-between gap-3">

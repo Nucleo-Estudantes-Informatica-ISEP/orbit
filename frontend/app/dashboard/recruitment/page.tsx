@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { ScrollArea as ScrollAreaPrimitive } from 'radix-ui';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -249,58 +250,80 @@ export default function RecruitmentPage() {
       </div>
 
       {loading ? (
-        <div className="flex gap-3 overflow-x-auto pb-4">
-          {STAGES.map((s) => <Skeleton key={s.id} className="h-64 w-[260px] shrink-0" />)}
-        </div>
+        <ScrollAreaPrimitive.Root className="relative overflow-hidden w-full h-[calc(100vh-12rem)]">
+          <ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit]">
+            <div className="flex gap-3 pb-4">
+              {STAGES.map((s) => <Skeleton key={s.id} className="h-64 w-[260px] shrink-0" />)}
+            </div>
+          </ScrollAreaPrimitive.Viewport>
+          <ScrollAreaPrimitive.Scrollbar orientation="vertical" className="flex touch-none select-none transition-colors h-full w-2.5 border-l border-l-transparent p-[1px]">
+            <ScrollAreaPrimitive.Thumb className="relative flex-1 rounded-full bg-border" />
+          </ScrollAreaPrimitive.Scrollbar>
+          <ScrollAreaPrimitive.Scrollbar orientation="horizontal" className="flex touch-none select-none transition-colors h-2.5 flex-col border-t border-t-transparent p-[1px]">
+            <ScrollAreaPrimitive.Thumb className="relative flex-1 rounded-full bg-border" />
+          </ScrollAreaPrimitive.Scrollbar>
+          <ScrollAreaPrimitive.Corner />
+        </ScrollAreaPrimitive.Root>
       ) : canUpdate ? (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <div className="flex gap-3 overflow-x-auto pb-4">
-              {STAGES.map((stage) => (
-                <KanbanColumn key={stage.id} id={stage.id} title={t(stage.label)} count={byStage(stage.id).length} color={stage.color}>
-                {byStage(stage.id).length === 0 ? (
-                  <div className="flex items-center justify-center h-14 text-xs text-muted-foreground">{t('recruitment.noCandidates')}</div>
-                ) : (
-                  byStage(stage.id).map((c) => (
-                    <KanbanCard key={c.id} id={c.id} onClick={() => openDetail(c)}>
-                      <div className="space-y-1">
-                        <div className="flex items-start justify-between gap-1">
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold truncate">{c.name}</p>
-                            <p className="text-xs text-muted-foreground truncate">{c.email}</p>
+          <ScrollAreaPrimitive.Root className="relative overflow-hidden w-full h-[calc(100vh-12rem)]">
+            <ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit]">
+              <div className="flex gap-3 pb-4">
+                {STAGES.map((stage) => (
+                  <KanbanColumn key={stage.id} id={stage.id} title={t(stage.label)} count={byStage(stage.id).length} color={stage.color}>
+                  {byStage(stage.id).length === 0 ? (
+                    <div className="flex items-center justify-center h-14 text-xs text-muted-foreground">{t('recruitment.noCandidates')}</div>
+                  ) : (
+                    byStage(stage.id).map((c) => (
+                      <KanbanCard key={c.id} id={c.id} onClick={() => openDetail(c)}>
+                        <div className="space-y-1">
+                          <div className="flex items-start justify-between gap-1">
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold truncate">{c.name}</p>
+                              <p className="text-xs text-muted-foreground truncate">{c.email}</p>
+                            </div>
+                            {canDelete && (
+                              <Button variant="ghost" size="icon" className="h-5 w-5 opacity-50 hover:opacity-100 shrink-0" onClick={(e) => { e.stopPropagation(); handleDelete(c.id); }}>
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            )}
                           </div>
-                          {canDelete && (
-                            <Button variant="ghost" size="icon" className="h-5 w-5 opacity-50 hover:opacity-100 shrink-0" onClick={(e) => { e.stopPropagation(); handleDelete(c.id); }}>
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
+                          <div className="flex items-center justify-between">
+                            <div className="flex gap-1.5 flex-wrap">
+                              {c.course && <Badge variant="outline" className="text-[10px]">{c.course}</Badge>}
+                              {c.year && <Badge variant="secondary" className="text-[10px]">{c.year}º ano</Badge>}
+                            </div>
+                            {c.cvUrl && (
+                              <a href={c.cvUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-muted-foreground hover:text-primary">
+                                <FileText className="h-3.5 w-3.5" />
+                              </a>
+                            )}
+                          </div>
+                          {c.departmentChoices && c.departmentChoices.length > 0 && (
+                            <div className="flex gap-1 flex-wrap pt-1">
+                              {c.departmentChoices.map((dc) => (
+                                <Badge key={dc.id} variant="outline" className="text-[10px] text-primary border-primary/30">
+                                  {dc.priority}º {dc.department.name}
+                                </Badge>
+                              ))}
+                            </div>
                           )}
                         </div>
-                        <div className="flex items-center justify-between">
-                          <div className="flex gap-1.5 flex-wrap">
-                            {c.course && <Badge variant="outline" className="text-[10px]">{c.course}</Badge>}
-                            {c.year && <Badge variant="secondary" className="text-[10px]">{c.year}º ano</Badge>}
-                          </div>
-                          {c.cvUrl && (
-                            <a href={c.cvUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-muted-foreground hover:text-primary">
-                              <FileText className="h-3.5 w-3.5" />
-                            </a>
-                          )}
-                        </div>
-                        {c.departmentChoices && c.departmentChoices.length > 0 && (
-                          <div className="flex gap-1 flex-wrap pt-1">
-                            {c.departmentChoices.map((dc) => (
-                              <Badge key={dc.id} variant="outline" className="text-[10px] text-primary border-primary/30">
-                                {dc.priority}º {dc.department.name}
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </KanbanCard>
-                  ))
-                )}
-              </KanbanColumn>
-            ))}
-          </div>
+                      </KanbanCard>
+                    ))
+                  )}
+                </KanbanColumn>
+              ))}
+            </div>
+            </ScrollAreaPrimitive.Viewport>
+            <ScrollAreaPrimitive.Scrollbar orientation="vertical" className="flex touch-none select-none transition-colors h-full w-2.5 border-l border-l-transparent p-[1px]">
+              <ScrollAreaPrimitive.Thumb className="relative flex-1 rounded-full bg-border" />
+            </ScrollAreaPrimitive.Scrollbar>
+            <ScrollAreaPrimitive.Scrollbar orientation="horizontal" className="flex touch-none select-none transition-colors h-2.5 flex-col border-t border-t-transparent p-[1px]">
+              <ScrollAreaPrimitive.Thumb className="relative flex-1 rounded-full bg-border" />
+            </ScrollAreaPrimitive.Scrollbar>
+            <ScrollAreaPrimitive.Corner />
+          </ScrollAreaPrimitive.Root>
           <DragOverlay>
             {activeCandidate && (
               <div className="bg-background border border-primary/40 rounded-lg p-3 shadow-xl w-[272px] opacity-95">
@@ -311,53 +334,64 @@ export default function RecruitmentPage() {
           </DragOverlay>
         </DndContext>
       ) : (
-          <div className="flex gap-3 overflow-x-auto pb-4">
-          {STAGES.map((stage) => (
-            <KanbanColumn key={stage.id} id={stage.id} title={t(stage.label)} count={byStage(stage.id).length} color={stage.color}>
-              {byStage(stage.id).length === 0 ? (
-                  <div className="flex items-center justify-center h-14 text-xs text-muted-foreground">{t('recruitment.noCandidates')}</div>
-              ) : (
-                byStage(stage.id).map((c) => (
-                  <KanbanCard key={c.id} id={c.id} onClick={() => openDetail(c)}>
-                    <div className="space-y-1">
-                      <div className="flex items-start justify-between gap-1">
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold truncate">{c.name}</p>
-                          <p className="text-xs text-muted-foreground truncate">{c.email}</p>
-                        </div>
-                        {canDelete && (
-                          <Button variant="ghost" size="icon" className="h-5 w-5 opacity-50 hover:opacity-100 shrink-0" onClick={(e) => { e.stopPropagation(); handleDelete(c.id); }}>
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        )}
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex gap-1.5 flex-wrap">
-                          {c.course && <Badge variant="outline" className="text-[10px]">{c.course}</Badge>}
-                          {c.year && <Badge variant="secondary" className="text-[10px]">{c.year}º ano</Badge>}
-                        </div>
-                        {c.cvUrl && (
-                          <a href={c.cvUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-muted-foreground hover:text-primary">
-                            <FileText className="h-3.5 w-3.5" />
-                          </a>
-                        )}
-                      </div>
-                      {c.departmentChoices && c.departmentChoices.length > 0 && (
-                        <div className="flex gap-1 flex-wrap pt-1">
-                          {c.departmentChoices.map((dc) => (
-                            <Badge key={dc.id} variant="outline" className="text-[10px] text-primary border-primary/30">
-                              {dc.priority}º {dc.department.name}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </KanbanCard>
-                ))
-              )}
-            </KanbanColumn>
-          ))}
-        </div>
+          <ScrollAreaPrimitive.Root className="relative overflow-hidden w-full h-[calc(100vh-12rem)]">
+            <ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit]">
+              <div className="flex gap-3 pb-4">
+                {STAGES.map((stage) => (
+                  <KanbanColumn key={stage.id} id={stage.id} title={t(stage.label)} count={byStage(stage.id).length} color={stage.color}>
+                    {byStage(stage.id).length === 0 ? (
+                        <div className="flex items-center justify-center h-14 text-xs text-muted-foreground">{t('recruitment.noCandidates')}</div>
+                    ) : (
+                      byStage(stage.id).map((c) => (
+                        <KanbanCard key={c.id} id={c.id} onClick={() => openDetail(c)}>
+                          <div className="space-y-1">
+                            <div className="flex items-start justify-between gap-1">
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold truncate">{c.name}</p>
+                                <p className="text-xs text-muted-foreground truncate">{c.email}</p>
+                              </div>
+                              {canDelete && (
+                                <Button variant="ghost" size="icon" className="h-5 w-5 opacity-50 hover:opacity-100 shrink-0" onClick={(e) => { e.stopPropagation(); handleDelete(c.id); }}>
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              )}
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <div className="flex gap-1.5 flex-wrap">
+                                {c.course && <Badge variant="outline" className="text-[10px]">{c.course}</Badge>}
+                                {c.year && <Badge variant="secondary" className="text-[10px]">{c.year}º ano</Badge>}
+                              </div>
+                              {c.cvUrl && (
+                                <a href={c.cvUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-muted-foreground hover:text-primary">
+                                  <FileText className="h-3.5 w-3.5" />
+                                </a>
+                              )}
+                            </div>
+                            {c.departmentChoices && c.departmentChoices.length > 0 && (
+                              <div className="flex gap-1 flex-wrap pt-1">
+                                {c.departmentChoices.map((dc) => (
+                                  <Badge key={dc.id} variant="outline" className="text-[10px] text-primary border-primary/30">
+                                    {dc.priority}º {dc.department.name}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </KanbanCard>
+                      ))
+                    )}
+                  </KanbanColumn>
+                ))}
+              </div>
+            </ScrollAreaPrimitive.Viewport>
+            <ScrollAreaPrimitive.Scrollbar orientation="vertical" className="flex touch-none select-none transition-colors h-full w-2.5 border-l border-l-transparent p-[1px]">
+              <ScrollAreaPrimitive.Thumb className="relative flex-1 rounded-full bg-border" />
+            </ScrollAreaPrimitive.Scrollbar>
+            <ScrollAreaPrimitive.Scrollbar orientation="horizontal" className="flex touch-none select-none transition-colors h-2.5 flex-col border-t border-t-transparent p-[1px]">
+              <ScrollAreaPrimitive.Thumb className="relative flex-1 rounded-full bg-border" />
+            </ScrollAreaPrimitive.Scrollbar>
+            <ScrollAreaPrimitive.Corner />
+          </ScrollAreaPrimitive.Root>
       )}
 
       {/* Create Modal */}

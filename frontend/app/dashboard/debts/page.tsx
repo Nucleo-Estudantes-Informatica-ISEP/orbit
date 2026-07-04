@@ -79,6 +79,9 @@ export default function DebtsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [exportOpen, setExportOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [confirmText, setConfirmText] = useState('');
   const [exportParams, setExportParams] = useState({
     dateFrom: '',
     dateTo: '',
@@ -221,6 +224,9 @@ export default function DebtsPage() {
       const updated = await api.post<Debt>(`/debts/${id}/complete`, {});
       setDebts((prev) => prev.map((d) => (d.id === id ? updated : d)));
       toast.success(t('debts.completed'));
+      setConfirmOpen(false);
+      setConfirmText('');
+      setConfirmId(null);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : t('debts.completeError'));
     }
@@ -479,7 +485,7 @@ export default function DebtsPage() {
                   {d.type === 'OUTCOME' ? '−' : '+'}{formatCurrency(Number(d.value))}
                 </span>
                 {canUpdate && d.status !== 'COMPLETED' && (
-                  <Button variant="outline" size="sm" onClick={() => handleComplete(d.id)}>
+                  <Button variant="outline" size="sm" onClick={() => { setConfirmId(d.id); setConfirmText(''); setConfirmOpen(true); }}>
                     {t('debts.complete')}
                   </Button>
                 )}
@@ -763,6 +769,29 @@ export default function DebtsPage() {
             <Button onClick={handleExport}>
               <FileDown className="mr-2 h-4 w-4" />{t('debts.exportDownload')}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Complete Confirmation */}
+      <Dialog open={confirmOpen} onOpenChange={(o) => { if (!o) { setConfirmOpen(false); setConfirmText(''); setConfirmId(null); } }}>
+        <DialogContent className="w-full max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-primary">
+              <TrendingUp className="h-5 w-5" />{t('debts.completeTitle')}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">{t('debts.completeDescription')}</p>
+            <p className="text-sm font-medium">{t('debts.completeType')}</p>
+            <Input
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder={t('debts.completePlaceholder')}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setConfirmOpen(false); setConfirmText(''); setConfirmId(null); }}>{t('common.cancel')}</Button>
+            <Button variant="default" onClick={() => { if (confirmId) handleComplete(confirmId); }} disabled={confirmText !== 'CONCLUIR'}>{t('debts.completeConfirm')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
