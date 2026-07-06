@@ -69,6 +69,7 @@ export class FilesController {
   }
 
   @Get('*key')
+  @UseGuards(JwtAuthGuard)
   async getFile(@Param('key') key: string, @Res() res: Response) {
     try {
       const stat = await this.minioService.getObjectStat(key);

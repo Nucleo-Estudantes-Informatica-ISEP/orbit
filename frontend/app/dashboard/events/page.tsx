@@ -100,11 +100,17 @@ export default function EventsPage() {
   const firstDayOfWeek = new Date(calMonth.getFullYear(), calMonth.getMonth(), 1).getDay();
 
   const openCreate = () => { setEditTarget(null); setForm(emptyForm); setError(''); setModalOpen(true); };
+  const toLocalDatetime = (iso: string) => {
+    const d = new Date(iso);
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
   const openEdit = (e: Event) => {
     setEditTarget(e);
     setForm({
       title: e.title, description: e.description ?? '', location: e.location ?? '',
-      startDate: e.startDate.slice(0, 16), endDate: e.endDate.slice(0, 16), visibility: e.visibility,
+      startDate: toLocalDatetime(e.startDate), endDate: toLocalDatetime(e.endDate), visibility: e.visibility,
       departmentIds: e.eventDepartments?.map((d) => d.department.id) ?? [],
     });
     setError(''); setModalOpen(true);
@@ -112,12 +118,17 @@ export default function EventsPage() {
 
   const handleSave = async () => {
     setSaving(true); setError('');
+    const payload = {
+      ...form,
+      startDate: form.startDate ? new Date(form.startDate).toISOString() : form.startDate,
+      endDate: form.endDate ? new Date(form.endDate).toISOString() : form.endDate,
+    };
     try {
       if (editTarget) {
-        const updated = await api.put<Event>(`/events/${editTarget.id}`, form);
+        const updated = await api.put<Event>(`/events/${editTarget.id}`, payload);
         setEvents((prev) => prev.map((e) => e.id === editTarget.id ? updated : e));
       } else {
-        const created = await api.post<Event>('/events', { ...form, performedById: user?.id });
+        const created = await api.post<Event>('/events', { ...payload, performedById: user?.id });
         setEvents((prev) => [...prev, created].sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()));
       }
       setModalOpen(false);

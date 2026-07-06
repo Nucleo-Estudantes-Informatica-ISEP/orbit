@@ -17,7 +17,7 @@ import { SearchInput } from '@/components/search-input';
 import { useAuth } from '@/lib/auth-context';
 import { usePermission } from '@/lib/use-permission';
 import { useLocale } from '@/lib/locale-context';
-import { api, API_BASE } from '@/lib/api';
+import { api, getFileUrl } from '@/lib/api';
 import { FileUpload } from '@/components/file-upload';
 import { toast } from 'sonner';
 
@@ -247,7 +247,7 @@ export default function DocumentsPage() {
                   ...p,
                   fileKey: result.key,
                   fileName: result.originalName,
-                  url: `${API_BASE}/files/${result.key}`,
+                  url: getFileUrl(result.key),
                   title: p.title || result.originalName,
                 }))}
                 onClear={() => setForm((p) => ({ ...p, fileKey: '', fileName: '', url: '' }))}

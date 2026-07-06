@@ -16,7 +16,7 @@ import { FileUpload } from '@/components/file-upload';
 import { useAuth } from '@/lib/auth-context';
 import { useLocale } from '@/lib/locale-context';
 import { usePermission } from '@/lib/use-permission';
-import { api, API_BASE } from '@/lib/api';
+import { api, getFileUrl } from '@/lib/api';
 import { toast } from 'sonner';
 
 type PlanStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
@@ -337,7 +337,7 @@ export default function PlansPage() {
                   {/* File download */}
                   {selectedPlan.fileKey && (
                     <a
-                      href={`${API_BASE}/files/${selectedPlan.fileKey}`}
+                      href={getFileUrl(selectedPlan.fileKey)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-2 rounded-lg border border-border/40 px-3 py-2.5 text-sm font-medium hover:bg-muted/40 transition-colors"

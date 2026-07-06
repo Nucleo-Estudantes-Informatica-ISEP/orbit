@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import { Upload, X, FileText, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { api, API_BASE } from '@/lib/api';
+import { api, getFileUrl } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useLocale } from '@/lib/locale-context';
 
@@ -114,7 +114,7 @@ export function FileUpload({
             <img src={preview} alt="preview" className="h-12 w-12 rounded object-cover shrink-0" />
           ) : displayKey && isImage(undefined, displayName ?? displayKey) ? (
             <img
-              src={`${API_BASE}/files/${displayKey}`}
+              src={getFileUrl(displayKey)}
               alt="preview"
               className="h-12 w-12 rounded object-cover shrink-0"
             />
@@ -125,7 +125,7 @@ export function FileUpload({
             <p className="text-sm font-medium truncate">{displayName ?? displayKey}</p>
             {displayKey && !preview && (
               <a
-                href={`${API_BASE}/files/${displayKey}`}
+                href={getFileUrl(displayKey)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs text-primary flex items-center gap-1 hover:underline"

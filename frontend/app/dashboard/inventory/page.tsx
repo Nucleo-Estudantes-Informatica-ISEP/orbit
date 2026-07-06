@@ -19,7 +19,7 @@ import { FileUpload } from '@/components/file-upload';
 import { useAuth } from '@/lib/auth-context';
 import { usePermission } from '@/lib/use-permission';
 import { useLocale } from '@/lib/locale-context';
-import { api, API_BASE } from '@/lib/api';
+import { api, getFileUrl } from '@/lib/api';
 import { toast } from 'sonner';
 
 interface InventoryItem {
@@ -396,7 +396,7 @@ export default function InventoryPage() {
                 <div className="relative h-40 bg-muted flex items-center justify-center shrink-0">
                   {item.photoKey ? (
                     <img
-                      src={`${API_BASE}/files/${item.photoKey}`}
+                      src={getFileUrl(item.photoKey)}
                       alt={item.name}
                       className="w-full h-full object-cover"
                     />

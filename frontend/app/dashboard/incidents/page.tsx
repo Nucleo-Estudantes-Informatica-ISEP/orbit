@@ -15,7 +15,7 @@ import { EmptyState } from '@/components/empty-state';
 import { useAuth } from '@/lib/auth-context';
 import { usePermission } from '@/lib/use-permission';
 import { useLocale } from '@/lib/locale-context';
-import { api, API_BASE } from '@/lib/api';
+import { api, getFileUrl } from '@/lib/api';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -407,7 +407,7 @@ export default function IncidentsPage() {
                     <div key={f.key} className="flex items-center gap-2 rounded-lg border border-border/40 bg-muted/40 px-3 py-2">
                       <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
                       <span className="text-sm flex-1 truncate">{f.originalName}</span>
-                      <a href={`${API_BASE}/files/${f.key}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80">
+                      <a href={getFileUrl(f.key)} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80">
                         <ExternalLink className="h-3.5 w-3.5" />
                       </a>
                       <Button type="button" variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => removeFile(f.key)}>
@@ -461,7 +461,7 @@ export default function IncidentsPage() {
                 {(selectedIncident.fileKeys ?? []).length > 0 && (
                   <div className="flex flex-wrap gap-2">
                     {selectedIncident.fileKeys.map((key) => (
-                      <a key={key} href={`${API_BASE}/files/${key}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-primary hover:underline border border-primary/20 rounded px-2 py-1">
+                      <a key={key} href={getFileUrl(key)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-primary hover:underline border border-primary/20 rounded px-2 py-1">
                         <FileText className="h-3 w-3" />
                         {key.split('/').pop()?.slice(0, 25) ?? key}
                         <ExternalLink className="h-2.5 w-2.5" />

@@ -25,7 +25,7 @@ export class EventsService {
       throw new BadRequestException('Invalid date format');
     }
 
-    return parsed;
+    return parsed.toISOString();
   }
 
   create(data: CreateEventDto) {

@@ -20,7 +20,7 @@ import { EmptyState } from '@/components/empty-state';
 import { useAuth } from '@/lib/auth-context';
 import { usePermission } from '@/lib/use-permission';
 import { useLocale } from '@/lib/locale-context';
-import { api, API_BASE } from '@/lib/api';
+import { api, getFileUrl } from '@/lib/api';
 import { FileUpload } from '@/components/file-upload';
 import { toast } from 'sonner';
 
@@ -424,7 +424,7 @@ export default function RecruitmentPage() {
                   maxSizeMB={10}
                   currentKey={form.cvUrl?.includes('/files/') ? form.cvUrl.split('/files/')[1] : undefined}
                   currentName={form.cvUrl ? t('recruitment.currentCv') : undefined}
-                  onUpload={(result) => setForm((p) => ({ ...p, cvUrl: `${API_BASE}/files/${result.key}` }))}
+                  onUpload={(result) => setForm((p) => ({ ...p, cvUrl: getFileUrl(result.key) }))}
                   onClear={() => setForm((p) => ({ ...p, cvUrl: '' }))}
                 />
               </div>

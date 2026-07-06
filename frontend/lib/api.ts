@@ -36,6 +36,12 @@ export async function apiFetch<T = unknown>(
   return res.json() as Promise<T>;
 }
 
+export function getFileUrl(key: string): string {
+  if (typeof window === 'undefined') return `${API_BASE}/files/${key}`;
+  const token = localStorage.getItem('auth_token');
+  return `${API_BASE}/files/${key}?token=${encodeURIComponent(token ?? '')}`;
+}
+
 export const api = {
   get: <T = unknown>(path: string) => apiFetch<T>(path),
   post: <T = unknown>(path: string, body: unknown) =>
