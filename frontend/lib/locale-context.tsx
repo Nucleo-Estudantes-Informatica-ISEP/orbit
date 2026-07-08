@@ -15,6 +15,9 @@ const messages: Record<AppLocale, Messages> = {
   en: enMessages as Messages,
 };
 
+const LOCALE_COOKIE = 'app_locale';
+const LOCALE_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
+
 type LocaleContextType = {
   locale: AppLocale;
   intlLocale: string;
@@ -30,6 +33,25 @@ function isAppLocale(value: string): value is AppLocale {
   return value === 'pt' || value === 'en';
 }
 
+function readLocaleCookie() {
+  if (typeof document === 'undefined') return null;
+
+  const match = document.cookie
+    .split('; ')
+    .find((entry) => entry.startsWith(`${LOCALE_COOKIE}=`));
+
+  if (!match) return null;
+
+  const value = decodeURIComponent(match.split('=').slice(1).join('='));
+  return isAppLocale(value) ? value : null;
+}
+
+function writeLocaleCookie(locale: AppLocale) {
+  if (typeof document === 'undefined') return;
+
+  document.cookie = `${LOCALE_COOKIE}=${encodeURIComponent(locale)}; Path=/; Max-Age=${LOCALE_COOKIE_MAX_AGE}; SameSite=Lax`;
+}
+
 function toIntlLocale(locale: AppLocale) {
   return locale === 'pt' ? 'pt-PT' : 'en-US';
 }
@@ -39,7 +61,7 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<AppLocale>('pt');
 
   useEffect(() => {
-    const stored = typeof window !== 'undefined' ? localStorage.getItem('app_locale') : null;
+    const stored = readLocaleCookie();
     if (stored && isAppLocale(stored)) {
       setLocaleState(stored);
     }
@@ -47,7 +69,7 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     document.documentElement.lang = locale;
-    localStorage.setItem('app_locale', locale);
+    writeLocaleCookie(locale);
   }, [locale]);
 
   useEffect(() => {
@@ -60,6 +82,7 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
         if (!active) return;
         if (settings?.language && isAppLocale(settings.language)) {
           setLocaleState(settings.language);
+          writeLocaleCookie(settings.language);
         }
       })
       .catch(() => {});
@@ -71,7 +94,7 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
 
   const setLocale = useCallback(async (nextLocale: AppLocale, persist = true) => {
     setLocaleState(nextLocale);
-    localStorage.setItem('app_locale', nextLocale);
+    writeLocaleCookie(nextLocale);
 
     if (persist && user?.id) {
       try {

@@ -3,6 +3,13 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   ArrowRight, 
   LayoutDashboard,
@@ -14,10 +21,16 @@ import {
   Sparkles
 } from "lucide-react";
 import Link from "next/link";
-import { useLocale } from '@/lib/locale-context';
+import { useLocale, type AppLocale } from '@/lib/locale-context';
 
 export default function Home() {
-  const { t } = useLocale();
+  const { locale, setLocale, t } = useLocale();
+
+  const handleLocaleChange = (nextLocale: string) => {
+    if (nextLocale === 'pt' || nextLocale === 'en') {
+      void setLocale(nextLocale as AppLocale);
+    }
+  };
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground selection:bg-primary/20 selection:text-primary">
@@ -167,15 +180,25 @@ export default function Home() {
 
       {/* FOOTER */}
       <footer className="border-t border-border/40 bg-background">
-        <div className="mx-auto max-w-7xl px-6 py-12 md:flex md:items-center md:justify-between lg:px-8">
-          <div className="flex justify-center md:order-2 space-x-6 text-sm font-medium text-muted-foreground">
-            <Link href="/privacy" className="hover:text-foreground">{t('home.privacy')}</Link>
-            <Link href="/terms" className="hover:text-foreground">{t('home.terms')}</Link>
-          </div>
-          <div className="mt-8 md:order-1 md:mt-0">
-            <p className="text-center text-sm leading-5 text-muted-foreground">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-8 text-center lg:flex-row lg:items-center lg:justify-between lg:px-8 lg:text-left">
+          <div>
+            <p className="text-sm leading-5 text-muted-foreground">
               &copy; {new Date().getFullYear()} NEI-ISEP. {t('home.footer')}
             </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-4 text-sm font-medium text-muted-foreground lg:justify-end">
+            <Link href="/privacy" className="transition-colors hover:text-foreground">{t('home.privacy')}</Link>
+            <Link href="/terms" className="transition-colors hover:text-foreground">{t('home.terms')}</Link>
+            <span className="hidden h-4 w-px bg-border/60 lg:block" />
+            <Select value={locale} onValueChange={handleLocaleChange}>
+              <SelectTrigger className="h-8 w-[7.5rem] rounded-md border border-input bg-background px-3 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-muted/40 focus:ring-2 focus:ring-ring/30 data-[state=open]:bg-muted/40">
+                <SelectValue placeholder={locale === 'pt' ? t('home.languagePortuguese') : t('home.languageEnglish')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pt">{t('home.languagePortuguese')}</SelectItem>
+                <SelectItem value="en">{t('home.languageEnglish')}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </footer>
