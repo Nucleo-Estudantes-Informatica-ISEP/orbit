@@ -87,6 +87,7 @@ export default function IncidentsPage() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
+  const [filterPriority, setFilterPriority] = useState<string | null>(null);
   const { page, pageSize, setPage, setPageSize, paginate } = usePagination(10);
   const [modalOpen, setModalOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -118,7 +119,11 @@ export default function IncidentsPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const filtered = filterStatus === 'ALL' ? incidents : incidents.filter((d) => d.status === filterStatus);
+  const filtered = incidents.filter((d) => {
+    if (filterStatus !== 'ALL' && d.status !== filterStatus) return false;
+    if (filterPriority && d.priority !== filterPriority) return false;
+    return true;
+  });
 
   const openCreate = () => {
     setEditTarget(null);
@@ -260,24 +265,27 @@ export default function IncidentsPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {([
-          { key: 'ALL', label: t('incidents.filterAll'), value: incidents.length, color: '', bg: 'bg-primary/5 border-primary/20' },
-          { key: 'OPEN', label: t('incidents.statusOpen'), value: incidents.filter((d) => d.status === 'OPEN').length, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-500/10 border-blue-500/25' },
-          { key: 'ANALYZING', label: t('incidents.statusAnalyzing'), value: incidents.filter((d) => d.status === 'ANALYZING').length, color: 'text-blue-700 dark:text-blue-300', bg: 'bg-indigo-500/10 border-indigo-500/25' },
-          { key: 'RESOLVING', label: t('incidents.statusResolving'), value: incidents.filter((d) => d.status === 'RESOLVING').length, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/10 border-amber-500/25' },
-          { key: 'URGENT', label: t('incidents.priorityUrgent'), value: incidents.filter((d) => d.priority === 'URGENT').length, color: 'text-destructive', bg: 'bg-destructive/10 border-destructive/25' },
-        ] as const).map(({ key, label, value, color, bg }) => (
-          <button
-            key={key}
-            onClick={() => { setFilterStatus(key); setPage(1); }}
-            className={cn(
-              'rounded-xl border p-3 text-left transition-all hover:shadow-sm',
-              filterStatus === key ? 'border-primary bg-accent/30 shadow-sm' : `${bg}`,
-            )}
-          >
-            <p className={cn('text-xl font-bold', color)}>{value}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
-          </button>
-        ))}
+          { key: 'ALL', label: t('incidents.filterAll'), value: incidents.length, color: '', bg: 'bg-primary/5 border-primary/20', isPriority: false },
+          { key: 'OPEN', label: t('incidents.statusOpen'), value: incidents.filter((d) => d.status === 'OPEN').length, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-500/10 border-blue-500/25', isPriority: false },
+          { key: 'ANALYZING', label: t('incidents.statusAnalyzing'), value: incidents.filter((d) => d.status === 'ANALYZING').length, color: 'text-blue-700 dark:text-blue-300', bg: 'bg-indigo-500/10 border-indigo-500/25', isPriority: false },
+          { key: 'RESOLVING', label: t('incidents.statusResolving'), value: incidents.filter((d) => d.status === 'RESOLVING').length, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/10 border-amber-500/25', isPriority: false },
+          { key: 'URGENT', label: t('incidents.priorityUrgent'), value: incidents.filter((d) => d.priority === 'URGENT').length, color: 'text-destructive', bg: 'bg-destructive/10 border-destructive/25', isPriority: true },
+        ] as const).map(({ key, label, value, color, bg, isPriority }) => {
+          const active = isPriority ? filterPriority === key : filterStatus === key;
+          return (
+            <button
+              key={key}
+              onClick={() => { setFilterPriority(isPriority ? key : null); setFilterStatus(isPriority ? 'ALL' : key); setPage(1); }}
+              className={cn(
+                'rounded-xl border p-3 text-left transition-all hover:shadow-sm',
+                active ? 'border-primary bg-accent/30 shadow-sm' : `${bg}`,
+              )}
+            >
+              <p className={cn('text-xl font-bold', color)}>{value}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
+            </button>
+          );
+        })}
       </div>
 
       {loading ? (
