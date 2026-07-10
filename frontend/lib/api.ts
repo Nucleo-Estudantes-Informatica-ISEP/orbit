@@ -46,8 +46,8 @@ export function getFileUrl(key: string): string {
  *  - Old persisted file URL with expired token → extracts key, regenerates fresh
  *  - MinIO object key (no protocol) → wraps with getFileUrl
  *  - External URL (https://…) → returned as-is */
-export function resolveFileUrl(value: string | null | undefined): string | null {
-  if (!value) return null;
+export function resolveFileUrl(value: string | null | undefined): string | undefined {
+  if (!value) return undefined;
   const filePrefix = `${API_BASE}/files/`;
   if (value.startsWith(filePrefix)) {
     const key = value.slice(filePrefix.length).split('?')[0].split('#')[0];
