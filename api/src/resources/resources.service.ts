@@ -1,10 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
+import { MinioService } from '../files/minio.service';
 import { CreateResourceDto } from './dto/create-resource.dto';
 
 @Injectable()
 export class ResourcesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly minio: MinioService,
+  ) {}
 
   private readonly include = {
     resourceDepartments: { include: { department: { select: { id: true, name: true } } } },
@@ -93,7 +97,13 @@ export class ResourcesService {
     });
   }
 
-  remove(id: string) {
+  async remove(id: string) {
+    const r = await this.prisma.resource.findUnique({ where: { id } });
+    if (!r) throw new NotFoundException('Resource not found');
+    const key = this.minio.extractKey(r.url);
+    if (key) {
+      await this.minio.deleteObject(key).catch(() => {});
+    }
     return this.prisma.resource.delete({ where: { id } });
   }
 }

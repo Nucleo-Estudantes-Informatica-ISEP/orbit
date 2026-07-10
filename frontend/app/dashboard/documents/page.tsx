@@ -118,12 +118,20 @@ export default function DocumentsPage() {
   const handleSave = async () => {
     if (!form.title.trim()) { setError('Título é obrigatório.'); return; }
     setSaving(true); setError('');
+    const payload = {
+      title: form.title,
+      url: form.url,
+      category: form.category,
+      description: form.description,
+      visibility: form.visibility,
+      departmentIds: form.departmentIds,
+    };
     try {
       if (editTarget) {
-        const updated = await api.put<Resource>(`/resources/${editTarget.id}`, form);
+        const updated = await api.put<Resource>(`/resources/${editTarget.id}`, payload);
         setResources((prev) => prev.map((r) => r.id === editTarget.id ? updated : r));
       } else {
-        const created = await api.post<Resource>('/resources', { ...form, performedById: user?.id });
+        const created = await api.post<Resource>('/resources', { ...payload, performedById: user?.id });
         setResources((prev) => [created, ...prev]);
       }
       setModalOpen(false);

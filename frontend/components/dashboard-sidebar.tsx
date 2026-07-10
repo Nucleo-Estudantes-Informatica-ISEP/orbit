@@ -9,6 +9,7 @@ import {
   Briefcase,
   Calendar,
   FileText,
+  FolderOpen,
   Settings,
   LogOut,
   ChevronLeft,
@@ -101,7 +102,7 @@ export function DashboardSidebar({
       items: navItems(
         canSeeAnnouncements ? { icon: Megaphone, label: t('nav.communications'), href: '/dashboard/announcements' } : null,
         canSeeEvents ? { icon: Calendar, label: t('nav.events'), href: '/dashboard/events' } : null,
-        canSeeResources ? { icon: FileText, label: t('nav.resources'), href: '/dashboard/documents' } : null,
+        canSeeResources ? { icon: FolderOpen, label: t('nav.resources'), href: '/dashboard/documents' } : null,
       ),
     },
     {
@@ -119,6 +120,11 @@ export function DashboardSidebar({
         canSeePlans ? { icon: ClipboardList, label: t('nav.plans'), href: '/dashboard/plans' } : null,
         canSeeDebts ? { icon: CreditCard, label: t('nav.debts'), href: '/dashboard/debts' } : null,
         canSeeIncidents ? { icon: AlertTriangle, label: t('nav.incidents'), href: '/dashboard/incidents' } : null,
+      ),
+    },
+    {
+      label: t('nav.system'),
+      items: navItems(
         canSeeAudits ? { icon: History, label: t('nav.auditLogs'), href: '/dashboard/audit-logs' } : null,
         canSeeFiles ? { icon: FileText, label: t('nav.files'), href: '/dashboard/files' } : null,
       ),

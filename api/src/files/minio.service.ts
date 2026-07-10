@@ -57,6 +57,19 @@ export class MinioService implements OnModuleInit {
     return this.client.statObject(this.bucket, objectKey);
   }
 
+  /** Extract a MinIO object key from a stored URL or return the value itself
+   *  if it's already a plain key. Returns null for external URLs. */
+  extractKey(value: string | null | undefined): string | null {
+    if (!value) return null;
+    const filesIdx = value.indexOf('/files/');
+    if (filesIdx >= 0) {
+      const key = value.slice(filesIdx + 7).split('?')[0].split('#')[0];
+      return key || null;
+    }
+    if (!/^https?:\/\//i.test(value)) return value;
+    return null;
+  }
+
   async listObjects(): Promise<BucketItem[]> {
     return new Promise((resolve, reject) => {
       const items: BucketItem[] = [];

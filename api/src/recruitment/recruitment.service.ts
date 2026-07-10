@@ -1,10 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
+import { MinioService } from '../files/minio.service';
 import * as PDFDocument from 'pdfkit';
 
 @Injectable()
 export class RecruitmentService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly minio: MinioService,
+  ) {}
 
   private include = {
     departmentChoices: {
@@ -57,17 +61,29 @@ export class RecruitmentService {
     });
   }
 
-  remove(id: string) {
+  async remove(id: string) {
+    const c = await this.prisma.candidate.findUnique({ where: { id } });
+    if (!c) throw new NotFoundException('Candidate not found');
+    const key = this.minio.extractKey(c.cvUrl);
+    if (key) {
+      await this.minio.deleteObject(key).catch(() => {});
+    }
     return this.prisma.candidate.delete({ where: { id } });
   }
 
   async clearAll() {
-    const count = await this.prisma.candidate.count();
-    if (count === 0) return { deleted: 0 };
+    const candidates = await this.prisma.candidate.findMany({ select: { cvUrl: true } });
+    if (candidates.length === 0) return { deleted: 0 };
+    const keys = candidates
+      .map((c) => this.minio.extractKey(c.cvUrl))
+      .filter((k): k is string => k !== null);
+    if (keys.length) {
+      await Promise.all(keys.map((key) => this.minio.deleteObject(key).catch(() => {})));
+    }
     await this.prisma.candidateDepartmentChoice.deleteMany();
     await this.prisma.recruitmentComment.deleteMany();
     await this.prisma.candidate.deleteMany();
-    return { deleted: count };
+    return { deleted: candidates.length };
   }
 
   async exportOne(id: string): Promise<Buffer> {
