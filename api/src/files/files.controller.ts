@@ -2,12 +2,15 @@ import {
   Controller,
   Post,
   Get,
+  Delete,
   Param,
   Res,
+  Query,
   UseGuards,
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
@@ -43,6 +46,22 @@ function mimeFromExt(ext: string): string {
 export class FilesController {
   constructor(private readonly minioService: MinioService) {}
 
+  @Get()
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('FILES_VIEW')
+  async list(
+    @Query('page') pageStr?: string,
+    @Query('pageSize') pageSizeStr?: string,
+  ) {
+    const page = Math.max(1, Number(pageStr ?? 1) || 1);
+    const pageSize = Math.max(1, Math.min(100, Number(pageSizeStr ?? 20) || 20));
+    const all = (await this.minioService.listObjects()).filter((f) => f.name && f.lastModified) as { name: string; size: number; lastModified: Date }[];
+    const sorted = all.sort((a, b) => b.lastModified.getTime() - a.lastModified.getTime());
+    const total = sorted.length;
+    const items = sorted.slice((page - 1) * pageSize, page * pageSize);
+    return { items, total, page, pageSize };
+  }
+
   @Post('upload')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions('FILES_UPLOAD')
@@ -66,6 +85,19 @@ export class FilesController {
       mimeType: file.mimetype,
       size: file.size,
     };
+  }
+
+  @Delete(':key')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('FILES_DELETE')
+  async deleteFile(@Param('key') key: string) {
+    try {
+      await this.minioService.getObjectStat(key);
+    } catch {
+      throw new NotFoundException('Ficheiro não encontrado');
+    }
+    await this.minioService.deleteObject(key);
+    return { message: 'Ficheiro eliminado com sucesso' };
   }
 
   @Get('*key')

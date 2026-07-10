@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import * as Minio from 'minio';
+import type { BucketItem } from 'minio';
 
 @Injectable()
 export class MinioService implements OnModuleInit {
@@ -54,5 +55,15 @@ export class MinioService implements OnModuleInit {
 
   async getObjectStat(objectKey: string): Promise<Minio.BucketItemStat> {
     return this.client.statObject(this.bucket, objectKey);
+  }
+
+  async listObjects(): Promise<BucketItem[]> {
+    return new Promise((resolve, reject) => {
+      const items: BucketItem[] = [];
+      const stream = this.client.listObjectsV2(this.bucket, '', true);
+      stream.on('data', (item: BucketItem) => { if (item.name) items.push(item); });
+      stream.on('end', () => resolve(items));
+      stream.on('error', reject);
+    });
   }
 }

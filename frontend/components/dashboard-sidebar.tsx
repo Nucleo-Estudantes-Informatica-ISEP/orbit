@@ -84,6 +84,7 @@ export function DashboardSidebar({
   const canSeeDebts = usePermission('DEBTS_VIEW');
   const canSeeAudits = authUser?.permissions?.includes('AUDITS_READ') ?? false;
   const canSeeIncidents = usePermission('INCIDENTS_VIEW');
+  const canSeeFiles = usePermission('FILES_VIEW');
 
   const navItems = (...items: Array<NavItem | null>): NavItem[] => items.filter((item): item is NavItem => Boolean(item));
 
@@ -119,6 +120,7 @@ export function DashboardSidebar({
         canSeeDebts ? { icon: CreditCard, label: t('nav.debts'), href: '/dashboard/debts' } : null,
         canSeeIncidents ? { icon: AlertTriangle, label: t('nav.incidents'), href: '/dashboard/incidents' } : null,
         canSeeAudits ? { icon: History, label: t('nav.auditLogs'), href: '/dashboard/audit-logs' } : null,
+        canSeeFiles ? { icon: FileText, label: t('nav.files'), href: '/dashboard/files' } : null,
       ),
     },
   ].filter((group) => group.items.length > 0);

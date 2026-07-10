@@ -12,6 +12,7 @@
   "nav.debts": "Debts",
   "nav.auditLogs": "Audit Logs",
   "nav.incidents": "Incidents",
+  "nav.files": "Files",
   "nav.settings": "Settings",
   "nav.logout": "Logout",
   "nav.general": "General",
@@ -670,5 +671,15 @@
   "incidents.nameRequired": "Title is required.",
   "incidents.descriptionRequired": "Description is required.",
   "incidents.comments": "Comments",
-  "incidents.commentPlaceholder": "Write a comment..."
+  "incidents.commentPlaceholder": "Write a comment...",
+  "files.title": "Files",
+  "files.subtitle": "All files stored in the system",
+  "files.empty": "No files uploaded yet",
+  "files.name": "Name",
+  "files.size": "Size",
+  "files.lastModified": "Last modified",
+  "files.download": "Download",
+  "files.delete": "Delete",
+  "files.deleteConfirm": "Are you sure you want to delete this file?",
+  "files.deleted": "File deleted successfully"
 }

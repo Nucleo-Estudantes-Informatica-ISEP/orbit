@@ -12,6 +12,7 @@
   "nav.debts": "Dívidas",
   "nav.auditLogs": "Registo de Atividades",
   "nav.incidents": "Incidentes",
+  "nav.files": "Ficheiros",
   "nav.settings": "Definições",
   "nav.logout": "Terminar sessão",
   "nav.general": "Geral",
@@ -670,5 +671,15 @@
   "incidents.nameRequired": "O título é obrigatório.",
   "incidents.descriptionRequired": "A descrição é obrigatória.",
   "incidents.comments": "Comentários",
-  "incidents.commentPlaceholder": "Escreve um comentário..."
+  "incidents.commentPlaceholder": "Escreve um comentário...",
+  "files.title": "Ficheiros",
+  "files.subtitle": "Todos os ficheiros armazenados no sistema",
+  "files.empty": "Nenhum ficheiro carregado ainda",
+  "files.name": "Nome",
+  "files.size": "Tamanho",
+  "files.lastModified": "Última modificação",
+  "files.download": "Descarregar",
+  "files.delete": "Eliminar",
+  "files.deleteConfirm": "Tens a certeza que queres eliminar este ficheiro?",
+  "files.deleted": "Ficheiro eliminado com sucesso"
 }
