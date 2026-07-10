@@ -20,7 +20,7 @@ import { EmptyState } from '@/components/empty-state';
 import { useAuth } from '@/lib/auth-context';
 import { usePermission } from '@/lib/use-permission';
 import { useLocale } from '@/lib/locale-context';
-import { api, getFileUrl } from '@/lib/api';
+import { api, resolveFileUrl } from '@/lib/api';
 import { FileUpload } from '@/components/file-upload';
 import { toast } from 'sonner';
 
@@ -294,7 +294,7 @@ export default function RecruitmentPage() {
                               {c.year && <Badge variant="secondary" className="text-[10px]">{c.year}º ano</Badge>}
                             </div>
                             {c.cvUrl && (
-                              <a href={c.cvUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-muted-foreground hover:text-primary">
+                              <a href={resolveFileUrl(c.cvUrl)} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-muted-foreground hover:text-primary">
                                 <FileText className="h-3.5 w-3.5" />
                               </a>
                             )}
@@ -362,7 +362,7 @@ export default function RecruitmentPage() {
                                 {c.year && <Badge variant="secondary" className="text-[10px]">{c.year}º ano</Badge>}
                               </div>
                               {c.cvUrl && (
-                                <a href={c.cvUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-muted-foreground hover:text-primary">
+                                <a href={resolveFileUrl(c.cvUrl)} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-muted-foreground hover:text-primary">
                                   <FileText className="h-3.5 w-3.5" />
                                 </a>
                               )}
@@ -422,9 +422,9 @@ export default function RecruitmentPage() {
                 <FileUpload
                   accept=".pdf,.doc,.docx"
                   maxSizeMB={10}
-                  currentKey={form.cvUrl?.includes('/files/') ? form.cvUrl.split('/files/')[1] : undefined}
+                  currentKey={form.cvUrl || undefined}
                   currentName={form.cvUrl ? t('recruitment.currentCv') : undefined}
-                  onUpload={(result) => setForm((p) => ({ ...p, cvUrl: getFileUrl(result.key) }))}
+                   onUpload={(result) => setForm((p) => ({ ...p, cvUrl: result.key }))}
                   onClear={() => setForm((p) => ({ ...p, cvUrl: '' }))}
                 />
               </div>
@@ -496,7 +496,7 @@ export default function RecruitmentPage() {
                 {detailCandidate.course && <Badge variant="secondary">{detailCandidate.course}</Badge>}
                 {detailCandidate.year && <Badge variant="secondary">{detailCandidate.year}º ano</Badge>}
                 {detailCandidate.cvUrl && (
-                  <a href={detailCandidate.cvUrl} target="_blank" rel="noopener noreferrer">
+                  <a href={resolveFileUrl(detailCandidate.cvUrl)} target="_blank" rel="noopener noreferrer">
                     <Badge variant="outline" className="flex items-center gap-1 text-primary border-primary/30 cursor-pointer hover:bg-primary/5">
                       <FileText className="h-3 w-3" />{t('recruitment.viewCv')}
                     </Badge>

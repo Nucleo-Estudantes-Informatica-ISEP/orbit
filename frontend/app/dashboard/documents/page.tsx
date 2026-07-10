@@ -17,7 +17,7 @@ import { SearchInput } from '@/components/search-input';
 import { useAuth } from '@/lib/auth-context';
 import { usePermission } from '@/lib/use-permission';
 import { useLocale } from '@/lib/locale-context';
-import { api, getFileUrl } from '@/lib/api';
+import { api, API_BASE, resolveFileUrl } from '@/lib/api';
 import { FileUpload } from '@/components/file-upload';
 import { toast } from 'sonner';
 
@@ -184,7 +184,7 @@ export default function DocumentsPage() {
                   <div className="flex items-center gap-1 shrink-0">
                     {r.url && (
                       <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
-                        <a href={r.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                        <a href={resolveFileUrl(r.url)} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
                           <ExternalLink className="h-3.5 w-3.5" />
                         </a>
                       </Button>
@@ -247,7 +247,7 @@ export default function DocumentsPage() {
                   ...p,
                   fileKey: result.key,
                   fileName: result.originalName,
-                  url: getFileUrl(result.key),
+                  url: `${API_BASE}/files/${result.key}`,
                   title: p.title || result.originalName,
                 }))}
                 onClear={() => setForm((p) => ({ ...p, fileKey: '', fileName: '', url: '' }))}

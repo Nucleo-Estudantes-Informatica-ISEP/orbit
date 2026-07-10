@@ -42,6 +42,21 @@ export function getFileUrl(key: string): string {
   return `${API_BASE}/files/${key}?token=${encodeURIComponent(token ?? '')}`;
 }
 
+/** Resolve a stored URL/value to a downloadable file URL.
+ *  - Old persisted file URL with expired token → extracts key, regenerates fresh
+ *  - MinIO object key (no protocol) → wraps with getFileUrl
+ *  - External URL (https://…) → returned as-is */
+export function resolveFileUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const filePrefix = `${API_BASE}/files/`;
+  if (value.startsWith(filePrefix)) {
+    const key = value.slice(filePrefix.length).split('?')[0].split('#')[0];
+    return getFileUrl(key);
+  }
+  if (!/^https?:\/\//i.test(value)) return getFileUrl(value);
+  return value;
+}
+
 export const api = {
   get: <T = unknown>(path: string) => apiFetch<T>(path),
   post: <T = unknown>(path: string, body: unknown) =>
