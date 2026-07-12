@@ -67,7 +67,7 @@ export class PlansService {
       data: { status: 'APPROVED', approvedById, approvedAt: new Date() },
       include: this.include,
     });
-    this.notifyPlanCreator(plan.createdById, plan.name, 'APROVADO').catch(() => {});
+    this.notifyPlanCreator(plan.createdById, plan.name, 'APPROVED').catch(() => {});
     return result;
   }
 
@@ -82,7 +82,7 @@ export class PlansService {
       data: { status: 'REJECTED', approvedById, approvedAt: new Date(), rejectionNote: rejectionNote ?? null },
       include: this.include,
     });
-    this.notifyPlanCreator(plan.createdById, plan.name, 'REJEITADO').catch(() => {});
+    this.notifyPlanCreator(plan.createdById, plan.name, 'REJECTED', rejectionNote).catch(() => {});
     return result;
   }
 
@@ -95,13 +95,13 @@ export class PlansService {
     return this.prisma.plan.delete({ where: { id } });
   }
 
-  private async notifyPlanCreator(userId: string, planTitle: string, status: string) {
+  private async notifyPlanCreator(userId: string, planTitle: string, status: string, rejectionNote?: string) {
     const settings = await this.prisma.userSettings.findUnique({
       where: { userId },
       include: { user: { select: { name: true, email: true } } },
     });
     if (settings?.emailNotifications && settings.user.email) {
-      await this.mailService.sendPlanStatusUpdate(settings.user.email, settings.user.name, planTitle, status);
+      await this.mailService.sendPlanStatusUpdate(settings.user.email, settings.user.name, planTitle, status, rejectionNote);
     }
   }
 }
