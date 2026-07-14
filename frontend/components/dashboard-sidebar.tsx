@@ -150,7 +150,8 @@ export function DashboardSidebar({
       {/* Mobile Top Header */}
       <div className="flex md:hidden h-16 items-center justify-between px-4 border-b border-border/40 bg-background shrink-0">
         <div className="flex items-center gap-2">
-          <img src="/logo-extended.svg" alt="ORBIT" className="h-8 w-auto" />
+          <img src="/logo-extended-dark.svg" alt="ORBIT" className="h-8 w-auto block dark:hidden" />
+          <img src="/logo-extended.svg" alt="ORBIT" className="h-8 w-auto hidden dark:block" />
         </div>
         <Button
           variant="ghost"
@@ -183,16 +184,26 @@ export function DashboardSidebar({
         <div className={cn('flex shrink-0 border-b border-border/40', isCollapsed ? 'md:flex-col md:items-center md:py-4 md:gap-2' : 'items-center justify-between p-4 h-16')}>
           {/* Logo */}
           <div className="flex items-center">
-            <img
-              src="/logo-extended.svg"
-              alt="ORBIT"
-              className={cn('h-8 w-auto', isCollapsed && 'md:hidden')}
-            />
-            <img
-              src="/favicon.svg"
-              alt=""
-              className={cn('h-8 w-8 hidden', isCollapsed && 'md:block')}
-            />
+            {isCollapsed ? (
+              <img
+                src="/favicon.svg"
+                alt="ORBIT"
+                className="hidden h-8 w-8 md:block"
+              />
+            ) : (
+              <>
+                <img
+                  src="/logo-extended-dark.svg"
+                  alt="ORBIT"
+                  className="block h-8 w-auto dark:hidden"
+                />
+                <img
+                  src="/logo-extended.svg"
+                  alt="ORBIT"
+                  className="hidden h-8 w-auto dark:block"
+                />
+              </>
+            )}
           </div>
 
           {/* Desktop: collapse toggle */}

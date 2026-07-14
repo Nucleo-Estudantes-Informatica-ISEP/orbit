@@ -82,7 +82,8 @@ export default function LoginPage() {
 
       {/* BRANDING / LOGO (No hover animation) */}
       <Link href="/" className="mb-10 flex items-center gap-2">
-        <img src="/logo-extended.svg" alt="ORBIT" className="h-10 w-auto" />
+        <img src="/logo-extended-dark.svg" alt="ORBIT" className="h-10 w-auto block dark:hidden" />
+        <img src="/logo-extended.svg" alt="ORBIT" className="h-10 w-auto hidden dark:block" />
         <Badge variant="secondary" className="ml-2 text-[10px] font-medium tracking-wider uppercase">
           {'NEI-ISEP'}
         </Badge>

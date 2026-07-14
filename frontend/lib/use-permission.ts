@@ -5,7 +5,6 @@ import { useAuth } from '@/lib/auth-context';
 export function usePermission(permission: string): boolean {
   const { user } = useAuth();
   if (!user) return false;
-  if (user.roles?.includes('ADMIN')) return true;
 
   const effectivePermissions = new Set(user.permissions ?? []);
 
@@ -48,7 +47,7 @@ export function usePermission(permission: string): boolean {
   if (permission === 'FILES_UPLOAD' && effectivePermissions.has('FILES_UPLOAD')) return true;
   if (action === 'VIEW' && effectivePermissions.has(viewPermission)) return true;
 
-  // PLANS_APPROVE only for ADMIN (already handled above)
+  // PLANS_APPROVE remains explicit-only.
   if (permission === 'PLANS_APPROVE') return false;
 
   return false;
