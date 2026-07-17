@@ -82,6 +82,7 @@ export default function DebtsPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [confirmText, setConfirmText] = useState('');
+  const [confirmAction, setConfirmAction] = useState<'complete' | 'revert'>('complete');
   const [exportParams, setExportParams] = useState({
     dateFrom: '',
     dateTo: '',
@@ -229,6 +230,19 @@ export default function DebtsPage() {
       setConfirmId(null);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : t('debts.completeError'));
+    }
+  };
+
+  const handleRevert = async (id: string) => {
+    try {
+      const updated = await api.post<Debt>(`/debts/${id}/revert`, {});
+      setDebts((prev) => prev.map((d) => (d.id === id ? updated : d)));
+      toast.success(t('debts.reverted'));
+      setConfirmOpen(false);
+      setConfirmText('');
+      setConfirmId(null);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : t('debts.revertError'));
     }
   };
 
@@ -485,16 +499,21 @@ export default function DebtsPage() {
                   {d.type === 'OUTCOME' ? '−' : '+'}{formatCurrency(Number(d.value))}
                 </span>
                 {canUpdate && d.status !== 'COMPLETED' && (
-                  <Button variant="outline" size="sm" onClick={() => { setConfirmId(d.id); setConfirmText(''); setConfirmOpen(true); }}>
+                  <Button variant="outline" size="sm" onClick={() => { setConfirmAction('complete'); setConfirmId(d.id); setConfirmText(''); setConfirmOpen(true); }}>
                     {t('debts.complete')}
                   </Button>
                 )}
-                {canUpdate && (
+                {canUpdate && d.status === 'COMPLETED' && (
+                  <Button variant="outline" size="sm" onClick={() => { setConfirmAction('revert'); setConfirmId(d.id); setConfirmText(''); setConfirmOpen(true); }}>
+                    {t('debts.revert')}
+                  </Button>
+                )}
+                {canUpdate && d.status !== 'COMPLETED' && (
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(d)}>
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
                 )}
-                {canDelete && (
+                {canDelete && d.status !== 'COMPLETED' && (
                   <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDelete(d.id)}>
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
@@ -772,26 +791,41 @@ export default function DebtsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {/* Complete Confirmation */}
+      {/* Confirmation Dialog (Complete / Revert) */}
       <Dialog open={confirmOpen} onOpenChange={(o) => { if (!o) { setConfirmOpen(false); setConfirmText(''); setConfirmId(null); } }}>
         <DialogContent className="w-full max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-primary">
-              <TrendingUp className="h-5 w-5" />{t('debts.completeTitle')}
+              <TrendingUp className="h-5 w-5" />
+              {confirmAction === 'revert' ? t('debts.revertTitle') : t('debts.completeTitle')}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">{t('debts.completeDescription')}</p>
-            <p className="text-sm font-medium">{t('debts.completeType')}</p>
+            <p className="text-sm text-muted-foreground">
+              {confirmAction === 'revert' ? t('debts.revertDescription') : t('debts.completeDescription')}
+            </p>
+            <p className="text-sm font-medium">
+              {confirmAction === 'revert' ? t('debts.revertType') : t('debts.completeType')}
+            </p>
             <Input
               value={confirmText}
               onChange={(e) => setConfirmText(e.target.value)}
-              placeholder={t('debts.completePlaceholder')}
+              placeholder={confirmAction === 'revert' ? t('debts.revertPlaceholder') : t('debts.completePlaceholder')}
             />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setConfirmOpen(false); setConfirmText(''); setConfirmId(null); }}>{t('common.cancel')}</Button>
-            <Button variant="default" onClick={() => { if (confirmId) handleComplete(confirmId); }} disabled={confirmText !== 'CONCLUIR'}>{t('debts.completeConfirm')}</Button>
+            <Button
+              variant="default"
+              onClick={() => {
+                if (!confirmId) return;
+                if (confirmAction === 'revert') handleRevert(confirmId);
+                else handleComplete(confirmId);
+              }}
+              disabled={confirmText !== (confirmAction === 'revert' ? 'Reverter' : 'CONCLUIR')}
+            >
+              {confirmAction === 'revert' ? t('debts.revertConfirm') : t('debts.completeConfirm')}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

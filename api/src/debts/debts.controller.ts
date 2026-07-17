@@ -33,6 +33,12 @@ export class DebtsController {
     return this.svc.complete(id);
   }
 
+  @Post(':id/revert')
+  @Permissions('DEBTS_UPDATE')
+  revert(@Param('id') id: string) {
+    return this.svc.revert(id);
+  }
+
   @Put(':id')
   @Permissions('DEBTS_UPDATE')
   update(@Param('id') id: string, @Body() body: any) {

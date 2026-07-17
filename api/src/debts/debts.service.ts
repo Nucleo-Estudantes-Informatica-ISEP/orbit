@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { MinioService } from '../files/minio.service';
 
@@ -43,6 +43,11 @@ export class DebtsService {
   }
 
   async update(id: string, data: any) {
+    const existing = await this.prisma.debt.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Dívida não encontrada');
+    if (existing.status === 'COMPLETED') {
+      throw new BadRequestException('Não é possível editar uma dívida concluída');
+    }
     const { performedById, ...rest } = data;
     if (rest.occurredAt && typeof rest.occurredAt === 'string' && rest.occurredAt.length === 10) {
       rest.occurredAt = new Date(rest.occurredAt).toISOString();
@@ -78,9 +83,28 @@ export class DebtsService {
     });
   }
 
+  async revert(id: string) {
+    const d = await this.prisma.debt.findUnique({ where: { id } });
+    if (!d) throw new NotFoundException('Dívida não encontrada');
+    if (d.status !== 'COMPLETED') {
+      throw new BadRequestException('Apenas dívidas concluídas podem ser revertidas');
+    }
+    return this.prisma.debt.update({
+      where: { id },
+      data: {
+        status: 'PENDING',
+        completedAt: null,
+      },
+      include: this.include,
+    });
+  }
+
   async remove(id: string) {
     const d = await this.prisma.debt.findUnique({ where: { id } });
     if (!d) throw new NotFoundException('Dívida não encontrada');
+    if (d.status === 'COMPLETED') {
+      throw new BadRequestException('Não é possível eliminar uma dívida concluída');
+    }
     if (d.fileKeys?.length) {
       await Promise.all(d.fileKeys.map((key: string) => this.minio.deleteObject(key).catch(() => {})));
     }
