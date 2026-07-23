@@ -59,7 +59,7 @@ export default function EventsPage() {
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [view, setView] = useState<'list' | 'calendar'>('list');
-  const [filter, setFilter] = useState<'ALL' | 'UPCOMING' | 'PAST'>('ALL');
+  const [filter, setFilter] = useState<'ALL' | 'UPCOMING' | 'PAST'>('UPCOMING');
   const { page, pageSize, setPage, setPageSize, paginate } = usePagination(6);
 
   const [modalOpen, setModalOpen] = useState(false);
