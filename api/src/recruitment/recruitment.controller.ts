@@ -4,7 +4,13 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
 import type { Response } from 'express';
+import { ApiCreatedResponse, ApiOkResponse, ApiProduces, ApiTags } from '@nestjs/swagger';
+import { CreateCandidateDto, IdParamDto, UpdateCandidateDto } from '../contracts/request.dto';
+import { CandidateResponseDto, DeletedCountResponseDto } from '../contracts/response.dto';
+import { ApiProtectedController } from '../contracts/openapi.decorators';
 
+@ApiTags('candidates')
+@ApiProtectedController()
 @Controller('candidates')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class RecruitmentController {
@@ -12,18 +18,22 @@ export class RecruitmentController {
 
   @Post()
   @Permissions('RECRUITMENT_CREATE')
-  create(@Body() body: any) {
+  @ApiCreatedResponse({ type: CandidateResponseDto })
+  create(@Body() body: CreateCandidateDto) {
     return this.svc.create(body);
   }
 
   @Get()
   @Permissions('RECRUITMENT_READ')
+  @ApiOkResponse({ type: CandidateResponseDto, isArray: true })
   findAll() {
     return this.svc.findAll();
   }
 
   @Get('export/all')
   @Permissions('RECRUITMENT_READ')
+  @ApiProduces('application/pdf')
+  @ApiOkResponse({ schema: { type: 'string', format: 'binary' } })
   async exportAll(@Res() res: Response) {
     const buffer = await this.svc.exportAll();
     res.set({
@@ -36,11 +46,13 @@ export class RecruitmentController {
 
   @Get('export/:id')
   @Permissions('RECRUITMENT_READ')
-  async exportOne(@Param('id') id: string, @Res() res: Response) {
-    const buffer = await this.svc.exportOne(id);
+  @ApiProduces('application/pdf')
+  @ApiOkResponse({ schema: { type: 'string', format: 'binary' } })
+  async exportOne(@Param() params: IdParamDto, @Res() res: Response) {
+    const buffer = await this.svc.exportOne(params.id);
     res.set({
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="candidato-${id}.pdf"`,
+      'Content-Disposition': `attachment; filename="candidato-${params.id}.pdf"`,
       'Content-Length': buffer.length,
     });
     res.send(buffer);
@@ -48,25 +60,29 @@ export class RecruitmentController {
 
   @Get(':id')
   @Permissions('RECRUITMENT_READ')
-  findOne(@Param('id') id: string) {
-    return this.svc.findOne(id);
+  @ApiOkResponse({ type: CandidateResponseDto })
+  findOne(@Param() params: IdParamDto) {
+    return this.svc.findOne(params.id);
   }
 
   @Put(':id')
   @Permissions('RECRUITMENT_UPDATE')
-  update(@Param('id') id: string, @Body() body: any) {
-    return this.svc.update(id, body);
+  @ApiOkResponse({ type: CandidateResponseDto })
+  update(@Param() params: IdParamDto, @Body() body: UpdateCandidateDto) {
+    return this.svc.update(params.id, body);
   }
 
   @Delete()
   @Permissions('RECRUITMENT_DELETE')
+  @ApiOkResponse({ type: DeletedCountResponseDto })
   clearAll() {
     return this.svc.clearAll();
   }
 
   @Delete(':id')
   @Permissions('RECRUITMENT_DELETE')
-  remove(@Param('id') id: string) {
-    return this.svc.remove(id);
+  @ApiOkResponse({ type: CandidateResponseDto })
+  remove(@Param() params: IdParamDto) {
+    return this.svc.remove(params.id);
   }
 }

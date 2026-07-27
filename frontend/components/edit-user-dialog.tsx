@@ -100,6 +100,11 @@ export function EditUserDialog({ user, open, onOpenChange, onSave, roles, depart
       return;
     }
 
+    if (formData.password && formData.password.length < 8) {
+      setError(t('people.passwordLength'));
+      return;
+    }
+
     if (formData.password && formData.password !== formData.confirmPassword) {
       setError(t('people.passwordMismatch'));
       return;

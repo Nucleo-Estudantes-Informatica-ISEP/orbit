@@ -35,7 +35,7 @@ export class ResourcesService {
     });
   }
 
-  async findAll(filters?: { page?: string; pageSize?: string; category?: string; search?: string }) {
+  async findAll(filters?: { page?: number; pageSize?: number; category?: string; search?: string }) {
     const page = Math.max(1, Number(filters?.page ?? 1) || 1);
     const pageSize = Math.max(1, Math.min(100, Number(filters?.pageSize ?? 6) || 6));
     const where: any = {

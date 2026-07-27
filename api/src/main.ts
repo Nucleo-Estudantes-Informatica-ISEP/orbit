@@ -1,11 +1,18 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
+import { SwaggerModule } from '@nestjs/swagger';
+import { createOpenApiDocument } from './openapi';
+import { createValidationPipe } from './validation';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.enableShutdownHooks();
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  app.useGlobalPipes(createValidationPipe());
+
+  const openApiDocument = createOpenApiDocument(app);
+  SwaggerModule.setup('docs', app, openApiDocument, {
+    jsonDocumentUrl: 'openapi.json',
+  });
   
   // Habilitar CORS
   const corsOrigins = process.env.CORS_ORIGIN

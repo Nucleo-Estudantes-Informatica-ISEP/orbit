@@ -74,7 +74,7 @@ export class EventsService {
     });
   }
 
-  async findAll(filters?: { page?: string; pageSize?: string; filter?: string }) {
+  async findAll(filters?: { page?: number; pageSize?: number; filter?: string }) {
     const page = Math.max(1, Number(filters?.page ?? 1) || 1);
     const pageSize = Math.max(1, Math.min(100, Number(filters?.pageSize ?? 6) || 6));
     const now = new Date();

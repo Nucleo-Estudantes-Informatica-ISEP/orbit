@@ -112,7 +112,7 @@ export class AnnouncementsService {
     ));
   }
 
-  async findAll(userId: string, filters?: { page?: string; pageSize?: string; visibility?: string }) {
+  async findAll(userId: string, filters?: { page?: number; pageSize?: number; visibility?: string }) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { departmentId: true },

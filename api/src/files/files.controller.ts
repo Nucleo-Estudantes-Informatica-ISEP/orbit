@@ -20,6 +20,10 @@ import { Permissions } from '../auth/permissions.decorator';
 import { MinioService } from './minio.service';
 import { randomUUID } from 'crypto';
 import * as path from 'path';
+import { ApiBody, ApiConsumes, ApiCreatedResponse, ApiOkResponse, ApiProduces, ApiTags } from '@nestjs/swagger';
+import { FileKeyParamDto, PaginationQueryDto } from '../contracts/request.dto';
+import { FileResponseDto, MessageResponseDto, PaginatedFileResponseDto } from '../contracts/response.dto';
+import { ApiProtectedController } from '../contracts/openapi.decorators';
 
 const INLINE_TYPES = new Set([
   'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
@@ -42,6 +46,8 @@ function mimeFromExt(ext: string): string {
   return map[ext.toLowerCase()] ?? 'application/octet-stream';
 }
 
+@ApiTags('files')
+@ApiProtectedController()
 @Controller('files')
 export class FilesController {
   constructor(private readonly minioService: MinioService) {}
@@ -49,12 +55,12 @@ export class FilesController {
   @Get()
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions('FILES_VIEW')
+  @ApiOkResponse({ type: PaginatedFileResponseDto })
   async list(
-    @Query('page') pageStr?: string,
-    @Query('pageSize') pageSizeStr?: string,
+    @Query() query: PaginationQueryDto,
   ) {
-    const page = Math.max(1, Number(pageStr ?? 1) || 1);
-    const pageSize = Math.max(1, Math.min(100, Number(pageSizeStr ?? 20) || 20));
+    const page = query.page ?? 1;
+    const pageSize = Math.min(100, query.pageSize ?? 20);
     const all = (await this.minioService.listObjects()).filter((f) => f.name && f.lastModified) as { name: string; size: number; lastModified: Date }[];
     const sorted = all.sort((a, b) => b.lastModified.getTime() - a.lastModified.getTime());
     const total = sorted.length;
@@ -66,6 +72,15 @@ export class FilesController {
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions('FILES_UPLOAD')
   @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
+  @ApiCreatedResponse({ type: FileResponseDto })
   async upload(@UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('Nenhum ficheiro enviado');
     if (file.size > 10 * 1024 * 1024) {
@@ -90,23 +105,26 @@ export class FilesController {
   @Delete(':key')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions('FILES_DELETE')
-  async deleteFile(@Param('key') key: string) {
+  @ApiOkResponse({ type: MessageResponseDto })
+  async deleteFile(@Param() params: FileKeyParamDto) {
     try {
-      await this.minioService.getObjectStat(key);
+      await this.minioService.getObjectStat(params.key);
     } catch {
       throw new NotFoundException('Ficheiro não encontrado');
     }
-    await this.minioService.deleteObject(key);
+    await this.minioService.deleteObject(params.key);
     return { message: 'Ficheiro eliminado com sucesso' };
   }
 
   @Get('*key')
   @UseGuards(JwtAuthGuard)
-  async getFile(@Param('key') key: string, @Res() res: Response) {
+  @ApiProduces('application/octet-stream')
+  @ApiOkResponse({ schema: { type: 'string', format: 'binary' } })
+  async getFile(@Param() params: FileKeyParamDto, @Res() res: Response) {
     try {
-      const stat = await this.minioService.getObjectStat(key);
-      const stream = await this.minioService.getObject(key);
-      const ext = path.extname(key).toLowerCase();
+      const stat = await this.minioService.getObjectStat(params.key);
+      const stream = await this.minioService.getObject(params.key);
+      const ext = path.extname(params.key).toLowerCase();
       const contentType =
         (stat.metaData?.['content-type'] as string | undefined) ??
         (stat.metaData?.['Content-Type'] as string | undefined) ??
@@ -114,7 +132,7 @@ export class FilesController {
 
       const disposition = INLINE_TYPES.has(contentType) ? 'inline' : 'attachment';
       res.setHeader('Content-Type', contentType);
-      res.setHeader('Content-Disposition', `${disposition}; filename="${path.basename(key)}"`);
+      res.setHeader('Content-Disposition', `${disposition}; filename="${path.basename(params.key)}"`);
       res.setHeader('Cache-Control', 'private, max-age=3600');
       if (stat.size) res.setHeader('Content-Length', stat.size);
       stream.pipe(res);

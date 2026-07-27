@@ -187,7 +187,13 @@ function TasksPage() {
     if (!form.title.trim()) { setError(t('tasks.titleRequired')); return; }
     setSaving(true); setError('');
     try {
-      const payload = { ...form, deadline: form.deadline || undefined, performedById: user?.id };
+      const payload = {
+        ...form,
+        deadline: form.deadline || undefined,
+        boardId: form.boardId || undefined,
+        projectId: form.projectId || undefined,
+        performedById: user?.id,
+      };
       if (editTarget) {
         const updated = await api.put<Task>(`/tasks/${editTarget.id}`, payload);
         setTasks((prev) => prev.map((t) => t.id === editTarget.id ? updated : t));

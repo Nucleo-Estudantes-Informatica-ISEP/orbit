@@ -3,7 +3,13 @@ import { TasksService } from './tasks.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
+import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { CreateTaskDto, IdParamDto, TaskQueryDto, UpdateTaskDto } from '../contracts/request.dto';
+import { TaskResponseDto } from '../contracts/response.dto';
+import { ApiProtectedController } from '../contracts/openapi.decorators';
 
+@ApiTags('tasks')
+@ApiProtectedController()
 @Controller('tasks')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class TasksController {
@@ -11,31 +17,36 @@ export class TasksController {
 
   @Post()
   @Permissions('TASKS_CREATE')
-  create(@Body() body: any) {
+  @ApiCreatedResponse({ type: TaskResponseDto })
+  create(@Body() body: CreateTaskDto) {
     return this.svc.create(body);
   }
 
   @Get()
   @Permissions('TASKS_READ')
-  findAll(@Query('boardId') boardId?: string, @Query('projectId') projectId?: string, @Query('assigneeId') assigneeId?: string, @Query('status') status?: string) {
-    return this.svc.findAll({ boardId, projectId, assigneeId, status });
+  @ApiOkResponse({ type: TaskResponseDto, isArray: true })
+  findAll(@Query() query: TaskQueryDto) {
+    return this.svc.findAll(query);
   }
 
   @Get(':id')
   @Permissions('TASKS_READ')
-  findOne(@Param('id') id: string) {
-    return this.svc.findOne(id);
+  @ApiOkResponse({ type: TaskResponseDto })
+  findOne(@Param() params: IdParamDto) {
+    return this.svc.findOne(params.id);
   }
 
   @Put(':id')
   @Permissions('TASKS_UPDATE')
-  update(@Param('id') id: string, @Body() body: any) {
-    return this.svc.update(id, body);
+  @ApiOkResponse({ type: TaskResponseDto })
+  update(@Param() params: IdParamDto, @Body() body: UpdateTaskDto) {
+    return this.svc.update(params.id, body);
   }
 
   @Delete(':id')
   @Permissions('TASKS_DELETE')
-  remove(@Param('id') id: string) {
-    return this.svc.remove(id);
+  @ApiOkResponse({ type: TaskResponseDto })
+  remove(@Param() params: IdParamDto) {
+    return this.svc.remove(params.id);
   }
 }
