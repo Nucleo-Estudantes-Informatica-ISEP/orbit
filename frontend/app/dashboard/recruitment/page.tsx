@@ -169,7 +169,16 @@ export default function RecruitmentPage() {
       const deptChoices = [form.department1, form.department2, form.department3, form.department4]
         .map((deptId, idx) => deptId ? { departmentId: deptId, priority: idx + 1 } : null)
         .filter(Boolean) as { departmentId: string; priority: number }[];
-      const payload = { ...form, year: form.year ? Number(form.year) : undefined, departmentChoices: deptChoices.length ? deptChoices : undefined, performedById: user?.id };
+      const payload = {
+        name: form.name,
+        email: form.email,
+        course: form.course || undefined,
+        year: form.year ? Number(form.year) : undefined,
+        cvUrl: form.cvUrl || undefined,
+        notes: form.notes || undefined,
+        departmentChoices: deptChoices.length ? deptChoices : undefined,
+        performedById: user?.id,
+      };
       const created = await api.post<Candidate>('/candidates', payload);
       setCandidates((prev) => [created, ...prev]);
       setCreateOpen(false);
