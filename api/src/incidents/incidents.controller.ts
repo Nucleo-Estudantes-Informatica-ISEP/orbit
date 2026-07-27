@@ -1,24 +1,22 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Post,
-  Put,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
+import { IncidentsService } from './incidents.service';
+import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import {
-  IncidentsService,
-  type CreateIncidentCommentInput,
-  type CreateIncidentInput,
-  type UpdateIncidentInput,
-} from './incidents.service';
+  CommentIdParamDto,
+  CreateIncidentCommentDto,
+  CreateIncidentDto,
+  IdParamDto,
+  IncidentQueryDto,
+  UpdateIncidentDto,
+} from '../contracts/request.dto';
+import { IncidentCommentResponseDto, IncidentResponseDto } from '../contracts/response.dto';
+import { ApiProtectedController } from '../contracts/openapi.decorators';
 
+@ApiTags('incidents')
+@ApiProtectedController()
 @Controller('incidents')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class IncidentsController {
@@ -26,46 +24,50 @@ export class IncidentsController {
 
   @Post()
   @Permissions('INCIDENTS_CREATE')
-  create(@Body() body: CreateIncidentInput) {
+  @ApiCreatedResponse({ type: IncidentResponseDto })
+  create(@Body() body: CreateIncidentDto) {
     return this.svc.create(body);
   }
 
   @Get()
   @Permissions('INCIDENTS_READ')
-  findAll(@Query('departmentId') departmentId?: string) {
-    return this.svc.findAll(departmentId);
+  @ApiOkResponse({ type: IncidentResponseDto, isArray: true })
+  findAll(@Query() query: IncidentQueryDto) {
+    return this.svc.findAll(query.departmentId);
   }
 
   @Get(':id')
   @Permissions('INCIDENTS_READ')
-  findOne(@Param('id') id: string) {
-    return this.svc.findOne(id);
+  @ApiOkResponse({ type: IncidentResponseDto })
+  findOne(@Param() params: IdParamDto) {
+    return this.svc.findOne(params.id);
   }
 
   @Put(':id')
   @Permissions('INCIDENTS_UPDATE')
-  update(@Param('id') id: string, @Body() body: UpdateIncidentInput) {
-    return this.svc.update(id, body);
+  @ApiOkResponse({ type: IncidentResponseDto })
+  update(@Param() params: IdParamDto, @Body() body: UpdateIncidentDto) {
+    return this.svc.update(params.id, body);
   }
 
   @Post(':id/comments')
   @Permissions('INCIDENTS_UPDATE')
-  addComment(
-    @Param('id') id: string,
-    @Body() body: CreateIncidentCommentInput,
-  ) {
-    return this.svc.addComment(id, body);
+  @ApiCreatedResponse({ type: IncidentResponseDto })
+  addComment(@Param() params: IdParamDto, @Body() body: CreateIncidentCommentDto) {
+    return this.svc.addComment(params.id, body);
   }
 
   @Delete('comments/:commentId')
   @Permissions('INCIDENTS_DELETE')
-  removeComment(@Param('commentId') commentId: string) {
-    return this.svc.removeComment(commentId);
+  @ApiOkResponse({ type: IncidentCommentResponseDto })
+  removeComment(@Param() params: CommentIdParamDto) {
+    return this.svc.removeComment(params.commentId);
   }
 
   @Delete(':id')
   @Permissions('INCIDENTS_DELETE')
-  remove(@Param('id') id: string) {
-    return this.svc.remove(id);
+  @ApiOkResponse({ type: IncidentResponseDto })
+  remove(@Param() params: IdParamDto) {
+    return this.svc.remove(params.id);
   }
 }

@@ -1,23 +1,15 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Post,
-  Put,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
-import {
-  DebtsService,
-  type CreateDebtInput,
-  type UpdateDebtInput,
-} from './debts.service';
+import { DebtsService } from './debts.service';
+import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { CreateDebtDto, DebtQueryDto, IdParamDto, UpdateDebtDto } from '../contracts/request.dto';
+import { DebtResponseDto } from '../contracts/response.dto';
+import { ApiProtectedController } from '../contracts/openapi.decorators';
 
+@ApiTags('debts')
+@ApiProtectedController()
 @Controller('debts')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class DebtsController {
@@ -25,43 +17,50 @@ export class DebtsController {
 
   @Post()
   @Permissions('DEBTS_CREATE')
-  create(@Body() body: CreateDebtInput) {
+  @ApiCreatedResponse({ type: DebtResponseDto })
+  create(@Body() body: CreateDebtDto) {
     return this.svc.create(body);
   }
 
   @Get()
   @Permissions('DEBTS_READ')
-  findAll(@Query('type') type?: string) {
-    return this.svc.findAll(type);
+  @ApiOkResponse({ type: DebtResponseDto, isArray: true })
+  findAll(@Query() query: DebtQueryDto) {
+    return this.svc.findAll(query.type);
   }
 
   @Get(':id')
   @Permissions('DEBTS_READ')
-  findOne(@Param('id') id: string) {
-    return this.svc.findOne(id);
+  @ApiOkResponse({ type: DebtResponseDto })
+  findOne(@Param() params: IdParamDto) {
+    return this.svc.findOne(params.id);
   }
 
   @Post(':id/complete')
   @Permissions('DEBTS_UPDATE')
-  complete(@Param('id') id: string) {
-    return this.svc.complete(id);
+  @ApiCreatedResponse({ type: DebtResponseDto })
+  complete(@Param() params: IdParamDto) {
+    return this.svc.complete(params.id);
   }
 
   @Post(':id/revert')
   @Permissions('DEBTS_UPDATE')
-  revert(@Param('id') id: string) {
-    return this.svc.revert(id);
+  @ApiCreatedResponse({ type: DebtResponseDto })
+  revert(@Param() params: IdParamDto) {
+    return this.svc.revert(params.id);
   }
 
   @Put(':id')
   @Permissions('DEBTS_UPDATE')
-  update(@Param('id') id: string, @Body() body: UpdateDebtInput) {
-    return this.svc.update(id, body);
+  @ApiOkResponse({ type: DebtResponseDto })
+  update(@Param() params: IdParamDto, @Body() body: UpdateDebtDto) {
+    return this.svc.update(params.id, body);
   }
 
   @Delete(':id')
   @Permissions('DEBTS_DELETE')
-  remove(@Param('id') id: string) {
-    return this.svc.remove(id);
+  @ApiOkResponse({ type: DebtResponseDto })
+  remove(@Param() params: IdParamDto) {
+    return this.svc.remove(params.id);
   }
 }

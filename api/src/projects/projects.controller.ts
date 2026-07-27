@@ -1,18 +1,15 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Post,
-  Put,
-  UseGuards,
-} from '@nestjs/common';
-import { ProjectsService, type ProjectInput } from './projects.service';
+import { Body, Controller, Delete, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
+import { ProjectsService } from './projects.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
+import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { CreateProjectDto, IdParamDto, ProjectMemberDto, ProjectMemberParamDto, UpdateProjectDto } from '../contracts/request.dto';
+import { ProjectResponseDto } from '../contracts/response.dto';
+import { ApiProtectedController } from '../contracts/openapi.decorators';
 
+@ApiTags('projects')
+@ApiProtectedController()
 @Controller('projects')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class ProjectsController {
@@ -20,43 +17,50 @@ export class ProjectsController {
 
   @Post()
   @Permissions('PROJECTS_CREATE')
-  create(@Body() body: ProjectInput) {
+  @ApiCreatedResponse({ type: ProjectResponseDto })
+  create(@Body() body: CreateProjectDto) {
     return this.svc.create(body);
   }
 
   @Get()
   @Permissions('PROJECTS_READ')
+  @ApiOkResponse({ type: ProjectResponseDto, isArray: true })
   findAll() {
     return this.svc.findAll();
   }
 
   @Get(':id')
   @Permissions('PROJECTS_READ')
-  findOne(@Param('id') id: string) {
-    return this.svc.findOne(id);
+  @ApiOkResponse({ type: ProjectResponseDto })
+  findOne(@Param() params: IdParamDto) {
+    return this.svc.findOne(params.id);
   }
 
   @Put(':id')
   @Permissions('PROJECTS_UPDATE')
-  update(@Param('id') id: string, @Body() body: Partial<ProjectInput>) {
-    return this.svc.update(id, body);
+  @ApiOkResponse({ type: ProjectResponseDto })
+  update(@Param() params: IdParamDto, @Body() body: UpdateProjectDto) {
+    return this.svc.update(params.id, body);
   }
 
   @Delete(':id')
   @Permissions('PROJECTS_DELETE')
-  remove(@Param('id') id: string) {
-    return this.svc.remove(id);
+  @ApiOkResponse({ type: ProjectResponseDto })
+  remove(@Param() params: IdParamDto) {
+    return this.svc.remove(params.id);
   }
 
   @Post(':id/members')
   @Permissions('PROJECTS_UPDATE')
-  addMember(@Param('id') id: string, @Body() body: { userId: string }) {
-    return this.svc.addMember(id, body.userId);
+  @ApiCreatedResponse({ type: ProjectResponseDto })
+  addMember(@Param() params: IdParamDto, @Body() body: ProjectMemberDto) {
+    return this.svc.addMember(params.id, body.userId);
   }
 
   @Delete(':id/members/:userId')
   @Permissions('PROJECTS_UPDATE')
-  removeMember(@Param('id') id: string, @Param('userId') userId: string) {
-    return this.svc.removeMember(id, userId);
+  @ApiOkResponse({ type: ProjectResponseDto })
+  removeMember(@Param() params: ProjectMemberParamDto) {
+    return this.svc.removeMember(params.id, params.userId);
   }
 }

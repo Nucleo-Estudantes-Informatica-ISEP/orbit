@@ -94,7 +94,12 @@ export default function SettingsPage() {
     if (!settings || !user) return;
     setSettingsSaving(true); setSettingsMsg('');
     try {
-      await api.put(`/user-settings/${user.id}`, settings);
+      await api.put(`/user-settings/${user.id}`, {
+        darkMode: settings.darkMode,
+        emailNotifications: settings.emailNotifications,
+        inAppNotifications: settings.inAppNotifications,
+        language: settings.language,
+      });
       setSettingsMsg(t('settings.preferencesSaved'));
     } catch (error: unknown) { setSettingsMsg(error instanceof Error ? error.message : t('settings.profileSaveError')); }
     setSettingsSaving(false);
@@ -104,7 +109,7 @@ export default function SettingsPage() {
     if (!passwordForm.next || passwordForm.next !== passwordForm.confirm) {
       setPasswordMsg(t('settings.passwordMismatch')); return;
     }
-    if (passwordForm.next.length < 6) { setPasswordMsg(t('settings.passwordLength')); return; }
+    if (passwordForm.next.length < 8) { setPasswordMsg(t('settings.passwordLength')); return; }
     setPasswordMsg('');
     try {
       await api.put(`/users/${user?.id}`, { password: passwordForm.next });
@@ -123,7 +128,7 @@ export default function SettingsPage() {
     setSettingsSaving(true);
     setSettingsMsg('');
     try {
-      await api.put(`/user-settings/${user?.id}`, updated);
+      await api.put(`/user-settings/${user?.id}`, { language: updated.language });
       await setLocale(next, false);
       setSettingsMsg(t('settings.preferencesSaved'));
     } catch (error: unknown) {
