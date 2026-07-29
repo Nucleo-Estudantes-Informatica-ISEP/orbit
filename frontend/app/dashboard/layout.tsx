@@ -44,7 +44,7 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="flex h-screen flex-col md:flex-row bg-background text-foreground selection:bg-primary/20 selection:text-primary overflow-hidden">
+    <div className="flex h-[100dvh] flex-col md:flex-row bg-background text-foreground selection:bg-primary/20 selection:text-primary overflow-hidden">
       <DashboardSidebar
         userName={user?.name || 'User'}
         userRole={user?.roles?.[0] || 'Member'}

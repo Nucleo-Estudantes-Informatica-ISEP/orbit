@@ -239,7 +239,7 @@ export default function RecruitmentPage() {
           <h1 className="text-2xl font-bold tracking-tight">{t('recruitment.title')}</h1>
           <p className="text-muted-foreground text-sm mt-1">{t('recruitment.subtitle')}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {canCreate && (
             <Button onClick={() => { setForm(emptyForm); setError(''); setCreateOpen(true); }}>
               <Plus className="mr-2 h-4 w-4" />{t('recruitment.newCandidate')}
@@ -476,11 +476,11 @@ export default function RecruitmentPage() {
 
       {/* Detail Drawer */}
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-full max-w-4xl">
           {detailCandidate && (
             <>
               <DialogHeader className="pb-3">
-                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pr-8">
                   <div className="flex items-start gap-3">
                     <div className="flex flex-col">
                       <DialogTitle className="text-lg sm:text-xl">{detailCandidate.name}</DialogTitle>
@@ -532,7 +532,7 @@ export default function RecruitmentPage() {
               )}
               <Separator className="my-4" />
               <Tabs defaultValue="comments">
-                <TabsList className="w-full grid grid-cols-2">
+                <TabsList className="w-full h-auto flex flex-col sm:grid sm:grid-cols-2">
                   <TabsTrigger value="comments" className="flex-1 text-left"><MessageSquare className="mr-1.5 h-3.5 w-3.5" />{t('recruitment.comments')} ({comments.length})</TabsTrigger>
                   <TabsTrigger value="history" className="flex-1 text-left"><History className="mr-1.5 h-3.5 w-3.5" />{t('recruitment.history')}</TabsTrigger>
                 </TabsList>

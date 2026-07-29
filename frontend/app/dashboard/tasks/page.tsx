@@ -314,7 +314,7 @@ function TasksPage() {
 
       {/* Task Modal */}
       <Dialog open={modalOpen} onOpenChange={(o) => !o && setModalOpen(false)}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader><DialogTitle>{editTarget ? t('common.edit') : t('tasks.newTask')}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
@@ -326,7 +326,7 @@ function TasksPage() {
               <Label>{t('tasks.descriptionLabel')}</Label>
               <Textarea value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} placeholder={t('tasks.descriptionPlaceholder')} rows={3} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>{t('tasks.priorityLabel')}</Label>
                 <Select value={form.priority} onValueChange={(v) => setForm((p) => ({ ...p, priority: v }))}>
@@ -349,7 +349,7 @@ function TasksPage() {
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>{t('tasks.deadlineLabel')}</Label>
                 <Input type="date" value={form.deadline} onChange={(e) => setForm((p) => ({ ...p, deadline: e.target.value }))} />

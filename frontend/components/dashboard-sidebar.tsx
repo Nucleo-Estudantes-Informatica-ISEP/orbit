@@ -251,7 +251,7 @@ export function DashboardSidebar({
                         isActive(item.href)
                           ? 'bg-primary/10 text-primary'
                           : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-                        isCollapsed && 'justify-center',
+                        isCollapsed && 'md:justify-center',
                       )}
                       title={isCollapsed ? item.label : undefined}
                     >
@@ -277,7 +277,7 @@ export function DashboardSidebar({
               isActive('/dashboard/settings')
                 ? 'bg-primary/10 text-primary'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-              isCollapsed && 'justify-center',
+              isCollapsed && 'md:justify-center',
             )}
             title={isCollapsed ? t('nav.settings') : undefined}
           >
@@ -291,7 +291,7 @@ export function DashboardSidebar({
                 variant="ghost"
                 className={cn(
                   'w-full justify-start gap-3 h-auto px-3 py-2 text-foreground hover:bg-muted',
-                  isCollapsed && 'md:flex-col md:px-0 justify-center',
+                  isCollapsed && 'md:flex-col md:px-0 md:justify-center',
                 )}
               >
                 <Avatar className="h-8 w-8 border border-border/40 shrink-0">
@@ -305,7 +305,7 @@ export function DashboardSidebar({
                 </div>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent side={isCollapsed ? 'right' : 'bottom'} align={isCollapsed ? 'end' : 'start'} className="w-56 mb-1" sideOffset={8}>
+            <DropdownMenuContent side={isMobileMenuOpen ? 'bottom' : (isCollapsed ? 'right' : 'bottom')} align={isMobileMenuOpen ? 'start' : (isCollapsed ? 'end' : 'start')} className="w-56 mb-1" sideOffset={8}>
               <div className="px-2 py-1.5 text-sm">
                 <p className="font-semibold">{userName}</p>
               </div>

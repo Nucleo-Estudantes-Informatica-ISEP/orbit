@@ -214,7 +214,7 @@ export default function ProjectsPage() {
       )}
 
       <Dialog open={modalOpen} onOpenChange={(o) => !o && setModalOpen(false)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>{editTarget ? t('common.edit') : t('projects.new')}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
@@ -222,7 +222,7 @@ export default function ProjectsPage() {
               <Label>{t('projects.nameLabel')}</Label>
               <Input value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} placeholder={t('projects.namePlaceholder')} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>{t('projects.statusLabel')}</Label>
                 <Select value={form.status} onValueChange={(v) => setForm((p) => ({ ...p, status: v }))}>

@@ -40,7 +40,7 @@ export function DeleteConfirmDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[400px] bg-background border-border/40">
+      <DialogContent className="sm:max-w-sm bg-background border-border/40">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-foreground">
             <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0" />

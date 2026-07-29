@@ -492,7 +492,7 @@ export default function InventoryPage() {
 
       {/* Modal */}
       <Dialog open={modalOpen} onOpenChange={(o) => !o && setModalOpen(false)}>
-        <DialogContent className="max-w-full sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{editTarget ? t('common.edit') : t('inventory.newItem')}</DialogTitle>
           </DialogHeader>
@@ -518,7 +518,7 @@ export default function InventoryPage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>{t('inventory.valueLabel')}</Label>
                 <Input
@@ -541,7 +541,7 @@ export default function InventoryPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>{t('inventory.purchaseDateLabel')}</Label>
                 <Input
@@ -560,7 +560,7 @@ export default function InventoryPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>{t('inventory.departmentLabel')}</Label>
                 <Select
@@ -611,7 +611,7 @@ export default function InventoryPage() {
       </Dialog>
 
       <Dialog open={exportOpen} onOpenChange={setExportOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{t('inventory.exportDialogTitle')}</DialogTitle>
           </DialogHeader>
@@ -625,7 +625,7 @@ export default function InventoryPage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>{t('inventory.exportDateFrom')}</Label>
                 <Input type="date" value={exportParams.dateFrom} onChange={(e) => setExportParams((p) => ({ ...p, dateFrom: e.target.value }))} />
@@ -636,7 +636,7 @@ export default function InventoryPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>{t('inventory.exportColDepartment')}</Label>
                 <Select value={exportParams.department} onValueChange={(v) => setExportParams((p) => ({ ...p, department: v }))}>
@@ -662,7 +662,7 @@ export default function InventoryPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>{t('inventory.exportSortBy')}</Label>
                 <Select value={exportParams.sortBy} onValueChange={(v) => setExportParams((p) => ({ ...p, sortBy: v as any }))}>

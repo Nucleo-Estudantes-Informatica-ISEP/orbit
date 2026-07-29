@@ -24,26 +24,26 @@ export class RecruitmentController {
 
   @Get('export/all')
   @Permissions('RECRUITMENT_READ')
-  async exportAll(@Res({ passthrough: true }) res: Response) {
+  async exportAll(@Res() res: Response) {
     const buffer = await this.svc.exportAll();
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': 'attachment; filename="candidatos.pdf"',
       'Content-Length': buffer.length,
     });
-    return buffer;
+    res.send(buffer);
   }
 
   @Get('export/:id')
   @Permissions('RECRUITMENT_READ')
-  async exportOne(@Param('id') id: string, @Res({ passthrough: true }) res: Response) {
+  async exportOne(@Param('id') id: string, @Res() res: Response) {
     const buffer = await this.svc.exportOne(id);
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="candidato-${id}.pdf"`,
       'Content-Length': buffer.length,
     });
-    return buffer;
+    res.send(buffer);
   }
 
   @Get(':id')

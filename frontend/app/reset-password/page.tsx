@@ -143,8 +143,7 @@ function ResetPasswordPage() {
             </form>
           )}
         </CardContent>
-
-        <CardFooter className="flex flex-col border-t border-border/40 px-6 py-5 bg-muted/10">
+        <CardFooter className="flex flex-col border-t border-border/40 px-4 sm:px-6 py-5 bg-muted/10">
           <Button
             type="button"
             variant="ghost"

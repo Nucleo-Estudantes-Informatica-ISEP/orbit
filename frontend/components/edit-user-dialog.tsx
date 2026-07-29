@@ -126,7 +126,7 @@ export function EditUserDialog({ user, open, onOpenChange, onSave, roles, depart
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] bg-background border-border/40">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-foreground">
             {isAddMode ? t('people.addNewUser') : t('people.editUser')}

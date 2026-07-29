@@ -81,7 +81,7 @@ export function NotificationBell({ isCollapsed }: { isCollapsed?: boolean }) {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent side="right" align="start" className="w-80 p-0">
+      <PopoverContent side="bottom" align="start" className="w-[calc(100vw-2rem)] sm:w-80 p-0">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
           <span className="text-sm font-semibold">{t('notifications.title')}</span>
           {unreadCount > 0 && (

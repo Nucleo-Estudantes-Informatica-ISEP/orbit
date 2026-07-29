@@ -79,7 +79,7 @@ export function EditDepartmentDialog({ department, open, onOpenChange, onSave }:
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] bg-background border-border/40">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-foreground">
             {isAddMode ? t('departments.addNew') : t('departments.edit')}

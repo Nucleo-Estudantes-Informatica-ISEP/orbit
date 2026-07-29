@@ -269,7 +269,7 @@ export default function DocumentsPage() {
                 placeholder={t('documents.urlPlaceholder')}
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>{t('documents.categoryLabel')}</Label>
                 <Select value={form.category} onValueChange={(v) => setForm((p) => ({ ...p, category: v }))}>

@@ -165,7 +165,7 @@ export default function DepartmentsTab() {
             <div className="overflow-x-auto rounded-md border border-border/40">
               <Table>
                 <TableHeader className="bg-muted/30">
-                  <TableRow className="hover:bg-transparent">
+                  <TableRow className="hover:bg-transparent whitespace-nowrap">
                     <TableHead>{t('common.name')}</TableHead>
                     <TableHead>{t('common.description')}</TableHead>
                     <TableHead>{t('people.users')}</TableHead>
@@ -176,7 +176,7 @@ export default function DepartmentsTab() {
                 </TableHeader>
                 <TableBody>
                   {paginate(departments).map((dept) => (
-                    <TableRow key={dept.id} className="transition-colors hover:bg-muted/50">
+                    <TableRow key={dept.id} className="transition-colors hover:bg-muted/50 whitespace-nowrap">
                       <TableCell className="align-middle font-medium">{dept.name}</TableCell>
                       <TableCell className="align-middle text-muted-foreground">
                         {dept.description || '—'}

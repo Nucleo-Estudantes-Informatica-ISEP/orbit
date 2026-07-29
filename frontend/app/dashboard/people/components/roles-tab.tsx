@@ -157,7 +157,7 @@ export default function RolesTab() {
             <div className="overflow-x-auto rounded-md border border-border/40">
               <Table>
                 <TableHeader className="bg-muted/30">
-                  <TableRow className="hover:bg-transparent">
+                  <TableRow className="hover:bg-transparent whitespace-nowrap">
                     <TableHead>{t('common.name')}</TableHead>
                     <TableHead>{t('common.description')}</TableHead>
                     <TableHead>{t('people.users')}</TableHead>
@@ -167,7 +167,7 @@ export default function RolesTab() {
                 </TableHeader>
                 <TableBody>
                   {paginate(roles).map((role) => (
-                    <TableRow key={role.id} className="transition-colors hover:bg-muted/50">
+                    <TableRow key={role.id} className="transition-colors hover:bg-muted/50 whitespace-nowrap">
                       <TableCell className="align-middle font-medium">{role.name}</TableCell>
                       <TableCell className="align-middle text-muted-foreground">{role.description || '—'}</TableCell>
                       <TableCell className="align-middle">

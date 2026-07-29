@@ -533,7 +533,7 @@ export default function DebtsPage() {
 
       {/* Debt Modal */}
       <Dialog open={modalOpen} onOpenChange={(o) => !o && setModalOpen(false)}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editTarget ? t('common.edit') : t('debts.newDebt')}</DialogTitle>
           </DialogHeader>
@@ -547,7 +547,7 @@ export default function DebtsPage() {
               <Input value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} placeholder={t('debts.descriptionPlaceholder')} />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>{t('debts.valueLabel')}</Label>
                 <Input type="number" min="0" step="0.01" value={form.value} onChange={(e) => setForm((p) => ({ ...p, value: e.target.value }))} placeholder={t('debts.valuePlaceholder')} />
@@ -564,7 +564,7 @@ export default function DebtsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>{t('debts.statusLabel')}</Label>
                 <Select value={form.status} onValueChange={(v) => setForm((p) => ({ ...p, status: v as 'PENDING' | 'COMPLETED' }))}>
@@ -582,7 +582,7 @@ export default function DebtsPage() {
             </div>
 
             {form.type === 'OUTCOME' ? (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>{t('debts.creditorNameLabel')}</Label>
                   <Input value={form.creditorName} onChange={(e) => setForm((p) => ({ ...p, creditorName: e.target.value }))} placeholder={t('debts.creditorNamePlaceholder')} />
@@ -593,7 +593,7 @@ export default function DebtsPage() {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>{t('debts.debtorNameLabel')}</Label>
                   <Input value={form.debtorName} onChange={(e) => setForm((p) => ({ ...p, debtorName: e.target.value }))} placeholder={t('debts.debtorNamePlaceholder')} />
@@ -605,7 +605,7 @@ export default function DebtsPage() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>{t('debts.receivingAccountLabel')}</Label>
                 <Input maxLength={64} value={form.receivingAccount} onChange={(e) => setForm((p) => ({ ...p, receivingAccount: e.target.value }))} placeholder={t('debts.receivingAccountPlaceholder')} />
@@ -667,12 +667,12 @@ export default function DebtsPage() {
       </Dialog>
 
       <Dialog open={exportOpen} onOpenChange={setExportOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{t('debts.exportDialogTitle')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>{t('debts.exportDateFrom')}</Label>
                 <Input type="date" value={exportParams.dateFrom} onChange={(e) => setExportParams((p) => ({ ...p, dateFrom: e.target.value }))} />
@@ -683,7 +683,7 @@ export default function DebtsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>{t('debts.exportColType')}</Label>
                 <Select value={exportParams.type} onValueChange={(v) => setExportParams((p) => ({ ...p, type: v as 'ALL' | 'INCOME' | 'OUTCOME' }))}>
@@ -708,7 +708,7 @@ export default function DebtsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>{t('debts.exportSortBy')}</Label>
                 <Select value={exportParams.sortBy} onValueChange={(v) => setExportParams((p) => ({ ...p, sortBy: v as 'occurredAt' | 'value' | 'createdAt' }))}>

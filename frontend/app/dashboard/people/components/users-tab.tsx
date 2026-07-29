@@ -164,7 +164,7 @@ export default function UsersTab() {
           </CardTitle>
           <CardDescription className="mt-1">{t('people.subtitle')}</CardDescription>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <SearchInput value={search} onChange={(value) => { setSearch(value); setPage(1); }} className="w-48" />
           {canCreateUsers && (
             <Button

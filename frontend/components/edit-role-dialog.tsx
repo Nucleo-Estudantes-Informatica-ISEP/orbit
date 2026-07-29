@@ -13,6 +13,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useLocale } from '@/lib/locale-context';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { formatSystemPermission, permissionGroups, systemPermissions, type SystemPermission } from '@/lib/system-permissions';
@@ -94,7 +95,7 @@ export function EditRoleDialog({ role, open, onOpenChange, onSave }: EditRoleDia
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] bg-background border-border/40">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-foreground">
             {isAddMode ? t('roles.addNew') : t('roles.edit')}
@@ -165,27 +166,29 @@ export function EditRoleDialog({ role, open, onOpenChange, onSave }: EditRoleDia
                 {t('roles.deselectAll')}
               </Button>
             </div>
-            <div className="space-y-4 rounded-lg border border-border/50 bg-muted/20 p-3 max-h-[360px] overflow-y-auto">
-              {permissionGroups.map((group) => (
-                <div key={group.label} className="space-y-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70">
-                    {group.label}
-                  </p>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {group.permissions.map((permission) => (
-                      <label key={permission} className="flex items-center gap-2 text-sm text-foreground">
-                        <Checkbox
-                          checked={formData.permissions.includes(permission)}
-                          onCheckedChange={(checked) => togglePermission(permission, checked === true)}
-                          disabled={isLoading}
-                        />
-                        <span>{formatSystemPermission(permission)}</span>
-                      </label>
-                    ))}
+            <ScrollArea className="max-h-[360px]">
+              <div className="space-y-4 rounded-lg border border-border/50 bg-muted/20 p-3">
+                {permissionGroups.map((group) => (
+                  <div key={group.label} className="space-y-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70">
+                      {group.label}
+                    </p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {group.permissions.map((permission) => (
+                        <label key={permission} className="flex items-center gap-2 text-sm text-foreground">
+                          <Checkbox
+                            checked={formData.permissions.includes(permission)}
+                            onCheckedChange={(checked) => togglePermission(permission, checked === true)}
+                            disabled={isLoading}
+                          />
+                          <span>{formatSystemPermission(permission)}</span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            </ScrollArea>
           </div>
         </div>
 

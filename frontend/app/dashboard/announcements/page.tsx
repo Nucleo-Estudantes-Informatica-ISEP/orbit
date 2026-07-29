@@ -256,7 +256,7 @@ export default function AnnouncementsPage() {
 
       {/* Create/Edit Modal */}
       <Dialog open={createOpen || !!editTarget} onOpenChange={(o) => { if (!o) closeModal(); }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editTarget ? t('common.edit') : t('announcements.new')}</DialogTitle>
           </DialogHeader>
@@ -337,7 +337,7 @@ export default function AnnouncementsPage() {
 
       {/* Detail Modal */}
       <Dialog open={!!detailTarget} onOpenChange={(o) => !o && setDetailTarget(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl">
           {detailTarget && (
             <>
               <DialogHeader>

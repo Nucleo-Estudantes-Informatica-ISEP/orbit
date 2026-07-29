@@ -345,7 +345,7 @@ export default function IncidentsPage() {
 
       {/* Create/Edit Modal */}
       <Dialog open={modalOpen} onOpenChange={(o) => !o && setModalOpen(false)}>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto overflow-x-hidden">
+        <DialogContent className="sm:max-w-xl">
           <DialogHeader className="min-w-0">
             <DialogTitle>{editTarget ? t('incidents.editIncident') : t('incidents.newIncident')}</DialogTitle>
           </DialogHeader>
@@ -361,7 +361,7 @@ export default function IncidentsPage() {
               <Label>{t('incidents.descriptionLabel')}</Label>
               <Textarea value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} placeholder={t('incidents.descriptionPlaceholder')} rows={3} className="whitespace-pre-wrap break-words max-w-full" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>{t('incidents.priorityLabel')}</Label>
                 <Select value={form.priority} onValueChange={(v) => setForm((p) => ({ ...p, priority: v as any }))}>
@@ -388,7 +388,7 @@ export default function IncidentsPage() {
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>{t('incidents.departmentLabel')}</Label>
                 <Select value={form.departmentId || 'NONE'} onValueChange={(v) => setForm((p) => ({ ...p, departmentId: v === 'NONE' ? '' : v }))}>
@@ -442,7 +442,7 @@ export default function IncidentsPage() {
 
       {/* Detail Modal */}
       <Dialog open={detailOpen} onOpenChange={(o) => !o && setDetailOpen(false)}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
+        <DialogContent className="max-w-2xl">
           {selectedIncident && (
             <>
               <DialogHeader className="min-w-0">
