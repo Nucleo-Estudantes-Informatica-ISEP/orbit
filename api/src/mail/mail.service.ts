@@ -27,7 +27,7 @@ export class MailService {
   }
 
   private get from() {
-    return process.env.SMTP_FROM || 'ORBIT <noreply@nei-isep.org>';
+    return process.env.SMTP_FROM || 'ORBIT <no-reply@nei-isep.org>';
   }
 
   async sendWelcomeEmail(to: string, name: string, password: string) {

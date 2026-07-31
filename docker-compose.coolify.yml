@@ -44,9 +44,9 @@ services:
       SMTP_HOST: mail.nei-isep.org
       SMTP_PORT: "465"
       SMTP_SECURE: "true"
-      SMTP_USER: noreply@nei-isep.org
+      SMTP_USER: no-reply@nei-isep.org
       SMTP_PASS: "2;$$mmpYRl1asVe!4"
-      SMTP_FROM: ORBIT <noreply@nei-isep.org>
+      SMTP_FROM: ORBIT <no-reply@nei-isep.org>
     depends_on:
       db:
         condition: service_healthy
