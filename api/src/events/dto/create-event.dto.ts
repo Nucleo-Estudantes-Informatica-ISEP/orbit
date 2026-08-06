@@ -14,11 +14,11 @@ export class CreateEventDto {
   @IsString()
   location?: string;
 
-  @ValidateIf((event: CreateEventDto) => event.startDate === undefined)
+  @ValidateIf((event: CreateEventDto) => event.start !== undefined || event.startDate === undefined)
   @IsDateString()
   start?: string;
 
-  @ValidateIf((event: CreateEventDto) => event.endDate === undefined)
+  @ValidateIf((event: CreateEventDto) => event.end !== undefined || event.endDate === undefined)
   @IsDateString()
   end?: string;
 
@@ -27,11 +27,11 @@ export class CreateEventDto {
   @IsUUID(undefined, { each: true })
   departmentIds?: string[];
 
-  @ValidateIf((event: CreateEventDto) => event.start === undefined)
+  @ValidateIf((event: CreateEventDto) => event.startDate !== undefined || event.start === undefined)
   @IsDateString()
   startDate?: string;
 
-  @ValidateIf((event: CreateEventDto) => event.end === undefined)
+  @ValidateIf((event: CreateEventDto) => event.endDate !== undefined || event.end === undefined)
   @IsDateString()
   endDate?: string;
 

@@ -6,12 +6,16 @@ export class CreateAnnouncementDto {
   @IsNotEmpty()
   title: string;
 
-  @ValidateIf((announcement: CreateAnnouncementDto) => announcement.description === undefined)
+  @ValidateIf((announcement: CreateAnnouncementDto) =>
+    announcement.content !== undefined || announcement.description === undefined,
+  )
   @IsString()
   @IsNotEmpty()
   content?: string;
 
-  @ValidateIf((announcement: CreateAnnouncementDto) => announcement.content === undefined)
+  @ValidateIf((announcement: CreateAnnouncementDto) =>
+    announcement.description !== undefined || announcement.content === undefined,
+  )
   @IsString()
   @IsNotEmpty()
   description?: string;
