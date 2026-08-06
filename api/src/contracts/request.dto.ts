@@ -27,9 +27,7 @@ import {
   Priority,
   ProjectStatus,
   RecruitmentStage,
-  SystemPermission,
   TaskStatus,
-  UserStatus,
   Visibility,
   PlanStatus,
 } from '@prisma/client';
@@ -719,110 +717,4 @@ export class PlanQueryDto {
   @IsOptional()
   @IsEnum(PlanStatus)
   status?: PlanStatus;
-}
-
-export class CreateRoleContractDto {
-  @IsString()
-  @IsNotEmpty()
-  name: string;
-
-  @IsOptional()
-  @IsString()
-  description?: string;
-
-  @IsOptional()
-  @IsArray()
-  @IsEnum(SystemPermission, { each: true })
-  permissions?: SystemPermission[];
-}
-
-export class UpdateRoleContractDto {
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  name?: string;
-
-  @IsOptional()
-  @IsString()
-  description?: string;
-
-  @IsOptional()
-  @IsArray()
-  @IsEnum(SystemPermission, { each: true })
-  permissions?: SystemPermission[];
-}
-
-export class CreateDepartmentContractDto {
-  @IsString()
-  @IsNotEmpty()
-  name: string;
-
-  @IsOptional()
-  @IsString()
-  description?: string;
-}
-
-export class UpdateDepartmentContractDto {
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  name?: string;
-
-  @IsOptional()
-  @IsString()
-  description?: string;
-}
-
-export class CreateUserContractDto {
-  @IsString()
-  @IsNotEmpty()
-  name: string;
-
-  @IsEmail()
-  email: string;
-
-  @IsString()
-  @MinLength(8)
-  password: string;
-
-  @IsUUID()
-  departmentId: string;
-
-  @IsOptional()
-  @IsArray()
-  @IsUUID(undefined, { each: true })
-  roles?: string[];
-
-  @IsOptional()
-  @IsEnum(UserStatus)
-  status?: UserStatus;
-}
-
-export class UpdateUserContractDto {
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  name?: string;
-
-  @IsOptional()
-  @IsEmail()
-  email?: string;
-
-  @IsOptional()
-  @IsString()
-  @MinLength(8)
-  password?: string;
-
-  @IsOptional()
-  @IsUUID()
-  departmentId?: string;
-
-  @IsOptional()
-  @IsArray()
-  @IsUUID(undefined, { each: true })
-  roles?: string[];
-
-  @IsOptional()
-  @IsEnum(UserStatus)
-  status?: UserStatus;
 }

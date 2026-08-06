@@ -12,6 +12,8 @@ import {
   PaginationQueryDto,
   UpdateUserSettingsDto,
 } from './request.dto';
+import { CreateAnnouncementDto } from '../announcements/dto/create-announcement.dto';
+import { CreateEventDto } from '../events/dto/create-event.dto';
 
 describe('request DTO contracts', () => {
   it.each([
@@ -24,6 +26,14 @@ describe('request DTO contracts', () => {
     [CreateIncidentDto, { name: 'Outage', description: 'API unavailable' }],
     [UpdateUserSettingsDto, { darkMode: true, language: 'pt' }],
     [PaginationQueryDto, { page: '2', pageSize: '50' }],
+    [CreateAnnouncementDto, { title: 'Update', content: 'Message', description: 'Fallback' }],
+    [CreateEventDto, {
+      title: 'Meeting',
+      start: '2026-08-06T10:00:00.000Z',
+      startDate: '2026-08-06T10:00:00.000Z',
+      end: '2026-08-06T11:00:00.000Z',
+      endDate: '2026-08-06T11:00:00.000Z',
+    }],
   ])('%p accepts a valid payload', async (Dto, payload) => {
     const instance = plainToInstance(Dto, payload);
     await expect(validate(instance)).resolves.toHaveLength(0);
@@ -39,6 +49,10 @@ describe('request DTO contracts', () => {
     [CreateIncidentDto, { name: '', description: '' }],
     [UpdateUserSettingsDto, { darkMode: 'yes' }],
     [PaginationQueryDto, { page: '0', pageSize: '1001' }],
+    [CreateAnnouncementDto, { title: 'Update', content: '' }],
+    [CreateAnnouncementDto, { title: 'Update', content: 'Valid', description: '' }],
+    [CreateEventDto, { title: 'Meeting', start: 'invalid', startDate: '2026-08-06T10:00:00.000Z' }],
+    [CreateEventDto, { title: 'Meeting', end: '2026-08-06T11:00:00.000Z', endDate: 'invalid' }],
   ])('%p rejects an invalid payload', async (Dto, payload) => {
     const instance = plainToInstance(Dto, payload);
     expect(await validate(instance)).not.toHaveLength(0);
