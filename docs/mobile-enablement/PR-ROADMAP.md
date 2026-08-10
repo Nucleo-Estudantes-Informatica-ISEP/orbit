@@ -45,7 +45,7 @@ Suggested branch: `security/server-owned-actors`
 
 - Derive `createdById` and `performedById` from the authenticated JWT.
 - Remove authoritative actor IDs from client DTOs.
-- Cover Tasks, Projects, Events, Incidents/comments, Announcements, and any other affected mutations found during audit.
+- Cover Tasks, Projects, Events, Incidents and Incident comments, Announcements, and any other affected mutations found during audit.
 - Preserve target/assignee/member IDs that describe the mutation target.
 - Update web callers and add forged-ID security tests.
 
