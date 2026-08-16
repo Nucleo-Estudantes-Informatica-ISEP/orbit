@@ -1,9 +1,21 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { AnnouncementsService } from './announcements.service';
 import { CreateAnnouncementDto } from './dto/create-announcement.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
+import type { AuthenticatedRequest } from '../auth/authenticated-request';
 
 @Controller('announcements')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -18,7 +30,12 @@ export class AnnouncementsController {
 
   @Get()
   @Permissions('ANNOUNCEMENTS_READ')
-  findAll(@Request() req: any, @Query('page') page?: string, @Query('pageSize') pageSize?: string, @Query('visibility') visibility?: string) {
+  findAll(
+    @Request() req: AuthenticatedRequest,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('visibility') visibility?: string,
+  ) {
     if (!page && !pageSize) {
       return this.svc.findAllRaw(req.user.userId, visibility);
     }
@@ -27,13 +44,13 @@ export class AnnouncementsController {
 
   @Get('me')
   @Permissions('ANNOUNCEMENTS_READ')
-  findForMe(@Request() req: any) {
+  findForMe(@Request() req: AuthenticatedRequest) {
     return this.svc.findAllForUser(req.user.userId);
   }
 
   @Put('me/read-all')
   @Permissions('ANNOUNCEMENTS_READ')
-  markAllRead(@Request() req: any) {
+  markAllRead(@Request() req: AuthenticatedRequest) {
     return this.svc.markAllRead(req.user.userId);
   }
 
@@ -51,7 +68,10 @@ export class AnnouncementsController {
 
   @Put(':id')
   @Permissions('ANNOUNCEMENTS_UPDATE')
-  update(@Param('id') id: string, @Body() body: any) {
+  update(
+    @Param('id') id: string,
+    @Body() body: Partial<CreateAnnouncementDto>,
+  ) {
     return this.svc.update(id, body);
   }
 
@@ -66,5 +86,4 @@ export class AnnouncementsController {
   togglePin(@Param('id') id: string) {
     return this.svc.togglePin(id);
   }
-
 }

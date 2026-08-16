@@ -47,14 +47,16 @@ export function EditRoleDialog({ role, open, onOpenChange, onSave }: EditRoleDia
 
   // Update form data when modal opens/changes
   useEffect(() => {
-    if (open) {
+    if (!open) return;
+    const timeoutId = window.setTimeout(() => {
       setFormData({
         name: role?.name || '',
         description: role?.description || '',
         permissions: role?.permissions || [],
       });
       setError('');
-    }
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
   }, [role, open]);
 
   const handleChange = (field: string, value: string) => {

@@ -63,7 +63,10 @@ export class MinioService implements OnModuleInit {
     if (!value) return null;
     const filesIdx = value.indexOf('/files/');
     if (filesIdx >= 0) {
-      const key = value.slice(filesIdx + 7).split('?')[0].split('#')[0];
+      const key = value
+        .slice(filesIdx + 7)
+        .split('?')[0]
+        .split('#')[0];
       return key || null;
     }
     if (!/^https?:\/\//i.test(value)) return value;
@@ -74,7 +77,9 @@ export class MinioService implements OnModuleInit {
     return new Promise((resolve, reject) => {
       const items: BucketItem[] = [];
       const stream = this.client.listObjectsV2(this.bucket, '', true);
-      stream.on('data', (item: BucketItem) => { if (item.name) items.push(item); });
+      stream.on('data', (item: BucketItem) => {
+        if (item.name) items.push(item);
+      });
       stream.on('end', () => resolve(items));
       stream.on('error', reject);
     });

@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Plus, Trash2, Pencil, ExternalLink, Upload, X, FileText, TrendingUp, TrendingDown, CreditCard, FileDown } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,6 +17,7 @@ import { useLocale } from '@/lib/locale-context';
 import { api, getFileUrl } from '@/lib/api';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { downloadSpreadsheet } from '@/lib/spreadsheet-export';
 
 interface Debt {
   id: string;
@@ -118,9 +118,12 @@ export default function DebtsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [load]);
 
   const filtered = filter === 'ALL' ? debts : debts.filter((d) => d.type === filter);
 
@@ -209,7 +212,7 @@ export default function DebtsPage() {
         setDebts((prev) => [created, ...prev]);
       }
       setModalOpen(false);
-    } catch (e: any) { setError(e.message || t('common.saveError')); }
+    } catch (error: unknown) { setError(error instanceof Error ? error.message : t('common.saveError')); }
     setSaving(false);
   };
 
@@ -246,7 +249,7 @@ export default function DebtsPage() {
     }
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     let data = [...debts];
 
     if (exportParams.dateFrom) {
@@ -286,7 +289,7 @@ export default function DebtsPage() {
         groups.get(key)!.push(d);
       }
 
-      const wsData: any[][] = [];
+      const wsData: unknown[][] = [];
       const cols = buildColumns();
 
       wsData.push(cols);
@@ -309,11 +312,12 @@ export default function DebtsPage() {
         wsData.push([t('debts.exportGrandTotal'), formatCurrency(grandTotal)]);
       }
 
-      const ws = XLSX.utils.aoa_to_sheet(wsData);
-      colWidths(ws, cols);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, t('debts.title'));
-      XLSX.writeFile(wb, `dividas_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      await downloadSpreadsheet(
+        wsData,
+        cols,
+        t('debts.title'),
+        `dividas_${new Date().toISOString().slice(0, 10)}.xlsx`,
+      );
       setExportOpen(false);
       return;
     }
@@ -328,11 +332,12 @@ export default function DebtsPage() {
       wsData.push([t('debts.exportGrandTotal'), formatCurrency(total)]);
     }
 
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
-    colWidths(ws, cols);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, t('debts.title'));
-    XLSX.writeFile(wb, `dividas_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    await downloadSpreadsheet(
+      wsData,
+      cols,
+      t('debts.title'),
+      `dividas_${new Date().toISOString().slice(0, 10)}.xlsx`,
+    );
     setExportOpen(false);
   };
 
@@ -368,11 +373,6 @@ export default function DebtsPage() {
     if (c.createdBy) row.push(d.createdBy?.name || '—');
     if (c.createdAt) row.push(new Date(d.createdAt).toLocaleDateString('pt-PT'));
     return row;
-  };
-
-  const colWidths = (ws: XLSX.WorkSheet, cols: string[]) => {
-    const wscols = cols.map((h) => ({ wch: Math.max(h.length * 2, 12) }));
-    ws['!cols'] = wscols;
   };
 
   const formatCurrency = (v: number) =>
@@ -732,7 +732,7 @@ export default function DebtsPage() {
               </div>
               <div className="space-y-1.5">
                 <Label>{t('debts.exportGroupBy')}</Label>
-                <Select value={exportParams.groupBy} onValueChange={(v) => setExportParams((p) => ({ ...p, groupBy: v as any }))}>
+                <Select value={exportParams.groupBy} onValueChange={(groupBy) => setExportParams((previous) => ({ ...previous, groupBy: groupBy as typeof exportParams.groupBy }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">{t('debts.exportGroupNone')}</SelectItem>

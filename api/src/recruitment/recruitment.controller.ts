@@ -1,5 +1,19 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Res, UseGuards } from '@nestjs/common';
-import { RecruitmentService } from './recruitment.service';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  RecruitmentService,
+  type CreateCandidateInput,
+  type UpdateCandidateInput,
+} from './recruitment.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
@@ -12,7 +26,7 @@ export class RecruitmentController {
 
   @Post()
   @Permissions('RECRUITMENT_CREATE')
-  create(@Body() body: any) {
+  create(@Body() body: CreateCandidateInput) {
     return this.svc.create(body);
   }
 
@@ -54,7 +68,7 @@ export class RecruitmentController {
 
   @Put(':id')
   @Permissions('RECRUITMENT_UPDATE')
-  update(@Param('id') id: string, @Body() body: any) {
+  update(@Param('id') id: string, @Body() body: UpdateCandidateInput) {
     return this.svc.update(id, body);
   }
 

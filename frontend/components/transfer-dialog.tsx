@@ -46,13 +46,16 @@ export function TransferDialog({
   const { t } = useLocale();
   const [selectedOption, setSelectedOption] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const isBusy = isLoading || isProcessing;
 
   // Reset when dialog opens/closes
   useEffect(() => {
-    if (open) {
+    if (!open) return;
+    const timeoutId = window.setTimeout(() => {
       setSelectedOption('');
       setIsProcessing(false);
-    }
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
   }, [open]);
 
   const handleConfirm = async () => {
@@ -80,7 +83,7 @@ export function TransferDialog({
         </DialogHeader>
 
         <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-3 text-sm text-amber-700 dark:text-amber-500">
-          <strong>{userCount}</strong> {userCount === 1 ? t('transfer.userIsAssociated') : t('transfer.usersAssociated')} <strong>"{currentItemName}"</strong>.{userCount > 0 ? ` ${t('transfer.selectWhere')}` : ''}
+          <strong>{userCount}</strong> {userCount === 1 ? t('transfer.userIsAssociated') : t('transfer.usersAssociated')} <strong>&quot;{currentItemName}&quot;</strong>.{userCount > 0 ? ` ${t('transfer.selectWhere')}` : ''}
         </div>
 
         {userCount > 0 && (
@@ -89,7 +92,7 @@ export function TransferDialog({
               <Label htmlFor="transfer-select" className="text-foreground">
                 {t('transfer.to')}
               </Label>
-              <Select value={selectedOption} onValueChange={setSelectedOption} disabled={isProcessing}>
+              <Select value={selectedOption} onValueChange={setSelectedOption} disabled={isBusy}>
                 <SelectTrigger id="transfer-select" className="bg-background border-border/50 focus-visible:ring-primary/50">
                   <SelectValue placeholder={t('transfer.selectDestination')} />
                 </SelectTrigger>
@@ -109,17 +112,17 @@ export function TransferDialog({
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
-            disabled={isProcessing}
+            disabled={isBusy}
             className="border-border/50 w-full"
           >
             {t('common.cancel')}
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={isProcessing || userCount === 0 || !selectedOption}
+            disabled={isBusy || userCount === 0 || !selectedOption}
             className="w-full"
           >
-            {isProcessing ? (
+            {isBusy ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 {t('transfer.transferring')}

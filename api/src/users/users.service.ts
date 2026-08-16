@@ -1,11 +1,21 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { MailService } from '../mail/mail.service';
 import * as bcrypt from 'bcryptjs';
+import { type Prisma, SystemPermission } from '@prisma/client';
 
-const CRITICAL_PERMISSIONS = ['USERS_CREATE', 'USERS_UPDATE', 'ROLES_CREATE', 'ROLES_UPDATE'];
+const CRITICAL_PERMISSIONS: SystemPermission[] = [
+  'USERS_CREATE',
+  'USERS_UPDATE',
+  'ROLES_CREATE',
+  'ROLES_UPDATE',
+];
 
 const userSelect = {
   id: true,
@@ -56,7 +66,9 @@ export class UsersService {
       select: userSelect,
     });
 
-    this.mailService.sendWelcomeEmail(dto.email, dto.name, dto.password).catch(() => {});
+    this.mailService
+      .sendWelcomeEmail(dto.email, dto.name, dto.password)
+      .catch(() => {});
 
     if (dto.roles?.length) {
       const roles = await this.prisma.role.findMany({
@@ -98,7 +110,7 @@ export class UsersService {
   }
 
   async update(id: string, dto: UpdateUserDto) {
-    const updateData: any = {};
+    const updateData: Prisma.UserUncheckedUpdateInput = {};
 
     if (dto.name) updateData.name = dto.name;
     if (dto.email) updateData.email = dto.email;
@@ -113,7 +125,9 @@ export class UsersService {
     });
 
     if (dto.password) {
-      this.mailService.sendPasswordChanged(updatedUser.email, updatedUser.name).catch(() => {});
+      this.mailService
+        .sendPasswordChanged(updatedUser.email, updatedUser.name)
+        .catch(() => {});
     }
 
     // Update roles if provided
@@ -163,12 +177,16 @@ export class UsersService {
     });
     if (!target) throw new NotFoundException('User not found');
 
-    const targetPermissions = new Set(target.userRoles.flatMap((ur) => ur.role.permissions));
-    if (targetPermissions.has('CAN_BE_DELETED' as any)) {
+    const targetPermissions = new Set(
+      target.userRoles.flatMap((ur) => ur.role.permissions),
+    );
+    if (targetPermissions.has('CAN_BE_DELETED')) {
       throw new ForbiddenException('Este utilizador não pode ser apagado.');
     }
 
-    const hasCritical = CRITICAL_PERMISSIONS.some((p) => targetPermissions.has(p as any));
+    const hasCritical = CRITICAL_PERMISSIONS.some((p) =>
+      targetPermissions.has(p),
+    );
 
     if (hasCritical) {
       const criticalUsers = await this.prisma.user.findMany({
@@ -182,7 +200,7 @@ export class UsersService {
 
       const countWithCritical = criticalUsers.filter((u) =>
         CRITICAL_PERMISSIONS.some((p) =>
-          u.userRoles.some((ur) => ur.role.permissions.includes(p as any)),
+          u.userRoles.some((ur) => ur.role.permissions.includes(p)),
         ),
       ).length;
 
@@ -202,35 +220,38 @@ export class UsersService {
   }
 
   async getStats() {
-    const [total, activeCount, inactiveCount, departmentStats, roleStats] = await Promise.all([
-      this.prisma.user.count(),
-      this.prisma.user.count({ where: { status: 'ACTIVE' } }),
-      this.prisma.user.count({ where: { status: 'INACTIVE' } }),
-      this.prisma.department.findMany({
-        select: {
-          id: true,
-          name: true,
-          _count: {
-            select: { users: true },
+    const [total, activeCount, inactiveCount, departmentStats, roleStats] =
+      await Promise.all([
+        this.prisma.user.count(),
+        this.prisma.user.count({ where: { status: 'ACTIVE' } }),
+        this.prisma.user.count({ where: { status: 'INACTIVE' } }),
+        this.prisma.department.findMany({
+          select: {
+            id: true,
+            name: true,
+            _count: {
+              select: { users: true },
+            },
           },
-        },
-      }),
-      this.prisma.role.findMany({
-        select: {
-          id: true,
-          name: true,
-          _count: {
-            select: { userRoles: true },
+        }),
+        this.prisma.role.findMany({
+          select: {
+            id: true,
+            name: true,
+            _count: {
+              select: { userRoles: true },
+            },
           },
-        },
-      }),
-    ]);
+        }),
+      ]);
 
     return {
       total,
       active: activeCount,
       inactive: inactiveCount,
-      suspended: await this.prisma.user.count({ where: { status: 'SUSPENDED' } }),
+      suspended: await this.prisma.user.count({
+        where: { status: 'SUSPENDED' },
+      }),
       byDepartment: departmentStats.map((dept) => ({
         id: dept.id,
         name: dept.name,
@@ -244,4 +265,3 @@ export class UsersService {
     };
   }
 }
-

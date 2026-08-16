@@ -48,7 +48,7 @@ export function DeleteConfirmDialog({
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
             {description}
-            {itemName && <span className="font-semibold text-foreground block mt-2">"{itemName}"</span>}
+            {itemName && <span className="font-semibold text-foreground block mt-2">&quot;{itemName}&quot;</span>}
           </DialogDescription>
         </DialogHeader>
 

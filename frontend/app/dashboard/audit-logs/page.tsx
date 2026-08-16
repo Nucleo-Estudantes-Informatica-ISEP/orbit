@@ -32,8 +32,7 @@ export default function AuditLogsPage() {
   const { page, pageSize, setPage, setPageSize, paginate } = usePagination(20);
 
   useEffect(() => {
-    if (!user) return;
-    if (!canRead) { setLoading(false); return; }
+    if (!user || !canRead) return;
     api.get<AuditLogEntry[]>('/audit-logs')
       .then((data) => { setLogs(data ?? []); setLoading(false); })
       .catch(() => setLoading(false));
@@ -42,7 +41,6 @@ export default function AuditLogsPage() {
   if (!user) return null;
   if (!canRead) { redirect('/dashboard'); return null; }
 
-  const totalPages = Math.ceil(logs.length / pageSize);
   const paginatedLogs = paginate(logs);
 
   const actionBadgeVariant = (action: string): 'default' | 'secondary' | 'destructive' | 'outline' => {

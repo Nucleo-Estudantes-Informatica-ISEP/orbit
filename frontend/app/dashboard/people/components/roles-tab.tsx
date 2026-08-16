@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Loader2, Plus, Shield, Edit2, Trash2 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -43,7 +43,7 @@ export default function RolesTab() {
   const canDeleteRoles = usePermission('ROLES_DELETE');
   const { page, pageSize, setPage, setPageSize, paginate } = usePagination(10);
 
-  const fetchRoles = async () => {
+  const fetchRoles = useCallback(async () => {
     try {
       setIsLoading(true);
       const data = await api.get<Role[]>('/roles');
@@ -53,11 +53,13 @@ export default function RolesTab() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [t]);
 
   useEffect(() => {
-    if (token) fetchRoles();
-  }, [token]);
+    if (!token) return;
+    const timeoutId = window.setTimeout(() => void fetchRoles(), 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [fetchRoles, token]);
 
   const handleSaveRole = async (updatedData: Partial<Role>) => {
     const isEditing = !!selectedRole;

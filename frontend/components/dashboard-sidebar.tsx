@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import {
   LayoutDashboard,
   Users,
@@ -19,7 +20,6 @@ import {
   Megaphone,
   CheckSquare,
   UserPlus,
-  Bell,
   Package,
   ClipboardList,
   CreditCard,
@@ -41,10 +41,10 @@ import { useAuth } from '@/lib/auth-context';
 import { usePermission } from '@/lib/use-permission';
 import { useLocale } from '@/lib/locale-context';
 import { cn } from '@/lib/utils';
+import { OrbitLogo } from '@/components/orbit-logo';
 
 interface SidebarProps {
   userName?: string;
-  userRole?: string;
   userAvatar?: string;
   userInitials?: string;
 }
@@ -62,7 +62,6 @@ type NavGroup = {
 
 export function DashboardSidebar({
   userName = 'John Doe',
-  userRole = 'Administrator',
   userAvatar,
   userInitials = 'JD',
 }: SidebarProps) {
@@ -73,7 +72,10 @@ export function DashboardSidebar({
   const pathname = usePathname();
   const { user: authUser, logout } = useAuth();
   const { t } = useLocale();
-  const canSeePeople = usePermission('USERS_VIEW') || usePermission('ROLES_VIEW') || usePermission('DEPARTMENTS_VIEW');
+  const canSeeUsers = usePermission('USERS_VIEW');
+  const canSeeRoles = usePermission('ROLES_VIEW');
+  const canSeeDepartments = usePermission('DEPARTMENTS_VIEW');
+  const canSeePeople = canSeeUsers || canSeeRoles || canSeeDepartments;
   const canSeeAnnouncements = usePermission('ANNOUNCEMENTS_VIEW');
   const canSeeEvents = usePermission('EVENTS_VIEW');
   const canSeeResources = usePermission('RESOURCES_VIEW');
@@ -132,7 +134,8 @@ export function DashboardSidebar({
   ].filter((group) => group.items.length > 0);
 
   useEffect(() => {
-    setIsMobileMenuOpen(false);
+    const timeoutId = window.setTimeout(() => setIsMobileMenuOpen(false), 0);
+    return () => window.clearTimeout(timeoutId);
   }, [pathname]);
 
   const handleLogout = () => {
@@ -150,8 +153,7 @@ export function DashboardSidebar({
       {/* Mobile Top Header */}
       <div className="flex md:hidden h-16 items-center justify-between px-4 border-b border-border/40 bg-background shrink-0">
         <div className="flex items-center gap-2">
-          <img src="/logo-extended-dark.svg" alt="ORBIT" className="h-8 w-auto block dark:hidden" />
-          <img src="/logo-extended.svg" alt="ORBIT" className="h-8 w-auto hidden dark:block" />
+          <OrbitLogo />
         </div>
         <Button
           variant="ghost"
@@ -185,23 +187,16 @@ export function DashboardSidebar({
           {/* Logo */}
           <div className="flex items-center">
             {isCollapsed ? (
-              <img
+              <Image
                 src="/favicon.svg"
                 alt="ORBIT"
+                width={32}
+                height={32}
                 className="hidden h-8 w-8 md:block"
               />
             ) : (
               <>
-                <img
-                  src="/logo-extended-dark.svg"
-                  alt="ORBIT"
-                  className="block h-8 w-auto dark:hidden"
-                />
-                <img
-                  src="/logo-extended.svg"
-                  alt="ORBIT"
-                  className="hidden h-8 w-auto dark:block"
-                />
+                <OrbitLogo />
               </>
             )}
           </div>

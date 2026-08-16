@@ -6,11 +6,16 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.enableShutdownHooks();
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-  
+
   // Habilitar CORS
   const corsOrigins = process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(',')
-    : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3090', 'http://127.0.0.1:3001'];
+    : [
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'http://localhost:3090',
+        'http://127.0.0.1:3001',
+      ];
   app.enableCors({
     origin: corsOrigins,
     credentials: true,
@@ -21,4 +26,4 @@ async function bootstrap() {
   await app.listen(process.env.PORT ?? 3000);
 }
 
-bootstrap();
+void bootstrap();

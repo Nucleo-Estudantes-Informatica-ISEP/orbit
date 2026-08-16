@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
@@ -43,7 +53,10 @@ export class PlansController {
 
   @Put(':id/reject')
   @Permissions('PLANS_APPROVE')
-  reject(@Param('id') id: string, @Body() body: { approvedById: string; rejectionNote?: string }) {
+  reject(
+    @Param('id') id: string,
+    @Body() body: { approvedById: string; rejectionNote?: string },
+  ) {
     return this.svc.reject(id, body.approvedById, body.rejectionNote);
   }
 

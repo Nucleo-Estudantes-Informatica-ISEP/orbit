@@ -5,6 +5,8 @@ export class ResetPasswordDto {
   token: string;
 
   @IsString()
-  @MinLength(8, { message: 'A palavra-passe deve ter pelo menos 8 caracteres.' })
+  @MinLength(8, {
+    message: 'A palavra-passe deve ter pelo menos 8 caracteres.',
+  })
   password: string;
 }

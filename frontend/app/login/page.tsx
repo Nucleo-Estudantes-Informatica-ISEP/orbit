@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +14,7 @@ import { useAuth } from "@/lib/auth-context";
 import LoadingScreen from '@/components/ui/loading-screen';
 import SplashScreen from '@/components/ui/splash-screen';
 import { useLocale } from '@/lib/locale-context';
+import { OrbitLogo } from '@/components/orbit-logo';
 
 export default function LoginPage() {
   const { login, isLoading: authLoading } = useAuth();
@@ -82,8 +83,7 @@ export default function LoginPage() {
 
       {/* BRANDING / LOGO (No hover animation) */}
       <Link href="/" className="mb-10 flex items-center gap-2">
-        <img src="/logo-extended-dark.svg" alt="ORBIT" className="h-10 w-auto block dark:hidden" />
-        <img src="/logo-extended.svg" alt="ORBIT" className="h-10 w-auto hidden dark:block" />
+        <OrbitLogo className="h-10" />
         <Badge variant="secondary" className="ml-2 text-[10px] font-medium tracking-wider uppercase">
           {'NEI-ISEP'}
         </Badge>

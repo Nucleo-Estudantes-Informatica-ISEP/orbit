@@ -42,13 +42,15 @@ export function EditDepartmentDialog({ department, open, onOpenChange, onSave }:
 
   // Update form data when modal opens/changes
   useEffect(() => {
-    if (open) {
+    if (!open) return;
+    const timeoutId = window.setTimeout(() => {
       setFormData({
         name: department?.name || '',
         description: department?.description || '',
       });
       setError('');
-    }
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
   }, [department, open]);
 
   const handleChange = (field: string, value: string) => {

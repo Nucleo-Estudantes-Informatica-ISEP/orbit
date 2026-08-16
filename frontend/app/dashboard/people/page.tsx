@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { Building2, Shield, Users } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -69,14 +69,13 @@ export default function PeoplePage() {
     return items;
   }, [canViewUsers, canViewRoles, canViewDepartments, t]);
 
-  useEffect(() => {
-    if (sections.length === 0) return;
-    if (!sections.some((section) => section.id === activeTab)) {
-      setActiveTab(sections[0].id);
-    }
-  }, [activeTab, sections]);
-
-  const activePanel = useMemo(() => sections.find((section) => section.id === activeTab)?.panel ?? null, [activeTab, sections]);
+  const resolvedActiveTab = sections.some((section) => section.id === activeTab)
+    ? activeTab
+    : sections[0]?.id;
+  const activePanel = useMemo(
+    () => sections.find((section) => section.id === resolvedActiveTab)?.panel ?? null,
+    [resolvedActiveTab, sections],
+  );
 
   return (
     <div className="space-y-6 md:space-y-8">
@@ -96,7 +95,7 @@ export default function PeoplePage() {
       ) : (
         <>
           {/* Alterado para permitir scroll horizontal no mobile sem quebrar o layout */}
-          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as PeopleTab)} className="w-full">
+          <Tabs value={resolvedActiveTab} onValueChange={(value) => setActiveTab(value as PeopleTab)} className="w-full">
             <div className="w-full overflow-x-auto pb-2">
               <TabsList className="flex w-max min-w-full justify-start bg-muted/70 p-1 sm:justify-center md:w-auto md:min-w-0">
                 {sections.map((section) => (

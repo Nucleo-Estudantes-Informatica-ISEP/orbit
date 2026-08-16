@@ -1,6 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 
+export interface CreateRecruitmentCommentInput {
+  candidateId: string;
+  createdById: string;
+  content: string;
+}
+
 @Injectable()
 export class RecruitmentCommentService {
   constructor(private prisma: PrismaService) {}
@@ -9,8 +15,11 @@ export class RecruitmentCommentService {
     createdBy: { select: { id: true, name: true } },
   };
 
-  create(data: { candidateId: string; createdById: string; content: string }) {
-    return this.prisma.recruitmentComment.create({ data, include: this.include });
+  create(data: CreateRecruitmentCommentInput) {
+    return this.prisma.recruitmentComment.create({
+      data,
+      include: this.include,
+    });
   }
 
   findAllForCandidate(candidateId: string) {
@@ -22,7 +31,10 @@ export class RecruitmentCommentService {
   }
 
   async findOne(id: string) {
-    const c = await this.prisma.recruitmentComment.findUnique({ where: { id }, include: this.include });
+    const c = await this.prisma.recruitmentComment.findUnique({
+      where: { id },
+      include: this.include,
+    });
     if (!c) throw new NotFoundException('Comment not found');
     return c;
   }

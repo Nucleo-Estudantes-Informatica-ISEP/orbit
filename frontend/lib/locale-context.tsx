@@ -61,10 +61,11 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<AppLocale>('pt');
 
   useEffect(() => {
-    const stored = readLocaleCookie();
-    if (stored && isAppLocale(stored)) {
-      setLocaleState(stored);
-    }
+    const timeoutId = window.setTimeout(() => {
+      const stored = readLocaleCookie();
+      if (stored) setLocaleState(stored);
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
   }, []);
 
   useEffect(() => {
@@ -90,7 +91,7 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
     return () => {
       active = false;
     };
-  }, [user?.id]);
+  }, [user]);
 
   const setLocale = useCallback(async (nextLocale: AppLocale, persist = true) => {
     setLocaleState(nextLocale);
@@ -103,7 +104,7 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
         // keep local preference even if backend persistence fails
       }
     }
-  }, [user?.id]);
+  }, [user]);
 
   const t = useCallback((key: string, fallback?: string) => {
     return messages[locale][key] ?? fallback ?? key;

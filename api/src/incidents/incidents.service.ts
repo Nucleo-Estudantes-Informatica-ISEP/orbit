@@ -1,6 +1,27 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { MinioService } from '../files/minio.service';
+import type { Prisma } from '@prisma/client';
+
+export type CreateIncidentInput = Omit<
+  Prisma.IncidentUncheckedCreateInput,
+  'occurredAt'
+> & {
+  occurredAt?: Date | string;
+};
+
+export type UpdateIncidentInput = Omit<
+  Prisma.IncidentUncheckedUpdateInput,
+  'occurredAt'
+> & {
+  occurredAt?: Date | string;
+  createdById?: string | null;
+};
+
+export interface CreateIncidentCommentInput {
+  createdById?: string | null;
+  content: string;
+}
 
 @Injectable()
 export class IncidentsService {
@@ -18,10 +39,14 @@ export class IncidentsService {
     },
   };
 
-  create(data: any) {
+  create(data: CreateIncidentInput) {
     const { createdById, ...rest } = data;
-    if (rest.occurredAt && typeof rest.occurredAt === 'string' && rest.occurredAt.length === 10) {
-      rest.occurredAt = new Date(rest.occurredAt).toISOString();
+    if (
+      rest.occurredAt &&
+      typeof rest.occurredAt === 'string' &&
+      rest.occurredAt.length === 10
+    ) {
+      rest.occurredAt = new Date(rest.occurredAt);
     }
     return this.prisma.incident.create({
       data: { ...rest, createdById },
@@ -38,15 +63,23 @@ export class IncidentsService {
   }
 
   async findOne(id: string) {
-    const d = await this.prisma.incident.findUnique({ where: { id }, include: this.include });
+    const d = await this.prisma.incident.findUnique({
+      where: { id },
+      include: this.include,
+    });
     if (!d) throw new NotFoundException('Incidente não encontrado');
     return d;
   }
 
-  async update(id: string, data: any) {
+  async update(id: string, data: UpdateIncidentInput) {
     const { createdById, ...rest } = data;
-    if (rest.occurredAt && typeof rest.occurredAt === 'string' && rest.occurredAt.length === 10) {
-      rest.occurredAt = new Date(rest.occurredAt).toISOString();
+    void createdById;
+    if (
+      rest.occurredAt &&
+      typeof rest.occurredAt === 'string' &&
+      rest.occurredAt.length === 10
+    ) {
+      rest.occurredAt = new Date(rest.occurredAt);
     }
     return this.prisma.incident.update({
       where: { id },
@@ -55,7 +88,7 @@ export class IncidentsService {
     });
   }
 
-  async addComment(incidentId: string, data: any) {
+  async addComment(incidentId: string, data: CreateIncidentCommentInput) {
     const { createdById, content } = data;
     await this.prisma.incidentComment.create({
       data: { incidentId, content, createdById },
@@ -67,7 +100,9 @@ export class IncidentsService {
   }
 
   async removeComment(commentId: string) {
-    const c = await this.prisma.incidentComment.findUnique({ where: { id: commentId } });
+    const c = await this.prisma.incidentComment.findUnique({
+      where: { id: commentId },
+    });
     if (!c) throw new NotFoundException('Comentário não encontrado');
     return this.prisma.incidentComment.delete({ where: { id: commentId } });
   }
@@ -76,7 +111,11 @@ export class IncidentsService {
     const d = await this.prisma.incident.findUnique({ where: { id } });
     if (!d) throw new NotFoundException('Incidente não encontrado');
     if (d.fileKeys?.length) {
-      await Promise.all(d.fileKeys.map((key: string) => this.minio.deleteObject(key).catch(() => {})));
+      await Promise.all(
+        d.fileKeys.map((key: string) =>
+          this.minio.deleteObject(key).catch(() => {}),
+        ),
+      );
     }
     return this.prisma.incident.delete({ where: { id } });
   }

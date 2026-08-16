@@ -5,7 +5,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core';
 import { Plus, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -13,7 +12,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { EmptyState } from '@/components/empty-state';
 import { KanbanColumn } from '@/components/kanban-column';
 import { KanbanCard } from '@/components/kanban-card';
 import { PriorityBadge } from '@/components/priority-badge';
@@ -108,15 +106,10 @@ function TasksPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
-
-  // If navigated from projects with ?projectId=..., preselect the board dropdown
   useEffect(() => {
-    if (preselectedProject && selectedBoard === 'ALL') {
-      setSelectedBoard(preselectedProject);
-    }
-  // only run when the preselected project changes or when selectedBoard is still default
-  }, [preselectedProject, selectedBoard]);
+    const timeoutId = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [load]);
 
   const filtered = tasks.filter((t) => {
     if (selectedBoard !== 'ALL') {
@@ -196,7 +189,7 @@ function TasksPage() {
         setTasks((prev) => [created, ...prev]);
       }
       setModalOpen(false);
-    } catch (e: any) { setError(e.message || t('common.saveError')); }
+    } catch (error: unknown) { setError(error instanceof Error ? error.message : t('common.saveError')); }
     setSaving(false);
   };
 
@@ -226,7 +219,7 @@ function TasksPage() {
 
       {/* Board selector + filters */}
       <div className="flex items-center gap-3 flex-wrap">
-        <Select value={selectedBoard} onValueChange={setSelectedBoard}>
+        <Select value={selectedBoard === 'ALL' && preselectedProject ? preselectedProject : selectedBoard} onValueChange={setSelectedBoard}>
           <SelectTrigger className="w-48">
             <SelectValue placeholder={t('tasks.allBoards')} />
           </SelectTrigger>
@@ -414,4 +407,3 @@ export default function TasksPageWrapper() {
     </Suspense>
   );
 }
-

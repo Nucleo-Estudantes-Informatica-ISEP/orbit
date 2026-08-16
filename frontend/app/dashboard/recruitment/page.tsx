@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core';
-import { Plus, Mail, FileText, Trash2, MoreHorizontal, MessageSquare, History, X, Download, AlertTriangle } from 'lucide-react';
+import { Plus, Mail, FileText, Trash2, MessageSquare, History, Download, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -16,7 +16,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { KanbanColumn } from '@/components/kanban-column';
 import { KanbanCard } from '@/components/kanban-card';
-import { EmptyState } from '@/components/empty-state';
 import { useAuth } from '@/lib/auth-context';
 import { usePermission } from '@/lib/use-permission';
 import { useLocale } from '@/lib/locale-context';
@@ -122,7 +121,10 @@ export default function RecruitmentPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [load]);
 
   const openDetail = async (c: Candidate) => {
     setDetailCandidate(c);
@@ -182,7 +184,7 @@ export default function RecruitmentPage() {
       const created = await api.post<Candidate>('/candidates', payload);
       setCandidates((prev) => [created, ...prev]);
       setCreateOpen(false);
-    } catch (e: any) { setError(e.message || t('recruitment.createError')); }
+    } catch (error: unknown) { setError(error instanceof Error ? error.message : t('recruitment.createError')); }
     setSaving(false);
   };
 
@@ -229,8 +231,6 @@ export default function RecruitmentPage() {
       .slice(0, 2)
       .toUpperCase();
   };
-
-  const getDeptName = (id: string) => departments.find((d) => d.id === id)?.name || id;
 
   return (
     <div className="space-y-4">

@@ -1,5 +1,16 @@
-import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
-import { RecruitmentCommentService } from './recruitment-comment.service';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  RecruitmentCommentService,
+  type CreateRecruitmentCommentInput,
+} from './recruitment-comment.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
@@ -11,7 +22,7 @@ export class RecruitmentCommentController {
 
   @Post()
   @Permissions('RECRUITMENT_CREATE')
-  create(@Body() body: any) {
+  create(@Body() body: CreateRecruitmentCommentInput) {
     return this.svc.create(body);
   }
 

@@ -1,6 +1,17 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ResourcesService } from './resources.service';
 import { CreateResourceDto } from './dto/create-resource.dto';
+import type { UpdateResourceInput } from './resources.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
@@ -18,7 +29,12 @@ export class ResourcesController {
 
   @Get()
   @Permissions('RESOURCES_READ')
-  findAll(@Query('page') page?: string, @Query('pageSize') pageSize?: string, @Query('category') category?: string, @Query('search') search?: string) {
+  findAll(
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('category') category?: string,
+    @Query('search') search?: string,
+  ) {
     if (!page && !pageSize) {
       return this.svc.findAllRaw({ category, search });
     }
@@ -33,7 +49,7 @@ export class ResourcesController {
 
   @Put(':id')
   @Permissions('RESOURCES_UPDATE')
-  update(@Param('id') id: string, @Body() body: any) {
+  update(@Param('id') id: string, @Body() body: UpdateResourceInput) {
     return this.svc.update(id, body);
   }
 

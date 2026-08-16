@@ -22,7 +22,7 @@ export async function apiFetch<T = unknown>(
     localStorage.removeItem('auth_token');
     localStorage.removeItem('auth_user');
     if (typeof window !== 'undefined') {
-      window.location.href = '/login';
+      window.location.assign(new URL('/login', window.location.origin));
     }
     throw new Error('Sessão expirada. Por favor, faz login novamente.');
   }
@@ -95,7 +95,7 @@ export const api = {
       localStorage.removeItem('auth_token');
       localStorage.removeItem('auth_user');
       if (typeof window !== 'undefined') {
-        window.location.href = '/login';
+        window.location.assign(new URL('/login', window.location.origin));
       }
       throw new Error('Sessão expirada. Por favor, faz login novamente.');
     }
