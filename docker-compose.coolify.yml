@@ -31,6 +31,7 @@ services:
 
   migrator:
     image: orbit-api
+    exclude_from_hc: true
     command: ["npx", "prisma", "migrate", "deploy"]
     restart: "no"
     environment:
@@ -102,6 +103,12 @@ services:
       MINIO_ROOT_PASSWORD: ${SERVICE_PASSWORD_MINIO}
     volumes:
       - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     expose:
       - "9000"
 
