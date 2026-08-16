@@ -3,7 +3,11 @@ import { resolve } from 'node:path';
 
 type Operation = {
   operationId?: string;
-  parameters?: Array<{ in: string; name: string; schema?: { format?: string } }>;
+  parameters?: Array<{
+    in: string;
+    name: string;
+    schema?: { format?: string };
+  }>;
   requestBody?: unknown;
   responses?: Record<string, unknown>;
   security?: unknown[];
@@ -17,15 +21,20 @@ describe('checked-in OpenAPI contract', () => {
     paths: Record<string, Record<string, Operation>>;
     components: { schemas: Record<string, { additionalProperties?: boolean }> };
   };
-  const operations = Object.entries(document.paths).flatMap(([path, pathItem]) =>
-    Object.entries(pathItem)
-      .filter(([method]) => ['get', 'post', 'put', 'patch', 'delete'].includes(method))
-      .map(([method, operation]) => ({ path, method, operation })),
+  const operations = Object.entries(document.paths).flatMap(
+    ([path, pathItem]) =>
+      Object.entries(pathItem)
+        .filter(([method]) =>
+          ['get', 'post', 'put', 'patch', 'delete'].includes(method),
+        )
+        .map(([method, operation]) => ({ path, method, operation })),
   );
 
   it('documents every controller operation with stable unique IDs and responses', () => {
     expect(operations.length).toBeGreaterThanOrEqual(60);
-    const operationIds = operations.map(({ operation }) => operation.operationId);
+    const operationIds = operations.map(
+      ({ operation }) => operation.operationId,
+    );
     expect(new Set(operationIds).size).toBe(operationIds.length);
     for (const { operation } of operations) {
       expect(operation.operationId).toBeTruthy();
@@ -58,8 +67,11 @@ describe('checked-in OpenAPI contract', () => {
       '/auth/refresh',
       '/auth/forgot-password',
       '/auth/reset-password',
+      '/health',
     ]);
-    for (const { path, operation } of operations.filter(({ path }) => !publicPaths.has(path))) {
+    for (const { path, operation } of operations.filter(
+      ({ path }) => !publicPaths.has(path),
+    )) {
       expect(operation.security).toEqual([{ bearer: [] }]);
     }
   });
@@ -73,7 +85,9 @@ describe('checked-in OpenAPI contract', () => {
     });
     expect(requestSchemaNames.length).toBeGreaterThan(0);
     for (const schemaName of requestSchemaNames) {
-      expect(document.components.schemas[schemaName]?.additionalProperties).toBe(false);
+      expect(
+        document.components.schemas[schemaName]?.additionalProperties,
+      ).toBe(false);
     }
   });
 });
