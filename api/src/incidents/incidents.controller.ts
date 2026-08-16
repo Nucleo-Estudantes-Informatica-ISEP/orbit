@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  Query,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
@@ -12,8 +23,12 @@ import {
   IncidentQueryDto,
   UpdateIncidentDto,
 } from '../contracts/request.dto';
-import { IncidentCommentResponseDto, IncidentResponseDto } from '../contracts/response.dto';
+import {
+  IncidentCommentResponseDto,
+  IncidentResponseDto,
+} from '../contracts/response.dto';
 import { ApiProtectedController } from '../contracts/openapi.decorators';
+import type { AuthenticatedRequest } from '../auth/authenticated-request';
 
 @ApiTags('incidents')
 @ApiProtectedController()
@@ -25,8 +40,11 @@ export class IncidentsController {
   @Post()
   @Permissions('INCIDENTS_CREATE')
   @ApiCreatedResponse({ type: IncidentResponseDto })
-  create(@Body() body: CreateIncidentDto) {
-    return this.svc.create(body);
+  create(
+    @Request() request: AuthenticatedRequest,
+    @Body() body: CreateIncidentDto,
+  ) {
+    return this.svc.create(body, request.user.userId);
   }
 
   @Get()
@@ -53,8 +71,12 @@ export class IncidentsController {
   @Post(':id/comments')
   @Permissions('INCIDENTS_UPDATE')
   @ApiCreatedResponse({ type: IncidentResponseDto })
-  addComment(@Param() params: IdParamDto, @Body() body: CreateIncidentCommentDto) {
-    return this.svc.addComment(params.id, body);
+  addComment(
+    @Request() request: AuthenticatedRequest,
+    @Param() params: IdParamDto,
+    @Body() body: CreateIncidentCommentDto,
+  ) {
+    return this.svc.addComment(params.id, body, request.user.userId);
   }
 
   @Delete('comments/:commentId')

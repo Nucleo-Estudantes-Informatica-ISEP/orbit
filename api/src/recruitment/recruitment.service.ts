@@ -20,12 +20,10 @@ interface CandidateFields {
 }
 
 export type CreateCandidateInput = CandidateFields & {
-  performedById?: string;
   departmentChoices?: DepartmentChoiceInput[];
 };
 
 export type UpdateCandidateInput = Partial<CandidateFields> & {
-  performedById?: string;
   departmentChoices?: DepartmentChoiceInput[];
 };
 
@@ -55,8 +53,7 @@ export class RecruitmentService {
   };
 
   create(data: CreateCandidateInput) {
-    const { performedById, departmentChoices, ...createData } = data;
-    void performedById;
+    const { departmentChoices, ...createData } = data;
     return this.prisma.candidate.create({
       data: {
         ...createData,
@@ -89,8 +86,7 @@ export class RecruitmentService {
   }
 
   async update(id: string, data: UpdateCandidateInput) {
-    const { performedById, departmentChoices, ...updateData } = data;
-    void performedById;
+    const { departmentChoices, ...updateData } = data;
     if (departmentChoices) {
       await this.prisma.candidateDepartmentChoice.deleteMany({
         where: { candidateId: id },

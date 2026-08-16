@@ -131,9 +131,6 @@ export class UpdateBoardDto {
 }
 
 export class CreateAuditLogDto {
-  @IsUUID()
-  performedById: string;
-
   @IsString()
   @IsNotEmpty()
   action: string;
@@ -199,10 +196,6 @@ export class CreateDebtDto {
   @IsString()
   @MaxLength(64)
   depositAccount?: string;
-
-  @IsOptional()
-  @IsUUID()
-  createdById?: string;
 }
 
 export class UpdateDebtDto {
@@ -260,10 +253,6 @@ export class UpdateDebtDto {
   @IsString()
   @MaxLength(64)
   depositAccount?: string;
-
-  @IsOptional()
-  @IsUUID()
-  createdById?: string;
 }
 
 export class DebtQueryDto {
@@ -302,10 +291,6 @@ export class CreateIncidentDto {
   @ArrayMaxSize(20)
   @IsString({ each: true })
   fileKeys?: string[];
-
-  @IsOptional()
-  @IsUUID()
-  createdById?: string;
 }
 
 export class UpdateIncidentDto {
@@ -340,10 +325,6 @@ export class UpdateIncidentDto {
   @ArrayMaxSize(20)
   @IsString({ each: true })
   fileKeys?: string[];
-
-  @IsOptional()
-  @IsUUID()
-  createdById?: string;
 }
 
 export class IncidentQueryDto {
@@ -356,10 +337,6 @@ export class CreateIncidentCommentDto {
   @IsString()
   @IsNotEmpty()
   content: string;
-
-  @IsOptional()
-  @IsUUID()
-  createdById?: string;
 }
 
 export class CreateProjectDto {
@@ -381,10 +358,6 @@ export class CreateProjectDto {
   @IsOptional()
   @IsDateString()
   deadline?: string;
-
-  @IsOptional()
-  @IsUUID()
-  performedById?: string;
 }
 
 export class UpdateProjectDto {
@@ -408,10 +381,6 @@ export class UpdateProjectDto {
   @IsOptional()
   @IsDateString()
   deadline?: string;
-
-  @IsOptional()
-  @IsUUID()
-  performedById?: string;
 }
 
 export class ProjectMemberDto {
@@ -455,10 +424,6 @@ export class CreateTaskDto {
   @ArrayMaxSize(100)
   @IsUUID(undefined, { each: true })
   assigneeIds?: string[];
-
-  @IsOptional()
-  @IsUUID()
-  performedById?: string;
 }
 
 export class UpdateTaskDto {
@@ -498,10 +463,6 @@ export class UpdateTaskDto {
   @ArrayMaxSize(100)
   @IsUUID(undefined, { each: true })
   assigneeIds?: string[];
-
-  @IsOptional()
-  @IsUUID()
-  performedById?: string;
 }
 
 export class TaskQueryDto {
@@ -569,10 +530,6 @@ export class CreateCandidateDto {
   @ValidateNested({ each: true })
   @Type(() => CandidateDepartmentChoiceDto)
   departmentChoices?: CandidateDepartmentChoiceDto[];
-
-  @IsOptional()
-  @IsUUID()
-  performedById?: string;
 }
 
 export class UpdateCandidateDto {
@@ -613,18 +570,11 @@ export class UpdateCandidateDto {
   @ValidateNested({ each: true })
   @Type(() => CandidateDepartmentChoiceDto)
   departmentChoices?: CandidateDepartmentChoiceDto[];
-
-  @IsOptional()
-  @IsUUID()
-  performedById?: string;
 }
 
 export class CreateRecruitmentCommentDto {
   @IsUUID()
   candidateId: string;
-
-  @IsUUID()
-  createdById: string;
 
   @IsString()
   @IsNotEmpty()
@@ -683,9 +633,6 @@ export class TransferRoleDto {
 }
 
 export class PlanDecisionDto {
-  @IsUUID()
-  approvedById: string;
-
   @IsOptional()
   @IsString()
   rejectionNote?: string;

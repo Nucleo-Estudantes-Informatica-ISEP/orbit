@@ -25,7 +25,19 @@ describe('API contract validation (e2e)', () => {
       providers: [{ provide: TasksService, useValue: service }],
     })
       .overrideGuard(JwtAuthGuard)
-      .useValue({ canActivate: () => true })
+      .useValue({
+        canActivate: (context: {
+          switchToHttp(): { getRequest(): { user?: unknown } };
+        }) => {
+          context.switchToHttp().getRequest().user = {
+            userId: id,
+            email: 'member@example.com',
+            roles: [],
+            permissions: [],
+          };
+          return true;
+        },
+      })
       .overrideGuard(PermissionsGuard)
       .useValue({ canActivate: () => true })
       .compile();
@@ -42,8 +54,12 @@ describe('API contract validation (e2e)', () => {
       assigneeIds: [id],
     };
 
-    await request(app.getHttpServer()).post('/tasks').send(body).expect(201).expect(body);
-    expect(service.create).toHaveBeenCalledWith(body);
+    await request(app.getHttpServer())
+      .post('/tasks')
+      .send(body)
+      .expect(201)
+      .expect(body);
+    expect(service.create).toHaveBeenCalledWith(body, id);
   });
 
   it('rejects unknown body fields before service/Prisma', async () => {
@@ -54,11 +70,30 @@ describe('API contract validation (e2e)', () => {
       .expect(({ body }) => {
         expect(body.message).toContain('property injected should not exist');
       });
-    expect(service.create).not.toHaveBeenCalledWith(expect.objectContaining({ injected: true }));
+    expect(service.create).not.toHaveBeenCalledWith(
+      expect.objectContaining({ injected: true }),
+    );
+  });
+
+  it('rejects forged mutation actor fields', async () => {
+    await request(app.getHttpServer())
+      .post('/tasks')
+      .send({
+        title: 'Ship contract',
+        performedById: '2d813fc8-229d-4f66-83ad-72fd7d5b1254',
+      })
+      .expect(400)
+      .expect(({ body }: { body: { message: string[] } }) => {
+        expect(body.message).toContain(
+          'property performedById should not exist',
+        );
+      });
   });
 
   it('rejects invalid enum query values', async () => {
-    await request(app.getHttpServer()).get('/tasks?status=NOT_A_STATUS').expect(400);
+    await request(app.getHttpServer())
+      .get('/tasks?status=NOT_A_STATUS')
+      .expect(400);
   });
 
   it('rejects malformed UUID path parameters', async () => {
@@ -67,7 +102,10 @@ describe('API contract validation (e2e)', () => {
   });
 
   it('accepts valid UUID path parameters', async () => {
-    await request(app.getHttpServer()).get(`/tasks/${id}`).expect(200).expect({ id });
+    await request(app.getHttpServer())
+      .get(`/tasks/${id}`)
+      .expect(200)
+      .expect({ id });
   });
 
   afterAll(async () => {

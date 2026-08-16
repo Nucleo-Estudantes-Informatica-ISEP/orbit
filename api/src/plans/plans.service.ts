@@ -24,11 +24,12 @@ export class PlansService {
     approvedBy: { select: { id: true, name: true } },
   };
 
-  async create(dto: CreatePlanDto) {
+  async create(dto: CreatePlanDto, actorId: string) {
     const { deadline, ...rest } = dto;
     return this.prisma.plan.create({
       data: {
         ...rest,
+        createdById: actorId,
         ...(deadline ? { deadline: new Date(deadline) } : {}),
       },
       include: this.include,

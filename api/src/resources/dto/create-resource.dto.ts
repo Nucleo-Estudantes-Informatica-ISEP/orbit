@@ -1,4 +1,11 @@
-import { IsString, IsOptional, IsArray, IsEnum, IsUUID, IsNotEmpty } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsArray,
+  IsEnum,
+  IsUUID,
+  IsNotEmpty,
+} from 'class-validator';
 import { Visibility } from '@prisma/client';
 
 export class CreateResourceDto {
@@ -30,8 +37,4 @@ export class CreateResourceDto {
   @IsOptional()
   @IsEnum(Visibility)
   visibility?: Visibility;
-
-  @IsOptional()
-  @IsUUID()
-  performedById?: string;
 }

@@ -12,7 +12,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Pagination, usePagination } from '@/components/ui/data-pagination';
 import { EmptyState } from '@/components/empty-state';
-import { useAuth } from '@/lib/auth-context';
 import { usePermission } from '@/lib/use-permission';
 import { useLocale } from '@/lib/locale-context';
 import { api } from '@/lib/api';
@@ -48,7 +47,6 @@ function isThisWeek(date: Date) {
 }
 
 export default function EventsPage() {
-  const { user } = useAuth();
   const { t } = useLocale();
   const canCreate = usePermission('EVENTS_CREATE');
   const canUpdate = usePermission('EVENTS_UPDATE');
@@ -131,7 +129,7 @@ export default function EventsPage() {
         const updated = await api.put<Event>(`/events/${editTarget.id}`, payload);
         setEvents((prev) => prev.map((e) => e.id === editTarget.id ? updated : e));
       } else {
-        const created = await api.post<Event>('/events', { ...payload, performedById: user?.id });
+    const created = await api.post<Event>('/events', payload);
         setEvents((prev) => [...prev, created].sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()));
       }
       setModalOpen(false);

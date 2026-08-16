@@ -1,12 +1,29 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  Query,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
 import { DebtsService } from './debts.service';
 import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
-import { CreateDebtDto, DebtQueryDto, IdParamDto, UpdateDebtDto } from '../contracts/request.dto';
+import {
+  CreateDebtDto,
+  DebtQueryDto,
+  IdParamDto,
+  UpdateDebtDto,
+} from '../contracts/request.dto';
 import { DebtResponseDto } from '../contracts/response.dto';
 import { ApiProtectedController } from '../contracts/openapi.decorators';
+import type { AuthenticatedRequest } from '../auth/authenticated-request';
 
 @ApiTags('debts')
 @ApiProtectedController()
@@ -18,8 +35,11 @@ export class DebtsController {
   @Post()
   @Permissions('DEBTS_CREATE')
   @ApiCreatedResponse({ type: DebtResponseDto })
-  create(@Body() body: CreateDebtDto) {
-    return this.svc.create(body);
+  create(
+    @Request() request: AuthenticatedRequest,
+    @Body() body: CreateDebtDto,
+  ) {
+    return this.svc.create({ ...body, createdById: request.user.userId });
   }
 
   @Get()

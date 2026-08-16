@@ -46,8 +46,4 @@ export class UpdateInventoryItemDto {
   @IsOptional()
   @IsUUID()
   departmentId?: string;
-
-  @IsOptional()
-  @IsUUID()
-  performedById?: string;
 }

@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
@@ -6,9 +17,14 @@ import { PlansService } from './plans.service';
 import { CreatePlanDto } from './dto/create-plan.dto';
 import { UpdatePlanDto } from './dto/update-plan.dto';
 import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
-import { IdParamDto, PlanDecisionDto, PlanQueryDto } from '../contracts/request.dto';
+import {
+  IdParamDto,
+  PlanDecisionDto,
+  PlanQueryDto,
+} from '../contracts/request.dto';
 import { PlanResponseDto } from '../contracts/response.dto';
 import { ApiProtectedController } from '../contracts/openapi.decorators';
+import type { AuthenticatedRequest } from '../auth/authenticated-request';
 
 @ApiTags('plans')
 @ApiProtectedController()
@@ -20,8 +36,8 @@ export class PlansController {
   @Post()
   @Permissions('PLANS_CREATE')
   @ApiCreatedResponse({ type: PlanResponseDto })
-  create(@Body() dto: CreatePlanDto) {
-    return this.svc.create(dto);
+  create(@Request() request: AuthenticatedRequest, @Body() dto: CreatePlanDto) {
+    return this.svc.create(dto, request.user.userId);
   }
 
   @Get()
@@ -48,15 +64,22 @@ export class PlansController {
   @Put(':id/approve')
   @Permissions('PLANS_APPROVE')
   @ApiOkResponse({ type: PlanResponseDto })
-  approve(@Param() params: IdParamDto, @Body() body: PlanDecisionDto) {
-    return this.svc.approve(params.id, body.approvedById);
+  approve(
+    @Request() request: AuthenticatedRequest,
+    @Param() params: IdParamDto,
+  ) {
+    return this.svc.approve(params.id, request.user.userId);
   }
 
   @Put(':id/reject')
   @Permissions('PLANS_APPROVE')
   @ApiOkResponse({ type: PlanResponseDto })
-  reject(@Param() params: IdParamDto, @Body() body: PlanDecisionDto) {
-    return this.svc.reject(params.id, body.approvedById, body.rejectionNote);
+  reject(
+    @Request() request: AuthenticatedRequest,
+    @Param() params: IdParamDto,
+    @Body() body: PlanDecisionDto,
+  ) {
+    return this.svc.reject(params.id, request.user.userId, body.rejectionNote);
   }
 
   @Delete(':id')

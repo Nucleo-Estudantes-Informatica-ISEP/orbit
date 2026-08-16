@@ -1,12 +1,26 @@
-import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
 import { RecruitmentCommentService } from './recruitment-comment.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
 import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
-import { CandidateIdParamDto, CreateRecruitmentCommentDto, IdParamDto } from '../contracts/request.dto';
+import {
+  CandidateIdParamDto,
+  CreateRecruitmentCommentDto,
+  IdParamDto,
+} from '../contracts/request.dto';
 import { RecruitmentCommentResponseDto } from '../contracts/response.dto';
 import { ApiProtectedController } from '../contracts/openapi.decorators';
+import type { AuthenticatedRequest } from '../auth/authenticated-request';
 
 @ApiTags('recruitment-comments')
 @ApiProtectedController()
@@ -18,8 +32,11 @@ export class RecruitmentCommentController {
   @Post()
   @Permissions('RECRUITMENT_CREATE')
   @ApiCreatedResponse({ type: RecruitmentCommentResponseDto })
-  create(@Body() body: CreateRecruitmentCommentDto) {
-    return this.svc.create(body);
+  create(
+    @Request() request: AuthenticatedRequest,
+    @Body() body: CreateRecruitmentCommentDto,
+  ) {
+    return this.svc.create({ ...body, createdById: request.user.userId });
   }
 
   @Get('candidate/:candidateId')

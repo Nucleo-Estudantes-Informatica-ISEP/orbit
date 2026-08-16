@@ -145,7 +145,7 @@ function TasksPage() {
     if (!task || task.status === newStatus) return;
     setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, status: newStatus } : t));
     try {
-      await api.put(`/tasks/${task.id}`, { status: newStatus, performedById: user?.id });
+    await api.put(`/tasks/${task.id}`, { status: newStatus });
     } catch {
       setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, status: task.status } : t));
     }
@@ -185,7 +185,6 @@ function TasksPage() {
         deadline: form.deadline || undefined,
         boardId: form.boardId || undefined,
         projectId: form.projectId || undefined,
-        performedById: user?.id,
       };
       if (editTarget) {
         const updated = await api.put<Task>(`/tasks/${editTarget.id}`, payload);

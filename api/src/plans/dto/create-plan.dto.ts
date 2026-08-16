@@ -1,4 +1,10 @@
-import { IsString, IsOptional, IsDateString, IsUUID, IsNotEmpty } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsDateString,
+  IsUUID,
+  IsNotEmpty,
+} from 'class-validator';
 
 export class CreatePlanDto {
   @IsString()
@@ -19,7 +25,4 @@ export class CreatePlanDto {
 
   @IsUUID()
   departmentId: string;
-
-  @IsUUID()
-  createdById: string;
 }

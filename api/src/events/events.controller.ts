@@ -1,14 +1,34 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
 import { EventsService } from './events.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
-import { ApiCreatedResponse, ApiOkResponse, ApiTags, getSchemaPath } from '@nestjs/swagger';
+import {
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiTags,
+  getSchemaPath,
+} from '@nestjs/swagger';
 import { EventQueryDto, IdParamDto } from '../contracts/request.dto';
-import { EventResponseDto, PaginatedEventResponseDto } from '../contracts/response.dto';
+import {
+  EventResponseDto,
+  PaginatedEventResponseDto,
+} from '../contracts/response.dto';
 import { ApiProtectedController } from '../contracts/openapi.decorators';
 import { UpdateEventDto } from './dto/update-event.dto';
+import type { AuthenticatedRequest } from '../auth/authenticated-request';
 
 @ApiTags('events')
 @ApiProtectedController()
@@ -20,8 +40,11 @@ export class EventsController {
   @Post()
   @Permissions('EVENTS_CREATE')
   @ApiCreatedResponse({ type: EventResponseDto })
-  create(@Body() dto: CreateEventDto) {
-    return this.svc.create(dto);
+  create(
+    @Request() request: AuthenticatedRequest,
+    @Body() dto: CreateEventDto,
+  ) {
+    return this.svc.create(dto, request.user.userId);
   }
 
   @Get()

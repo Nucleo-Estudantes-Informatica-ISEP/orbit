@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { MinioService } from '../files/minio.service';
 import { CreateResourceDto } from './dto/create-resource.dto';
+import { UpdateResourceDto } from './dto/update-resource.dto';
 
 @Injectable()
 export class ResourcesService {
@@ -11,7 +12,9 @@ export class ResourcesService {
   ) {}
 
   private readonly include = {
-    resourceDepartments: { include: { department: { select: { id: true, name: true } } } },
+    resourceDepartments: {
+      include: { department: { select: { id: true, name: true } } },
+    },
   };
 
   create(data: CreateResourceDto) {
@@ -35,21 +38,41 @@ export class ResourcesService {
     });
   }
 
-  async findAll(filters?: { page?: number; pageSize?: number; category?: string; search?: string }) {
+  async findAll(filters?: {
+    page?: number;
+    pageSize?: number;
+    category?: string;
+    search?: string;
+  }) {
     const page = Math.max(1, Number(filters?.page ?? 1) || 1);
-    const pageSize = Math.max(1, Math.min(100, Number(filters?.pageSize ?? 6) || 6));
+    const pageSize = Math.max(
+      1,
+      Math.min(100, Number(filters?.pageSize ?? 6) || 6),
+    );
     const where: any = {
-      ...(filters?.category && filters.category !== 'ALL' ? { category: filters.category } : {}),
-      ...(filters?.search ? {
-        OR: [
-          { title: { contains: filters.search, mode: 'insensitive' } },
-          { description: { contains: filters.search, mode: 'insensitive' } },
-        ],
-      } : {}),
+      ...(filters?.category && filters.category !== 'ALL'
+        ? { category: filters.category }
+        : {}),
+      ...(filters?.search
+        ? {
+            OR: [
+              { title: { contains: filters.search, mode: 'insensitive' } },
+              {
+                description: { contains: filters.search, mode: 'insensitive' },
+              },
+            ],
+          }
+        : {}),
     };
     const [total, items] = await Promise.all([
       this.prisma.resource.count({ where }),
-      this.prisma.resource.findMany({ where, orderBy: { createdAt: 'desc' }, include: this.include, skip: (page - 1) * pageSize, take: pageSize }),
+      this.prisma.resource.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        include: this.include,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
     ]);
     return { items, total, page, pageSize };
   }
@@ -63,17 +86,23 @@ export class ResourcesService {
         { description: { contains: filters.search, mode: 'insensitive' } },
       ];
     }
-    return this.prisma.resource.findMany({ where, orderBy: { createdAt: 'desc' } });
+    return this.prisma.resource.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
   async findOne(id: string) {
-    const r = await this.prisma.resource.findUnique({ where: { id }, include: this.include });
+    const r = await this.prisma.resource.findUnique({
+      where: { id },
+      include: this.include,
+    });
     if (!r) throw new NotFoundException('Resource not found');
     return r;
   }
 
-  async update(id: string, data: any) {
-    const { performedById, departmentIds, ...updateData } = data;
+  async update(id: string, data: UpdateResourceDto) {
+    const { departmentIds, ...updateData } = data;
     return this.prisma.$transaction(async (tx) => {
       if (departmentIds !== undefined) {
         await tx.resourceDepartment.deleteMany({ where: { resourceId: id } });

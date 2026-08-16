@@ -121,7 +121,6 @@ export default function PlansPage() {
         deadline: form.deadline || undefined,
         fileKey: form.fileKey || undefined,
         departmentId: form.departmentId,
-        createdById: user.id,
       });
       setPlans((prev) => [created, ...prev]);
       toast.success('Plano submetido com sucesso');
@@ -136,7 +135,7 @@ export default function PlansPage() {
     if (!selectedPlan || !user?.id) return;
     setApproving(true);
     try {
-      const updated = await api.put<Plan>(`/plans/${selectedPlan.id}/approve`, { approvedById: user.id });
+    const updated = await api.put<Plan>(`/plans/${selectedPlan.id}/approve`, {});
       setPlans((prev) => prev.map((p) => p.id === updated.id ? updated : p));
       setSelectedPlan(updated);
       toast.success('Plano aprovado');
@@ -151,7 +150,6 @@ export default function PlansPage() {
     setApproving(true);
     try {
       const updated = await api.put<Plan>(`/plans/${selectedPlan.id}/reject`, {
-        approvedById: user.id,
         rejectionNote: rejectionNote || undefined,
       });
       setPlans((prev) => prev.map((p) => p.id === updated.id ? updated : p));

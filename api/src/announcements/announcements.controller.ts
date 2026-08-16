@@ -1,14 +1,35 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { AnnouncementsService } from './announcements.service';
 import { CreateAnnouncementDto } from './dto/create-announcement.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
-import { ApiCreatedResponse, ApiOkResponse, ApiTags, getSchemaPath } from '@nestjs/swagger';
+import {
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiTags,
+  getSchemaPath,
+} from '@nestjs/swagger';
 import { AnnouncementQueryDto, IdParamDto } from '../contracts/request.dto';
-import { AnnouncementResponseDto, CountResponseDto, PaginatedAnnouncementResponseDto } from '../contracts/response.dto';
+import {
+  AnnouncementResponseDto,
+  CountResponseDto,
+  PaginatedAnnouncementResponseDto,
+} from '../contracts/response.dto';
 import { ApiProtectedController } from '../contracts/openapi.decorators';
 import { UpdateAnnouncementDto } from './dto/update-announcement.dto';
+import type { AuthenticatedRequest } from '../auth/authenticated-request';
 
 @ApiTags('announcements')
 @ApiProtectedController()
@@ -20,8 +41,11 @@ export class AnnouncementsController {
   @Post()
   @Permissions('ANNOUNCEMENTS_CREATE')
   @ApiCreatedResponse({ type: AnnouncementResponseDto })
-  create(@Body() dto: CreateAnnouncementDto) {
-    return this.svc.create(dto);
+  create(
+    @Request() request: AuthenticatedRequest,
+    @Body() dto: CreateAnnouncementDto,
+  ) {
+    return this.svc.create(dto, request.user.userId);
   }
 
   @Get()
@@ -30,11 +54,17 @@ export class AnnouncementsController {
     schema: {
       oneOf: [
         { $ref: getSchemaPath(PaginatedAnnouncementResponseDto) },
-        { type: 'array', items: { $ref: getSchemaPath(AnnouncementResponseDto) } },
+        {
+          type: 'array',
+          items: { $ref: getSchemaPath(AnnouncementResponseDto) },
+        },
       ],
     },
   })
-  findAll(@Request() req: any, @Query() query: AnnouncementQueryDto) {
+  findAll(
+    @Request() req: AuthenticatedRequest,
+    @Query() query: AnnouncementQueryDto,
+  ) {
     if (!query.page && !query.pageSize) {
       return this.svc.findAllRaw(req.user.userId, query.visibility);
     }
@@ -44,14 +74,14 @@ export class AnnouncementsController {
   @Get('me')
   @Permissions('ANNOUNCEMENTS_READ')
   @ApiOkResponse({ type: AnnouncementResponseDto, isArray: true })
-  findForMe(@Request() req: any) {
+  findForMe(@Request() req: AuthenticatedRequest) {
     return this.svc.findAllForUser(req.user.userId);
   }
 
   @Put('me/read-all')
   @Permissions('ANNOUNCEMENTS_READ')
   @ApiOkResponse({ type: CountResponseDto })
-  markAllRead(@Request() req: any) {
+  markAllRead(@Request() req: AuthenticatedRequest) {
     return this.svc.markAllRead(req.user.userId);
   }
 
@@ -89,5 +119,4 @@ export class AnnouncementsController {
   togglePin(@Param() params: IdParamDto) {
     return this.svc.togglePin(params.id);
   }
-
 }

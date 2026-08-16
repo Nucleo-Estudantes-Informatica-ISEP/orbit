@@ -1,12 +1,29 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
 import { ProjectsService } from './projects.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
 import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
-import { CreateProjectDto, IdParamDto, ProjectMemberDto, ProjectMemberParamDto, UpdateProjectDto } from '../contracts/request.dto';
+import {
+  CreateProjectDto,
+  IdParamDto,
+  ProjectMemberDto,
+  ProjectMemberParamDto,
+  UpdateProjectDto,
+} from '../contracts/request.dto';
 import { ProjectResponseDto } from '../contracts/response.dto';
 import { ApiProtectedController } from '../contracts/openapi.decorators';
+import type { AuthenticatedRequest } from '../auth/authenticated-request';
 
 @ApiTags('projects')
 @ApiProtectedController()
@@ -18,8 +35,11 @@ export class ProjectsController {
   @Post()
   @Permissions('PROJECTS_CREATE')
   @ApiCreatedResponse({ type: ProjectResponseDto })
-  create(@Body() body: CreateProjectDto) {
-    return this.svc.create(body);
+  create(
+    @Request() request: AuthenticatedRequest,
+    @Body() body: CreateProjectDto,
+  ) {
+    return this.svc.create(body, request.user.userId);
   }
 
   @Get()
