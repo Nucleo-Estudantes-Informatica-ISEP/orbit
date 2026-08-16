@@ -1,17 +1,6 @@
 {
   "components": {
     "schemas": {
-      "AccessTokenResponseDto": {
-        "properties": {
-          "access_token": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "access_token"
-        ],
-        "type": "object"
-      },
       "AnnouncementDepartmentResponseDto": {
         "properties": {
           "announcementId": {
@@ -327,6 +316,26 @@
         ],
         "type": "object"
       },
+      "ChangeOwnPasswordDto": {
+        "additionalProperties": false,
+        "properties": {
+          "current_password": {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          "new_password": {
+            "maxLength": 128,
+            "minLength": 8,
+            "type": "string"
+          }
+        },
+        "required": [
+          "current_password",
+          "new_password"
+        ],
+        "type": "object"
+      },
       "CountResponseDto": {
         "properties": {
           "count": {
@@ -344,10 +353,6 @@
           "content": {
             "type": "string"
           },
-          "createdById": {
-            "format": "uuid",
-            "type": "string"
-          },
           "date": {
             "type": "string"
           },
@@ -359,10 +364,6 @@
             "type": "array"
           },
           "description": {
-            "type": "string"
-          },
-          "performedById": {
-            "format": "uuid",
             "type": "string"
           },
           "pinned": {
@@ -413,14 +414,9 @@
           },
           "entityId": {
             "type": "string"
-          },
-          "performedById": {
-            "format": "uuid",
-            "type": "string"
           }
         },
         "required": [
-          "performedById",
           "action",
           "entity",
           "entityId"
@@ -477,10 +473,6 @@
           "notes": {
             "type": "string"
           },
-          "performedById": {
-            "format": "uuid",
-            "type": "string"
-          },
           "stage": {
             "enum": [
               "REJECTED",
@@ -506,10 +498,6 @@
       "CreateDebtDto": {
         "additionalProperties": false,
         "properties": {
-          "createdById": {
-            "format": "uuid",
-            "type": "string"
-          },
           "creditorContact": {
             "type": "string"
           },
@@ -606,10 +594,6 @@
           "location": {
             "type": "string"
           },
-          "performedById": {
-            "format": "uuid",
-            "type": "string"
-          },
           "start": {
             "type": "string"
           },
@@ -638,10 +622,6 @@
         "properties": {
           "content": {
             "type": "string"
-          },
-          "createdById": {
-            "format": "uuid",
-            "type": "string"
           }
         },
         "required": [
@@ -652,10 +632,6 @@
       "CreateIncidentDto": {
         "additionalProperties": false,
         "properties": {
-          "createdById": {
-            "format": "uuid",
-            "type": "string"
-          },
           "departmentId": {
             "format": "uuid",
             "type": "string"
@@ -715,10 +691,6 @@
           "name": {
             "type": "string"
           },
-          "performedById": {
-            "format": "uuid",
-            "type": "string"
-          },
           "photoKey": {
             "type": "string"
           },
@@ -749,10 +721,6 @@
       "CreatePlanDto": {
         "additionalProperties": false,
         "properties": {
-          "createdById": {
-            "format": "uuid",
-            "type": "string"
-          },
           "deadline": {
             "type": "string"
           },
@@ -772,8 +740,7 @@
         },
         "required": [
           "name",
-          "departmentId",
-          "createdById"
+          "departmentId"
         ],
         "type": "object"
       },
@@ -791,10 +758,6 @@
             "type": "string"
           },
           "name": {
-            "type": "string"
-          },
-          "performedById": {
-            "format": "uuid",
             "type": "string"
           },
           "status": {
@@ -823,15 +786,10 @@
           },
           "content": {
             "type": "string"
-          },
-          "createdById": {
-            "format": "uuid",
-            "type": "string"
           }
         },
         "required": [
           "candidateId",
-          "createdById",
           "content"
         ],
         "type": "object"
@@ -853,10 +811,6 @@
             "type": "string"
           },
           "link": {
-            "type": "string"
-          },
-          "performedById": {
-            "format": "uuid",
             "type": "string"
           },
           "title": {
@@ -997,10 +951,6 @@
             "type": "string"
           },
           "description": {
-            "type": "string"
-          },
-          "performedById": {
-            "format": "uuid",
             "type": "string"
           },
           "priority": {
@@ -1608,17 +1558,10 @@
       "PlanDecisionDto": {
         "additionalProperties": false,
         "properties": {
-          "approvedById": {
-            "format": "uuid",
-            "type": "string"
-          },
           "rejectionNote": {
             "type": "string"
           }
         },
-        "required": [
-          "approvedById"
-        ],
         "type": "object"
       },
       "PlanResponseDto": {
@@ -2167,10 +2110,6 @@
           "content": {
             "type": "string"
           },
-          "createdById": {
-            "format": "uuid",
-            "type": "string"
-          },
           "date": {
             "type": "string"
           },
@@ -2182,10 +2121,6 @@
             "type": "array"
           },
           "description": {
-            "type": "string"
-          },
-          "performedById": {
-            "format": "uuid",
             "type": "string"
           },
           "pinned": {
@@ -2269,10 +2204,6 @@
           "notes": {
             "type": "string"
           },
-          "performedById": {
-            "format": "uuid",
-            "type": "string"
-          },
           "stage": {
             "enum": [
               "REJECTED",
@@ -2294,10 +2225,6 @@
       "UpdateDebtDto": {
         "additionalProperties": false,
         "properties": {
-          "createdById": {
-            "format": "uuid",
-            "type": "string"
-          },
           "creditorContact": {
             "type": "string"
           },
@@ -2386,10 +2313,6 @@
           "location": {
             "type": "string"
           },
-          "performedById": {
-            "format": "uuid",
-            "type": "string"
-          },
           "start": {
             "type": "string"
           },
@@ -2413,10 +2336,6 @@
       "UpdateIncidentDto": {
         "additionalProperties": false,
         "properties": {
-          "createdById": {
-            "format": "uuid",
-            "type": "string"
-          },
           "departmentId": {
             "format": "uuid",
             "type": "string"
@@ -2472,10 +2391,6 @@
           "name": {
             "type": "string"
           },
-          "performedById": {
-            "format": "uuid",
-            "type": "string"
-          },
           "photoKey": {
             "type": "string"
           },
@@ -2497,6 +2412,19 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "UpdateOwnProfileDto": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "maxLength": 100,
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
         "type": "object"
       },
       "UpdatePlanDto": {
@@ -2537,10 +2465,6 @@
           "name": {
             "type": "string"
           },
-          "performedById": {
-            "format": "uuid",
-            "type": "string"
-          },
           "status": {
             "enum": [
               "ACTIVE",
@@ -2571,10 +2495,6 @@
             "type": "string"
           },
           "link": {
-            "type": "string"
-          },
-          "performedById": {
-            "format": "uuid",
             "type": "string"
           },
           "title": {
@@ -2709,10 +2629,6 @@
             "type": "string"
           },
           "description": {
-            "type": "string"
-          },
-          "performedById": {
-            "format": "uuid",
             "type": "string"
           },
           "priority": {
@@ -3932,6 +3848,62 @@
         ]
       }
     },
+    "/auth/change-password": {
+      "put": {
+        "operationId": "Auth_changePassword",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeOwnPasswordDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/auth/forgot-password": {
       "post": {
         "operationId": "Auth_forgotPassword",
@@ -4058,6 +4030,60 @@
         "tags": [
           "auth"
         ]
+      },
+      "put": {
+        "operationId": "Auth_updateMe",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOwnProfileDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionUserResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "auth"
+        ]
       }
     },
     "/auth/refresh": {
@@ -4079,7 +4105,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AccessTokenResponseDto"
+                  "$ref": "#/components/schemas/AuthTokensResponseDto"
                 }
               }
             },
@@ -7295,6 +7321,20 @@
         ]
       }
     },
+    "/health": {
+      "get": {
+        "operationId": "Health_getHealth",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Health"
+        ]
+      }
+    },
     "/incidents": {
       "get": {
         "operationId": "Incidents_findAll",
@@ -8796,16 +8836,6 @@
             }
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PlanDecisionDto"
-              }
-            }
-          },
-          "required": true
-        },
         "responses": {
           "200": {
             "content": {

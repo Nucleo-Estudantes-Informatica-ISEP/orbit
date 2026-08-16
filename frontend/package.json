@@ -6,7 +6,8 @@
     "dev": "next dev -p 3090",
     "build": "next build",
     "start": "next start -p 3090",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --test --experimental-strip-types lib/*.test.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
