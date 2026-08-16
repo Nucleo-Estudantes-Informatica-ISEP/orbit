@@ -11,7 +11,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Pagination, usePagination } from '@/components/ui/data-pagination';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { EmptyState } from '@/components/empty-state';
 import { FileUpload } from '@/components/file-upload';
 import { useAuth } from '@/lib/auth-context';
@@ -97,7 +96,10 @@ export default function PlansPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [load]);
 
   const filtered = plans.filter((p) => statusFilter === 'ALL' || p.status === statusFilter);
 

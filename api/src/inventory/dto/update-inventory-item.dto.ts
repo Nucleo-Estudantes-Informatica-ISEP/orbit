@@ -1,4 +1,11 @@
-import { IsString, IsOptional, IsDateString, IsInt, IsUUID, Min } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsDateString,
+  IsInt,
+  IsUUID,
+  Min,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class UpdateInventoryItemDto {

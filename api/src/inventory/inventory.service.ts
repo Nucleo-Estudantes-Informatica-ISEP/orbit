@@ -19,6 +19,7 @@ export class InventoryService {
 
   async create(dto: CreateInventoryItemDto) {
     const { performedById, value, purchaseDate, warrantyDate, ...rest } = dto;
+    void performedById;
     return this.prisma.inventoryItem.create({
       data: {
         ...rest,
@@ -38,13 +39,17 @@ export class InventoryService {
   }
 
   async findOne(id: string) {
-    const item = await this.prisma.inventoryItem.findUnique({ where: { id }, include: this.include });
+    const item = await this.prisma.inventoryItem.findUnique({
+      where: { id },
+      include: this.include,
+    });
     if (!item) throw new NotFoundException('Item de inventário não encontrado');
     return item;
   }
 
   async update(id: string, dto: UpdateInventoryItemDto) {
     const { performedById, value, purchaseDate, warrantyDate, ...rest } = dto;
+    void performedById;
     return this.prisma.inventoryItem.update({
       where: { id },
       data: {

@@ -1,7 +1,19 @@
-import { Injectable, NestInterceptor, ExecutionContext, CallHandler } from '@nestjs/common';
+import {
+  Injectable,
+  NestInterceptor,
+  ExecutionContext,
+  CallHandler,
+} from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { PrismaService } from '../prisma.service';
+import type { Request } from 'express';
+import type { AuthenticatedUser } from '../auth/authenticated-request';
+
+type AuditRequest = Omit<Request, 'route'> & {
+  route?: { path?: string };
+  user?: AuthenticatedUser;
+};
 
 const ROUTE_ENTITY_MAP: Record<string, string> = {
   users: 'User',
@@ -41,24 +53,31 @@ function extractAction(method: string): string {
   return 'UPDATE';
 }
 
-function getEntityId(request: any): string | null {
-  return request.params?.id || request.params?.projectId || request.params?.userId || null;
+function getEntityId(request: AuditRequest): string | null {
+  const value =
+    request.params?.id ||
+    request.params?.projectId ||
+    request.params?.userId ||
+    null;
+  return Array.isArray(value) ? (value[0] ?? null) : value;
 }
 
 function isMutating(method: string): boolean {
   return MUTATING_METHODS.includes(method);
 }
 
-function shouldSkip(request: any): boolean {
-  return SKIP_PATHS.some((p) => request.route?.path === p || request.url?.startsWith(p));
+function shouldSkip(request: AuditRequest): boolean {
+  return SKIP_PATHS.some(
+    (p) => request.route?.path === p || request.url?.startsWith(p),
+  );
 }
 
 @Injectable()
 export class AuditLogInterceptor implements NestInterceptor {
   constructor(private prisma: PrismaService) {}
 
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    const request = context.switchToHttp().getRequest();
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
+    const request = context.switchToHttp().getRequest<AuditRequest>();
     const method = request.method;
     const user = request.user;
 
@@ -76,13 +95,44 @@ export class AuditLogInterceptor implements NestInterceptor {
 
     return next.handle().pipe(
       tap({
-        next: (responseBody: any) => {
-          const id = entityId || responseBody?.id || responseBody?.data?.id || 'unknown';
-          this.prisma.auditLog
-            .create({ data: { performedById: user.userId, action, entity, entityId: id } })
+        next: (responseBody: unknown) => {
+          const id = entityId ?? getResponseId(responseBody) ?? 'unknown';
+          void this.prisma.auditLog
+            .create({
+              data: {
+                performedById: user.userId,
+                action,
+                entity,
+                entityId: id,
+              },
+            })
             .catch(() => {});
         },
       }),
     );
   }
+}
+
+function getResponseId(responseBody: unknown): string | null {
+  if (!responseBody || typeof responseBody !== 'object') {
+    return null;
+  }
+
+  if ('id' in responseBody && typeof responseBody.id === 'string') {
+    return responseBody.id;
+  }
+
+  if ('data' in responseBody) {
+    const data = responseBody.data;
+    if (
+      data &&
+      typeof data === 'object' &&
+      'id' in data &&
+      typeof data.id === 'string'
+    ) {
+      return data.id;
+    }
+  }
+
+  return null;
 }

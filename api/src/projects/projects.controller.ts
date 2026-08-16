@@ -1,5 +1,14 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
-import { ProjectsService } from './projects.service';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  UseGuards,
+} from '@nestjs/common';
+import { ProjectsService, type ProjectInput } from './projects.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
@@ -11,7 +20,7 @@ export class ProjectsController {
 
   @Post()
   @Permissions('PROJECTS_CREATE')
-  create(@Body() body: any) {
+  create(@Body() body: ProjectInput) {
     return this.svc.create(body);
   }
 
@@ -29,7 +38,7 @@ export class ProjectsController {
 
   @Put(':id')
   @Permissions('PROJECTS_UPDATE')
-  update(@Param('id') id: string, @Body() body: any) {
+  update(@Param('id') id: string, @Body() body: Partial<ProjectInput>) {
     return this.svc.update(id, body);
   }
 

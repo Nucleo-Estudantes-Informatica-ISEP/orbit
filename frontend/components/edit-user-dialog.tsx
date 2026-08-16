@@ -64,7 +64,8 @@ export function EditUserDialog({ user, open, onOpenChange, onSave, roles, depart
 
   // Update form data when modal opens/changes
   useEffect(() => {
-    if (open) {
+    if (!open) return;
+    const timeoutId = window.setTimeout(() => {
       setFormData({
         name: user?.name || '',
         email: user?.email || '',
@@ -75,7 +76,8 @@ export function EditUserDialog({ user, open, onOpenChange, onSave, roles, depart
         active: user ? user.active !== false : true,
       });
       setError('');
-    }
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
   }, [user, open]);
 
   const handleChange = (field: string, value: string | boolean) => {

@@ -10,7 +10,6 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Pagination, usePagination } from '@/components/ui/data-pagination';
 import { EmptyState } from '@/components/empty-state';
 import { useAuth } from '@/lib/auth-context';
@@ -32,6 +31,7 @@ interface Event {
 }
 
 interface Department { id: string; name: string }
+type EventResponse = Event[] | { items: Event[]; total: number };
 
 const visibilityLabel = { PUBLIC: 'common.global', DEPARTMENT: 'common.department', PRIVATE: 'common.private' };
 const emptyForm = { title: '', description: '', location: '', startDate: '', endDate: '', visibility: 'PUBLIC' as Event['visibility'], departmentIds: [] as string[] };
@@ -60,7 +60,7 @@ export default function EventsPage() {
   const [total, setTotal] = useState(0);
   const [view, setView] = useState<'list' | 'calendar'>('list');
   const [filter, setFilter] = useState<'ALL' | 'UPCOMING' | 'PAST'>('UPCOMING');
-  const { page, pageSize, setPage, setPageSize, paginate } = usePagination(6);
+  const { page, pageSize, setPage, setPageSize } = usePagination(6);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Event | null>(null);
@@ -74,13 +74,13 @@ export default function EventsPage() {
       const depts = await api.get<Department[]>('/departments');
       setDepartments(depts);
       if (view === 'calendar') {
-        const respRaw = await api.get<any>(`/events?page=1&pageSize=1000&filter=${filter}`);
+        const respRaw = await api.get<EventResponse>(`/events?page=1&pageSize=1000&filter=${filter}`);
         const items: Event[] = Array.isArray(respRaw) ? respRaw : respRaw?.items ?? [];
         const totalNum: number = Array.isArray(respRaw) ? items.length : respRaw?.total ?? 0;
         setEvents(items);
         setTotal(totalNum ?? 0);
       } else {
-        const respRaw = await api.get<any>(`/events?page=${page}&pageSize=${pageSize}&filter=${filter}`);
+        const respRaw = await api.get<EventResponse>(`/events?page=${page}&pageSize=${pageSize}&filter=${filter}`);
         const items: Event[] = Array.isArray(respRaw) ? respRaw : respRaw?.items ?? [];
         const totalNum: number = Array.isArray(respRaw) ? items.length : respRaw?.total ?? 0;
         setEvents(items);
@@ -90,7 +90,10 @@ export default function EventsPage() {
     setLoading(false);
   }, [page, pageSize, filter, view]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [load]);
 
   const now = new Date();
 
@@ -132,7 +135,7 @@ export default function EventsPage() {
         setEvents((prev) => [...prev, created].sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()));
       }
       setModalOpen(false);
-    } catch (e: any) { setError(e.message || 'Erro ao guardar'); }
+    } catch (error: unknown) { setError(error instanceof Error ? error.message : 'Erro ao guardar'); }
     setSaving(false);
   };
 
@@ -300,7 +303,7 @@ export default function EventsPage() {
             </div>
             <div className="space-y-1.5">
               <Label>{t('events.visibilityLabel')}</Label>
-              <Select value={form.visibility} onValueChange={(v: any) => setForm((p) => ({ ...p, visibility: v, departmentIds: [] }))}>
+              <Select value={form.visibility} onValueChange={(visibility) => setForm((previous) => ({ ...previous, visibility: visibility as Event['visibility'], departmentIds: [] }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="PUBLIC">{t('events.global')}</SelectItem>

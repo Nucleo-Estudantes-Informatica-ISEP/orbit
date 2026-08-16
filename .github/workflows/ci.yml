@@ -1,0 +1,167 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api-quality:
+    name: API lint, typecheck, test, migrate & build
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/orbit_test?schema=public
+      JWT_SECRET: ci-only-jwt-secret
+      CORS_ORIGIN: https://ci.invalid
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: orbit_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d orbit_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Unit tests
+        run: npm test -- --runInBand
+
+      - name: End-to-end smoke test
+        run: npm run test:e2e -- --runInBand
+
+      - name: Apply migrations to an isolated database
+        run: npx prisma migrate deploy
+
+      - name: Production build
+        run: npm run build
+
+      - name: Reject critical production dependency advisories
+        run: npm audit --omit=dev --audit-level=critical
+
+  frontend-quality:
+    name: Frontend lint, typecheck & build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Production build
+        run: npm run build
+
+      - name: Reject critical production dependency advisories
+        run: npm audit --omit=dev --audit-level=critical
+
+  docker:
+    name: Production Docker images
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Build API image
+        run: docker build -t orbit-api-check ./api
+
+      - name: Build frontend image
+        run: docker build -t orbit-frontend-check ./frontend
+
+      - name: Verify non-root runtimes
+        run: |
+          test "$(docker inspect --format '{{.Config.User}}' orbit-api-check)" = "node"
+          test "$(docker inspect --format '{{.Config.User}}' orbit-frontend-check)" = "node"
+
+      - name: Validate Coolify compose model
+        env:
+          SERVICE_URL_FRONTEND_3090: https://ci.invalid
+          SERVICE_USER_POSTGRES: postgres
+          SERVICE_PASSWORD_POSTGRES: postgres
+          SERVICE_BASE64_64_JWT: ci-only-jwt-secret
+          SERVICE_USER_MINIO: minio
+          SERVICE_PASSWORD_MINIO: minio-password
+          SMTP_PASS: ci-only-smtp-password
+        run: docker compose -f docker-compose.coolify.yml config --quiet
+
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Install verified Gitleaks binary
+        env:
+          GITLEAKS_VERSION: 8.30.1
+        run: |
+          asset="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          curl --fail --silent --show-error --location --output "$asset" "$base/$asset"
+          curl --fail --silent --show-error --location --output checksums.txt "$base/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          grep " $asset$" checksums.txt | sha256sum --check --strict
+          tar -xzf "$asset" gitleaks
+
+      - name: Scan pull-request commits
+        if: github.event_name == 'pull_request'
+        run: ./gitleaks git --redact --no-banner --log-opts="${{ github.event.pull_request.base.sha }}..${{ github.sha }}" .
+
+      - name: Scan pushed commit
+        if: github.event_name != 'pull_request'
+        run: ./gitleaks git --redact --no-banner --log-opts=-1 .

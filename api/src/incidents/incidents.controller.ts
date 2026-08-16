@@ -1,8 +1,23 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
-import { IncidentsService } from './incidents.service';
+import {
+  IncidentsService,
+  type CreateIncidentCommentInput,
+  type CreateIncidentInput,
+  type UpdateIncidentInput,
+} from './incidents.service';
 
 @Controller('incidents')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -11,7 +26,7 @@ export class IncidentsController {
 
   @Post()
   @Permissions('INCIDENTS_CREATE')
-  create(@Body() body: any) {
+  create(@Body() body: CreateIncidentInput) {
     return this.svc.create(body);
   }
 
@@ -29,13 +44,16 @@ export class IncidentsController {
 
   @Put(':id')
   @Permissions('INCIDENTS_UPDATE')
-  update(@Param('id') id: string, @Body() body: any) {
+  update(@Param('id') id: string, @Body() body: UpdateIncidentInput) {
     return this.svc.update(id, body);
   }
 
   @Post(':id/comments')
   @Permissions('INCIDENTS_UPDATE')
-  addComment(@Param('id') id: string, @Body() body: any) {
+  addComment(
+    @Param('id') id: string,
+    @Body() body: CreateIncidentCommentInput,
+  ) {
     return this.svc.addComment(id, body);
   }
 

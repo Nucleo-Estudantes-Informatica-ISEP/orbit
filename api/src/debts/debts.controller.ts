@@ -1,8 +1,22 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
-import { DebtsService } from './debts.service';
+import {
+  DebtsService,
+  type CreateDebtInput,
+  type UpdateDebtInput,
+} from './debts.service';
 
 @Controller('debts')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -11,7 +25,7 @@ export class DebtsController {
 
   @Post()
   @Permissions('DEBTS_CREATE')
-  create(@Body() body: any) {
+  create(@Body() body: CreateDebtInput) {
     return this.svc.create(body);
   }
 
@@ -41,7 +55,7 @@ export class DebtsController {
 
   @Put(':id')
   @Permissions('DEBTS_UPDATE')
-  update(@Param('id') id: string, @Body() body: any) {
+  update(@Param('id') id: string, @Body() body: UpdateDebtInput) {
     return this.svc.update(id, body);
   }
 

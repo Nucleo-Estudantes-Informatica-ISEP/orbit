@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { CreateRoleDto } from './create-role.dto';
+import type { SystemPermission } from '@prisma/client';
 
 const roleSelect = {
   id: true,
@@ -25,7 +26,7 @@ export class RolesService {
       data: {
         name: dto.name,
         description: dto.description,
-        permissions: (dto.permissions ?? []) as any,
+        permissions: (dto.permissions ?? []) as SystemPermission[],
       },
       select: roleSelect,
     });
@@ -53,7 +54,9 @@ export class RolesService {
       data: {
         name: dto.name,
         description: dto.description,
-        permissions: dto.permissions ? (dto.permissions as any) : undefined,
+        permissions: dto.permissions
+          ? (dto.permissions as SystemPermission[])
+          : undefined,
       },
       select: roleSelect,
     });
@@ -79,7 +82,8 @@ export class RolesService {
       where: { id: destinationRoleId },
     });
 
-    if (!destinationRole) throw new NotFoundException('Destination role not found');
+    if (!destinationRole)
+      throw new NotFoundException('Destination role not found');
 
     // Get all user-role associations for the role being deleted
     const userRoles = await this.prisma.userRole.findMany({

@@ -1,4 +1,13 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  UseGuards,
+} from '@nestjs/common';
 import { DepartmentsService } from './departments.service';
 import { CreateDepartmentDto } from './dto/create-department.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -48,7 +57,10 @@ export class DepartmentsController {
 
   @Post(':id/transfer-and-delete')
   @Permissions('DEPARTMENTS_DELETE')
-  transferAndDelete(@Param('id') id: string, @Body() body: { destinationDepartmentId: string }) {
+  transferAndDelete(
+    @Param('id') id: string,
+    @Body() body: { destinationDepartmentId: string },
+  ) {
     return this.svc.transferAndDelete(id, body.destinationDepartmentId);
   }
 }

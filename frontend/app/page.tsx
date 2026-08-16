@@ -1,7 +1,8 @@
 'use client';
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { OrbitLogo } from '@/components/orbit-logo';
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -38,8 +39,7 @@ export default function Home() {
       <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6 lg:px-8">
           <div className="flex items-center gap-2">
-            <img src="/logo-extended-dark.svg" alt="ORBIT" className="h-8 w-auto block dark:hidden" />
-            <img src="/logo-extended.svg" alt="ORBIT" className="h-8 w-auto hidden dark:block" />
+            <OrbitLogo />
             <Badge variant="secondary" className="ml-2 text-[10px] font-medium tracking-wider uppercase">
               {'NEI-ISEP'}
             </Badge>

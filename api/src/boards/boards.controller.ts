@@ -1,4 +1,13 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  UseGuards,
+} from '@nestjs/common';
 import { BoardsService } from './boards.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
@@ -11,7 +20,14 @@ export class BoardsController {
 
   @Post()
   @Permissions('BOARDS_CREATE')
-  create(@Body() body: { name: string; description?: string; departmentIds?: string[] }) {
+  create(
+    @Body()
+    body: {
+      name: string;
+      description?: string;
+      departmentIds?: string[];
+    },
+  ) {
     return this.svc.create(body);
   }
 
@@ -29,7 +45,15 @@ export class BoardsController {
 
   @Put(':id')
   @Permissions('BOARDS_UPDATE')
-  update(@Param('id') id: string, @Body() body: any) {
+  update(
+    @Param('id') id: string,
+    @Body()
+    body: Partial<{
+      name: string;
+      description?: string;
+      departmentIds?: string[];
+    }>,
+  ) {
     return this.svc.update(id, body);
   }
 

@@ -27,6 +27,10 @@ export class CreateEventDto {
 
   @IsOptional()
   @IsString()
+  performedById?: string;
+
+  @IsOptional()
+  @IsString()
   startDate?: string;
 
   @IsOptional()

@@ -115,9 +115,12 @@ export default function IncidentsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [load]);
 
   const filtered = incidents.filter((d) => {
     if (filterStatus !== 'ALL' && d.status !== filterStatus) return false;
@@ -203,7 +206,7 @@ export default function IncidentsPage() {
         setIncidents((prev) => [created, ...prev]);
       }
       setModalOpen(false);
-    } catch (e: any) { setError(e.message || t('common.saveError')); }
+    } catch (error: unknown) { setError(error instanceof Error ? error.message : t('common.saveError')); }
     setSaving(false);
   };
 
@@ -364,7 +367,7 @@ export default function IncidentsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>{t('incidents.priorityLabel')}</Label>
-                <Select value={form.priority} onValueChange={(v) => setForm((p) => ({ ...p, priority: v as any }))}>
+                <Select value={form.priority} onValueChange={(priority) => setForm((previous) => ({ ...previous, priority: priority as Incident['priority'] }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="LOW">{t('incidents.priorityLow')}</SelectItem>
@@ -376,7 +379,7 @@ export default function IncidentsPage() {
               </div>
               <div className="space-y-1.5">
                 <Label>{t('incidents.statusLabel')}</Label>
-                <Select value={form.status} onValueChange={(v) => setForm((p) => ({ ...p, status: v as any }))}>
+                <Select value={form.status} onValueChange={(status) => setForm((previous) => ({ ...previous, status: status as Incident['status'] }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="OPEN">{t('incidents.statusOpen')}</SelectItem>

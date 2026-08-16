@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Pencil, Trash2, Users, Calendar, MoreHorizontal, CheckSquare, ArrowRight, Briefcase } from 'lucide-react';
+import { Plus, Pencil, Trash2, Calendar, MoreHorizontal, CheckSquare, ArrowRight, Briefcase } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -79,7 +79,10 @@ export default function ProjectsPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [load]);
 
   const filtered = projects.filter((p) => statusFilter === 'ALL' || p.status === statusFilter);
 
@@ -103,7 +106,7 @@ export default function ProjectsPage() {
         setProjects((prev) => [created, ...prev]);
       }
       setModalOpen(false);
-    } catch (e: any) { setError(e.message || t('common.saveError')); }
+    } catch (error: unknown) { setError(error instanceof Error ? error.message : t('common.saveError')); }
     setSaving(false);
   };
 
@@ -256,4 +259,3 @@ export default function ProjectsPage() {
     </div>
   );
 }
-

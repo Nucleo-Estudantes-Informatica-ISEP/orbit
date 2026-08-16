@@ -8,7 +8,7 @@ ENV DATABASE_URL=${DATABASE_URL}
 
 # Install dependencies (including devDependencies) for build
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
 # Copy source and build
 COPY . .
@@ -23,9 +23,10 @@ ENV DATABASE_URL=postgresql://postgres:postgres@db:5432/orbit?schema=public
 RUN apt-get update -y && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 
 # Reuse the installed dependencies and generated Prisma client from the build stage
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/prisma ./prisma
+COPY --chown=node:node --from=builder /app/node_modules ./node_modules
+COPY --chown=node:node --from=builder /app/dist ./dist
+COPY --chown=node:node --from=builder /app/prisma ./prisma
 
 EXPOSE 3000
+USER node
 CMD ["node", "dist/src/main"]

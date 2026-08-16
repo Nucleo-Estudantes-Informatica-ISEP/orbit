@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Loader2, Plus, Building2, Edit2, Trash2 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,7 +41,7 @@ export default function DepartmentsTab() {
   const canDeleteDepartments = usePermission('DEPARTMENTS_DELETE');
   const { page, pageSize, setPage, setPageSize, paginate } = usePagination(10);
 
-  const fetchDepartments = async () => {
+  const fetchDepartments = useCallback(async () => {
     try {
       setIsLoading(true);
       const data = await api.get<Department[]>('/departments');
@@ -64,11 +64,13 @@ export default function DepartmentsTab() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [t]);
 
   useEffect(() => {
-    if (token) void fetchDepartments();
-  }, [token]);
+    if (!token) return;
+    const timeoutId = window.setTimeout(() => void fetchDepartments(), 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [fetchDepartments, token]);
 
   const handleSaveDepartment = async (updatedData: Partial<Department>) => {
     const isEditing = !!selectedDepartment;

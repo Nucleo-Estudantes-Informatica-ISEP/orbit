@@ -20,10 +20,30 @@ import { DebtsModule } from './debts/debts.module';
 import { IncidentsModule } from './incidents/incidents.module';
 import { PrismaService } from './prisma.service';
 import { AuditLogInterceptor } from './audit-logs/audit-logs.interceptor';
+import { HealthController } from './health/health.controller';
 
 @Module({
-  imports: [UsersModule, DepartmentsModule, BoardsModule, TasksModule, RecruitmentModule, AuthModule, AnnouncementsModule, ResourcesModule, EventsModule, ProjectsModule, RolesModule, UserSettingsModule, AuditLogsModule, FilesModule, InventoryModule, PlansModule, DebtsModule, IncidentsModule],
-  controllers: [],
+  imports: [
+    UsersModule,
+    DepartmentsModule,
+    BoardsModule,
+    TasksModule,
+    RecruitmentModule,
+    AuthModule,
+    AnnouncementsModule,
+    ResourcesModule,
+    EventsModule,
+    ProjectsModule,
+    RolesModule,
+    UserSettingsModule,
+    AuditLogsModule,
+    FilesModule,
+    InventoryModule,
+    PlansModule,
+    DebtsModule,
+    IncidentsModule,
+  ],
+  controllers: [HealthController],
   providers: [
     PrismaService,
     { provide: APP_INTERCEPTOR, useClass: AuditLogInterceptor },

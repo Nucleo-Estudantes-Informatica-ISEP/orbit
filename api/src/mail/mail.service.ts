@@ -61,14 +61,28 @@ export class MailService {
     `;
 
     if (!this.transporter) {
-      this.logger.log(`[DEV] Welcome email for ${name} <${to}> — password: ${password}`);
+      this.logger.log(
+        `[DEV] Welcome email for ${name} <${to}> — password: ${password}`,
+      );
       return;
     }
 
-    await this.transporter.sendMail({ from: this.from, to, subject, text, html });
+    await this.transporter.sendMail({
+      from: this.from,
+      to,
+      subject,
+      text,
+      html,
+    });
   }
 
-  async sendAnnouncementNotification(to: string, userName: string, title: string, content: string, origin: string) {
+  async sendAnnouncementNotification(
+    to: string,
+    userName: string,
+    title: string,
+    content: string,
+    origin: string,
+  ) {
     const subject = `[ORBIT] ${title}`;
     const text = [
       `Olá ${userName},`,
@@ -97,13 +111,26 @@ export class MailService {
     `;
 
     if (!this.transporter) {
-      this.logger.log(`[DEV] Announcement notification for ${userName} <${to}>: ${title}`);
+      this.logger.log(
+        `[DEV] Announcement notification for ${userName} <${to}>: ${title}`,
+      );
       return;
     }
-    await this.transporter.sendMail({ from: this.from, to, subject, text, html });
+    await this.transporter.sendMail({
+      from: this.from,
+      to,
+      subject,
+      text,
+      html,
+    });
   }
 
-  async sendTaskAssigned(to: string, userName: string, taskTitle: string, boardName?: string) {
+  async sendTaskAssigned(
+    to: string,
+    userName: string,
+    taskTitle: string,
+    boardName?: string,
+  ) {
     const subject = `[ORBIT] Task atribuída: ${taskTitle}`;
     const where = boardName ? ` no board "${boardName}"` : '';
     const text = [
@@ -130,14 +157,33 @@ export class MailService {
     `;
 
     if (!this.transporter) {
-      this.logger.log(`[DEV] Task assigned to ${userName} <${to}>: ${taskTitle}`);
+      this.logger.log(
+        `[DEV] Task assigned to ${userName} <${to}>: ${taskTitle}`,
+      );
       return;
     }
-    await this.transporter.sendMail({ from: this.from, to, subject, text, html });
+    await this.transporter.sendMail({
+      from: this.from,
+      to,
+      subject,
+      text,
+      html,
+    });
   }
 
-  async sendPlanStatusUpdate(to: string, userName: string, planName: string, status: string, rejectionNote?: string) {
-    const statusLabel = status === 'APPROVED' ? 'aprovado' : status === 'REJECTED' ? 'rejeitado' : status;
+  async sendPlanStatusUpdate(
+    to: string,
+    userName: string,
+    planName: string,
+    status: string,
+    rejectionNote?: string,
+  ) {
+    const statusLabel =
+      status === 'APPROVED'
+        ? 'aprovado'
+        : status === 'REJECTED'
+          ? 'rejeitado'
+          : status;
     const subject = `[ORBIT] Plano ${statusLabel}: ${planName}`;
     const text = [
       `Olá ${userName},`,
@@ -163,10 +209,18 @@ export class MailService {
     `;
 
     if (!this.transporter) {
-      this.logger.log(`[DEV] Plan ${statusLabel} for ${userName} <${to}>: ${planName}`);
+      this.logger.log(
+        `[DEV] Plan ${statusLabel} for ${userName} <${to}>: ${planName}`,
+      );
       return;
     }
-    await this.transporter.sendMail({ from: this.from, to, subject, text, html });
+    await this.transporter.sendMail({
+      from: this.from,
+      to,
+      subject,
+      text,
+      html,
+    });
   }
 
   async sendPasswordReset(to: string, resetUrl: string) {
@@ -199,7 +253,13 @@ export class MailService {
       return;
     }
 
-    await this.transporter.sendMail({ from: this.from, to, subject, text, html });
+    await this.transporter.sendMail({
+      from: this.from,
+      to,
+      subject,
+      text,
+      html,
+    });
   }
 
   async sendPasswordChanged(to: string, userName: string) {
@@ -231,10 +291,18 @@ export class MailService {
     `;
 
     if (!this.transporter) {
-      this.logger.log(`[DEV] Password changed notification for ${userName} <${to}>`);
+      this.logger.log(
+        `[DEV] Password changed notification for ${userName} <${to}>`,
+      );
       return;
     }
 
-    await this.transporter.sendMail({ from: this.from, to, subject, text, html });
+    await this.transporter.sendMail({
+      from: this.from,
+      to,
+      subject,
+      text,
+      html,
+    });
   }
 }

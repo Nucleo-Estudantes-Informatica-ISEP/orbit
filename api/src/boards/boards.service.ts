@@ -5,8 +5,12 @@ import { PrismaService } from '../prisma.service';
 export class BoardsService {
   constructor(private prisma: PrismaService) {}
 
-  create(data: { name: string; description?: string; departmentIds?: string[] }) {
-    const { departmentIds, ...boardData } = data as any;
+  create(data: {
+    name: string;
+    description?: string;
+    departmentIds?: string[];
+  }) {
+    const { departmentIds, ...boardData } = data;
 
     return this.prisma.board.create({
       data: {
@@ -26,7 +30,11 @@ export class BoardsService {
 
   findAll() {
     return this.prisma.board.findMany({
-      include: { boardDepartments: { include: { department: { select: { id: true, name: true } } } } },
+      include: {
+        boardDepartments: {
+          include: { department: { select: { id: true, name: true } } },
+        },
+      },
     });
   }
 
@@ -34,9 +42,17 @@ export class BoardsService {
     const b = await this.prisma.board.findUnique({
       where: { id },
       include: {
-        boardDepartments: { include: { department: { select: { id: true, name: true } } } },
+        boardDepartments: {
+          include: { department: { select: { id: true, name: true } } },
+        },
         tasks: {
-          include: { taskAssignees: { include: { user: { select: { id: true, name: true, email: true } } } } },
+          include: {
+            taskAssignees: {
+              include: {
+                user: { select: { id: true, name: true, email: true } },
+              },
+            },
+          },
           orderBy: { createdAt: 'asc' },
         },
       },
@@ -45,8 +61,15 @@ export class BoardsService {
     return b;
   }
 
-  update(id: string, data: Partial<{ name: string; description?: string; departmentIds?: string[] }>) {
-    const { departmentIds, ...boardData } = data as any;
+  update(
+    id: string,
+    data: Partial<{
+      name: string;
+      description?: string;
+      departmentIds?: string[];
+    }>,
+  ) {
+    const { departmentIds, ...boardData } = data;
 
     return this.prisma.board.update({
       where: { id },

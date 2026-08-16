@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import Image from 'next/image';
 import { Upload, X, FileText, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -111,11 +112,14 @@ export function FileUpload({
       {hasFile ? (
         <div className="flex items-center gap-2 rounded-lg border border-border/40 bg-muted/40 p-3">
           {preview ? (
-            <img src={preview} alt="preview" className="h-12 w-12 rounded object-cover shrink-0" />
+            <Image src={preview} alt="preview" width={48} height={48} unoptimized className="h-12 w-12 rounded object-cover shrink-0" />
           ) : displayKey && isImage(undefined, displayName ?? displayKey) ? (
-            <img
+            <Image
               src={getFileUrl(displayKey)}
               alt="preview"
+              width={48}
+              height={48}
+              unoptimized
               className="h-12 w-12 rounded object-cover shrink-0"
             />
           ) : (
