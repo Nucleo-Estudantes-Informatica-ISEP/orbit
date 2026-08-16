@@ -15,6 +15,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: "3090"
+      HOSTNAME: "0.0.0.0"
       SERVICE_URL_FRONTEND_3090: ${SERVICE_URL_FRONTEND_3090}
     depends_on:
       api:
