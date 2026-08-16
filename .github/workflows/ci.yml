@@ -136,7 +136,10 @@ jobs:
           SERVICE_USER_MINIO: minio
           SERVICE_PASSWORD_MINIO: minio-password
           SMTP_PASS: ci-only-smtp-password
-        run: docker compose -f docker-compose.coolify.yml config --quiet
+        run: |
+          # exclude_from_hc is Coolify-specific and intentionally not part of the Compose spec.
+          sed '/^[[:space:]]*exclude_from_hc:/d' docker-compose.coolify.yml \
+            | docker compose -f - config --quiet
 
   secret-scan:
     name: Secret scan
