@@ -1,4 +1,13 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  UseGuards,
+} from '@nestjs/common';
 import { RolesService } from './roles.service';
 import { CreateRoleDto } from './create-role.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -48,7 +57,10 @@ export class RolesController {
 
   @Post(':id/transfer-and-delete')
   @Permissions('ROLES_DELETE')
-  transferAndDelete(@Param('id') id: string, @Body() body: { destinationRoleId: string }) {
+  transferAndDelete(
+    @Param('id') id: string,
+    @Body() body: { destinationRoleId: string },
+  ) {
     return this.svc.transferAndDelete(id, body.destinationRoleId);
   }
 }

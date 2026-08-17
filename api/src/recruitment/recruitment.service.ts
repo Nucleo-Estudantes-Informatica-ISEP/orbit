@@ -1,7 +1,40 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { MinioService } from '../files/minio.service';
-import * as PDFDocument from 'pdfkit';
+import PDFDocument from 'pdfkit';
+import type { Prisma, RecruitmentStage } from '@prisma/client';
+
+interface DepartmentChoiceInput {
+  departmentId: string;
+  priority: number;
+}
+
+interface CandidateFields {
+  name: string;
+  email: string;
+  course?: string | null;
+  year?: number | null;
+  cvUrl?: string | null;
+  notes?: string | null;
+  stage?: RecruitmentStage;
+}
+
+export type CreateCandidateInput = CandidateFields & {
+  performedById?: string;
+  departmentChoices?: DepartmentChoiceInput[];
+};
+
+export type UpdateCandidateInput = Partial<CandidateFields> & {
+  performedById?: string;
+  departmentChoices?: DepartmentChoiceInput[];
+};
+
+type CandidateWithRelations = Prisma.CandidateGetPayload<{
+  include: {
+    departmentChoices: { include: { department: true } };
+    comments: { include: { createdBy: { select: { name: true } } } };
+  };
+}>;
 
 @Injectable()
 export class RecruitmentService {
@@ -21,13 +54,21 @@ export class RecruitmentService {
     },
   };
 
-  create(data: any) {
+  create(data: CreateCandidateInput) {
     const { performedById, departmentChoices, ...createData } = data;
+    void performedById;
     return this.prisma.candidate.create({
       data: {
         ...createData,
         departmentChoices: departmentChoices?.length
-          ? { create: departmentChoices.map((dc: { departmentId: string; priority: number }) => ({ departmentId: dc.departmentId, priority: dc.priority })) }
+          ? {
+              create: departmentChoices.map(
+                (dc: { departmentId: string; priority: number }) => ({
+                  departmentId: dc.departmentId,
+                  priority: dc.priority,
+                }),
+              ),
+            }
           : undefined,
       },
       include: this.include,
@@ -39,18 +80,30 @@ export class RecruitmentService {
   }
 
   async findOne(id: string) {
-    const c = await this.prisma.candidate.findUnique({ where: { id }, include: this.include });
+    const c = await this.prisma.candidate.findUnique({
+      where: { id },
+      include: this.include,
+    });
     if (!c) throw new NotFoundException('Candidate not found');
     return c;
   }
 
-  async update(id: string, data: any) {
+  async update(id: string, data: UpdateCandidateInput) {
     const { performedById, departmentChoices, ...updateData } = data;
+    void performedById;
     if (departmentChoices) {
-      await this.prisma.candidateDepartmentChoice.deleteMany({ where: { candidateId: id } });
+      await this.prisma.candidateDepartmentChoice.deleteMany({
+        where: { candidateId: id },
+      });
       if (departmentChoices.length) {
         await this.prisma.candidateDepartmentChoice.createMany({
-          data: departmentChoices.map((dc: { departmentId: string; priority: number }) => ({ candidateId: id, departmentId: dc.departmentId, priority: dc.priority })),
+          data: departmentChoices.map(
+            (dc: { departmentId: string; priority: number }) => ({
+              candidateId: id,
+              departmentId: dc.departmentId,
+              priority: dc.priority,
+            }),
+          ),
         });
       }
     }
@@ -72,13 +125,17 @@ export class RecruitmentService {
   }
 
   async clearAll() {
-    const candidates = await this.prisma.candidate.findMany({ select: { cvUrl: true } });
+    const candidates = await this.prisma.candidate.findMany({
+      select: { cvUrl: true },
+    });
     if (candidates.length === 0) return { deleted: 0 };
     const keys = candidates
       .map((c) => this.minio.extractKey(c.cvUrl))
       .filter((k): k is string => k !== null);
     if (keys.length) {
-      await Promise.all(keys.map((key) => this.minio.deleteObject(key).catch(() => {})));
+      await Promise.all(
+        keys.map((key) => this.minio.deleteObject(key).catch(() => {})),
+      );
     }
     await this.prisma.candidateDepartmentChoice.deleteMany();
     await this.prisma.recruitmentComment.deleteMany();
@@ -87,13 +144,19 @@ export class RecruitmentService {
   }
 
   async exportOne(id: string): Promise<Buffer> {
-    const c = await this.prisma.candidate.findUnique({ where: { id }, include: this.include });
+    const c = await this.prisma.candidate.findUnique({
+      where: { id },
+      include: this.include,
+    });
     if (!c) throw new NotFoundException('Candidate not found');
     return this.generatePdf(c);
   }
 
   async exportAll(): Promise<Buffer> {
-    const candidates = await this.prisma.candidate.findMany({ include: this.include, orderBy: { createdAt: 'desc' } });
+    const candidates = await this.prisma.candidate.findMany({
+      include: this.include,
+      orderBy: { createdAt: 'desc' },
+    });
     return this.generatePdf(candidates);
   }
 
@@ -109,9 +172,15 @@ export class RecruitmentService {
     return labels[stage] ?? stage;
   }
 
-  private generatePdf(data: any): Promise<Buffer> {
+  private generatePdf(
+    data: CandidateWithRelations | CandidateWithRelations[],
+  ): Promise<Buffer> {
     return new Promise((resolve, reject) => {
-      const doc = new PDFDocument({ margin: 50, size: 'A4' });
+      const doc = new PDFDocument({
+        margin: 50,
+        size: 'A4',
+        bufferPages: true,
+      });
       const chunks: Buffer[] = [];
       doc.on('data', (chunk: Buffer) => chunks.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -126,8 +195,14 @@ export class RecruitmentService {
       items.forEach((c, idx) => {
         if (idx > 0) doc.addPage();
 
-        doc.fontSize(20).font('Helvetica-Bold').text('ORBIT - NEI-ISEP', { align: 'center' });
-        doc.fontSize(10).font('Helvetica').fillColor('#666')
+        doc
+          .fontSize(20)
+          .font('Helvetica-Bold')
+          .text('ORBIT - NEI-ISEP', { align: 'center' });
+        doc
+          .fontSize(10)
+          .font('Helvetica')
+          .fillColor('#666')
           .text('Sistema de Gestão de Recrutamento', { align: 'center' });
         doc.moveDown(0.5);
         doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor('#ccc').stroke();
@@ -176,7 +251,11 @@ export class RecruitmentService {
 
         if (c.notes) {
           doc.moveDown(0.5);
-          doc.fontSize(12).font('Helvetica-Bold').fillColor('#000').text('Notas:');
+          doc
+            .fontSize(12)
+            .font('Helvetica-Bold')
+            .fillColor('#000')
+            .text('Notas:');
           doc.fontSize(10).font('Helvetica').fillColor('#333');
           doc.text(c.notes, { indent: 10 });
           doc.moveDown(0.5);
@@ -184,7 +263,11 @@ export class RecruitmentService {
 
         if (c.departmentChoices && c.departmentChoices.length > 0) {
           doc.moveDown(0.5);
-          doc.fontSize(12).font('Helvetica-Bold').fillColor('#000').text('Preferências de Departamento:');
+          doc
+            .fontSize(12)
+            .font('Helvetica-Bold')
+            .fillColor('#000')
+            .text('Preferências de Departamento:');
           doc.moveDown(0.3);
           for (const dc of c.departmentChoices) {
             doc.fontSize(10).font('Helvetica').fillColor('#333');
@@ -194,21 +277,39 @@ export class RecruitmentService {
 
         if (c.cvUrl) {
           doc.moveDown(0.5);
-          doc.fontSize(12).font('Helvetica-Bold').fillColor('#000').text('Curriculum Vitae:');
+          doc
+            .fontSize(12)
+            .font('Helvetica-Bold')
+            .fillColor('#000')
+            .text('Curriculum Vitae:');
           doc.fontSize(10).font('Helvetica').fillColor('#2563eb');
           doc.text(c.cvUrl, { indent: 10, link: c.cvUrl, underline: true });
         }
 
         if (c.comments && c.comments.length > 0) {
           doc.moveDown(1);
-          doc.fontSize(12).font('Helvetica-Bold').fillColor('#000').text('Comentários:');
+          doc
+            .fontSize(12)
+            .font('Helvetica-Bold')
+            .fillColor('#000')
+            .text('Comentários:');
           doc.moveDown(0.3);
           for (const comment of c.comments) {
-            doc.moveTo(60, doc.y).lineTo(545, doc.y).strokeColor('#eee').stroke();
+            doc
+              .moveTo(60, doc.y)
+              .lineTo(545, doc.y)
+              .strokeColor('#eee')
+              .stroke();
             doc.moveDown(0.3);
             const author = comment.createdBy?.name ?? 'Sistema';
-            const date = new Date(comment.createdAt).toLocaleDateString('pt-PT');
-            doc.fontSize(9).font('Helvetica-Bold').fillColor('#555').text(`${author} - ${date}`, { indent: 10 });
+            const date = new Date(comment.createdAt).toLocaleDateString(
+              'pt-PT',
+            );
+            doc
+              .fontSize(9)
+              .font('Helvetica-Bold')
+              .fillColor('#555')
+              .text(`${author} - ${date}`, { indent: 10 });
             doc.fontSize(10).font('Helvetica').fillColor('#333');
             doc.text(comment.content, { indent: 10 });
             doc.moveDown(0.3);
@@ -223,10 +324,13 @@ export class RecruitmentService {
         doc.fontSize(7).font('Helvetica').fillColor('#999');
         doc.text(
           `Documento gerado em ${dateStr} às ${timeStr} pelo sistema ORBIT - NEI-ISEP`,
-          50, doc.page.height - 40,
+          50,
+          doc.page.height - 40,
           { align: 'center' },
         );
-        doc.text(`Página ${i + 1} de ${pageCount}`, 50, doc.page.height - 28, { align: 'center' });
+        doc.text(`Página ${i + 1} de ${pageCount}`, 50, doc.page.height - 28, {
+          align: 'center',
+        });
       }
 
       doc.end();

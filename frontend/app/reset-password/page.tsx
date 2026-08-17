@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, KeyRound, AlertCircle, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { OrbitLogo } from '@/components/orbit-logo';
 import { useLocale } from "@/lib/locale-context";
 
 function ResetPasswordPage() {
@@ -54,8 +55,7 @@ function ResetPasswordPage() {
       <div className="fixed inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] -z-10"></div>
 
       <Link href="/" className="mb-10 flex items-center gap-2">
-        <img src="/logo-extended-dark.svg" alt="ORBIT" className="h-10 w-auto block dark:hidden" />
-        <img src="/logo-extended.svg" alt="ORBIT" className="h-10 w-auto hidden dark:block" />
+        <OrbitLogo className="h-10" />
         <Badge variant="secondary" className="ml-2 text-[10px] font-medium tracking-wider uppercase">
           {'NEI-ISEP'}
         </Badge>
@@ -143,8 +143,7 @@ function ResetPasswordPage() {
             </form>
           )}
         </CardContent>
-
-        <CardFooter className="flex flex-col border-t border-border/40 px-6 py-5 bg-muted/10">
+        <CardFooter className="flex flex-col border-t border-border/40 px-4 sm:px-6 py-5 bg-muted/10">
           <Button
             type="button"
             variant="ghost"

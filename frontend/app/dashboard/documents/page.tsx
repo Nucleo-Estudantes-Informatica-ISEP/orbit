@@ -10,7 +10,6 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Pagination, usePagination } from '@/components/ui/data-pagination';
 import { EmptyState } from '@/components/empty-state';
 import { SearchInput } from '@/components/search-input';
@@ -33,6 +32,7 @@ interface Resource {
 }
 
 interface Department { id: string; name: string }
+type ResourceResponse = Resource[] | { items: Resource[]; total: number };
 
 const categoryColors: Record<string, string> = {
   'Documentos': 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30',
@@ -58,7 +58,7 @@ export default function DocumentsPage() {
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('ALL');
-  const { page, pageSize, setPage, setPageSize, paginate } = usePagination(6);
+  const { page, pageSize, setPage, setPageSize } = usePagination(6);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Resource | null>(null);
@@ -71,7 +71,7 @@ export default function DocumentsPage() {
     try {
       const depts = await api.get<Department[]>('/departments');
       setDepartments(depts);
-      const respRaw = await api.get<any>(
+      const respRaw = await api.get<ResourceResponse>(
         `/resources?page=${page}&pageSize=${pageSize}&category=${encodeURIComponent(category)}&search=${encodeURIComponent(search)}`,
       );
       const items: Resource[] = Array.isArray(respRaw) ? respRaw : respRaw?.items ?? [];
@@ -82,13 +82,10 @@ export default function DocumentsPage() {
     setLoading(false);
   }, [page, pageSize, category, search]);
 
-  useEffect(() => { load(); }, [load]);
-
-  const filtered = resources.filter((r) => {
-    const matchSearch = !search || r.title.toLowerCase().includes(search.toLowerCase()) || r.description?.toLowerCase().includes(search.toLowerCase());
-    const matchCat = category === 'ALL' || r.category === category;
-    return matchSearch && matchCat;
-  });
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [load]);
 
   const categoryOptions = [
     { value: 'ALL', label: t('common.all') },
@@ -135,7 +132,7 @@ export default function DocumentsPage() {
         setResources((prev) => [created, ...prev]);
       }
       setModalOpen(false);
-    } catch (e: any) { setError(e.message || 'Erro ao guardar'); }
+    } catch (error: unknown) { setError(error instanceof Error ? error.message : 'Erro ao guardar'); }
     setSaving(false);
   };
 
@@ -269,7 +266,7 @@ export default function DocumentsPage() {
                 placeholder={t('documents.urlPlaceholder')}
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>{t('documents.categoryLabel')}</Label>
                 <Select value={form.category} onValueChange={(v) => setForm((p) => ({ ...p, category: v }))}>
@@ -279,7 +276,7 @@ export default function DocumentsPage() {
               </div>
               <div className="space-y-1.5">
                 <Label>{t('documents.visibilityLabel')}</Label>
-                <Select value={form.visibility} onValueChange={(v: any) => setForm((p) => ({ ...p, visibility: v, departmentIds: [] }))}>
+                <Select value={form.visibility} onValueChange={(visibility) => setForm((previous) => ({ ...previous, visibility: visibility as Resource['visibility'], departmentIds: [] }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="PUBLIC">{t('documents.global')}</SelectItem>

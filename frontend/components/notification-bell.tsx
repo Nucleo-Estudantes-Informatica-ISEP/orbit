@@ -33,7 +33,7 @@ const typeToHref: Record<string, string> = {
   ROLE_CHANGED: '/dashboard/people',
 };
 
-export function NotificationBell({ isCollapsed }: { isCollapsed?: boolean }) {
+export function NotificationBell() {
   const { user } = useAuth();
   const { t, formatDate } = useLocale();
   const router = useRouter();
@@ -49,9 +49,12 @@ export function NotificationBell({ isCollapsed }: { isCollapsed?: boolean }) {
   }, [user]);
 
   useEffect(() => {
-    fetchNotifications();
+    const timeoutId = window.setTimeout(() => void fetchNotifications(), 0);
     const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
+    return () => {
+      window.clearTimeout(timeoutId);
+      clearInterval(interval);
+    };
   }, [fetchNotifications]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
@@ -81,7 +84,7 @@ export function NotificationBell({ isCollapsed }: { isCollapsed?: boolean }) {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent side="right" align="start" className="w-80 p-0">
+      <PopoverContent side="bottom" align="start" className="w-[calc(100vw-2rem)] sm:w-80 p-0">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
           <span className="text-sm font-semibold">{t('notifications.title')}</span>
           {unreadCount > 0 && (

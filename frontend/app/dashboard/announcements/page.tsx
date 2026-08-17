@@ -11,8 +11,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Skeleton } from '@/components/ui/skeleton';
-import LoadingScreen from '@/components/ui/loading-screen';
 import { Pagination, usePagination } from '@/components/ui/data-pagination';
 import { EmptyState } from '@/components/empty-state';
 import { RichTextEditor } from '@/components/rich-text-editor';
@@ -37,6 +35,7 @@ interface Announcement {
 
 interface Department { id: string; name: string }
 interface User { id: string; name: string; email: string }
+type AnnouncementResponse = Announcement[] | { items: Announcement[]; total: number };
 
 const visibilityIcon = { PUBLIC: Globe, DEPARTMENT: Building2, PRIVATE: Lock };
 const visibilityLabel = { PUBLIC: 'announcements.global', DEPARTMENT: 'announcements.department', PRIVATE: 'announcements.private' };
@@ -54,7 +53,7 @@ export default function AnnouncementsPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'ALL' | 'PUBLIC' | 'DEPARTMENT' | 'PRIVATE'>('ALL');
-  const { page, pageSize, setPage, setPageSize, paginate } = usePagination(6);
+  const { page, pageSize, setPage, setPageSize } = usePagination(6);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Announcement | null>(null);
@@ -79,7 +78,7 @@ export default function AnnouncementsPage() {
       ]);
       setDepartments(depts);
       setUsers(usrs);
-      const annRespRaw = await api.get<any>(`/announcements?page=${page}&pageSize=${pageSize}&visibility=${filter}`);
+      const annRespRaw = await api.get<AnnouncementResponse>(`/announcements?page=${page}&pageSize=${pageSize}&visibility=${filter}`);
       const annItems: Announcement[] = Array.isArray(annRespRaw) ? annRespRaw : annRespRaw?.items ?? [];
       const annTotal: number = Array.isArray(annRespRaw) ? annItems.length : annRespRaw?.total ?? 0;
       setAnnouncements(annItems);
@@ -90,9 +89,10 @@ export default function AnnouncementsPage() {
     setLoading(false);
   }, [page, pageSize, filter]);
 
-  useEffect(() => { load(); }, [load]);
-
-  const filtered = announcements.filter((a) => filter === 'ALL' || a.visibility === filter);
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [load]);
 
   const handleSave = async () => {
     if (!form.title.trim() || !form.content.trim()) { setError(t('announcements.requiredFields')); return; }
@@ -102,7 +102,7 @@ export default function AnnouncementsPage() {
         const updated = await api.put<Announcement>(`/announcements/${editTarget.id}`, { ...form, performedById: user?.id });
         setAnnouncements((prev) => prev.map((a) => a.id === editTarget.id ? updated : a));
       } else {
-        const result = await api.post<any>('/announcements', { ...form, createdById: user?.id, performedById: user?.id });
+        const result = await api.post<Announcement>('/announcements', { ...form, createdById: user?.id, performedById: user?.id });
         // PRIVATE announcements are per-user inbox items, not feed posts
         if (form.visibility !== 'PRIVATE') {
           setAnnouncements((prev) => [result, ...prev]);
@@ -111,7 +111,7 @@ export default function AnnouncementsPage() {
       setCreateOpen(false);
       setEditTarget(null);
       setForm({ title: '', content: '', visibility: 'PUBLIC', departmentIds: [], targetUserIds: [] });
-    } catch (e: any) { setError(e.message || t('common.saveError')); }
+    } catch (error: unknown) { setError(error instanceof Error ? error.message : t('common.saveError')); }
     setSaving(false);
   };
 
@@ -256,7 +256,7 @@ export default function AnnouncementsPage() {
 
       {/* Create/Edit Modal */}
       <Dialog open={createOpen || !!editTarget} onOpenChange={(o) => { if (!o) closeModal(); }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editTarget ? t('common.edit') : t('announcements.new')}</DialogTitle>
           </DialogHeader>
@@ -268,7 +268,7 @@ export default function AnnouncementsPage() {
             </div>
             <div className="space-y-1.5">
               <Label>{t('announcements.visibilityLabel')}</Label>
-              <Select value={form.visibility} onValueChange={(v: any) => setForm((p) => ({ ...p, visibility: v, departmentIds: [], targetUserIds: [] }))}>
+              <Select value={form.visibility} onValueChange={(visibility) => setForm((previous) => ({ ...previous, visibility: visibility as Announcement['visibility'], departmentIds: [], targetUserIds: [] }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="PUBLIC">{t('announcements.global')}</SelectItem>
@@ -337,7 +337,7 @@ export default function AnnouncementsPage() {
 
       {/* Detail Modal */}
       <Dialog open={!!detailTarget} onOpenChange={(o) => !o && setDetailTarget(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl">
           {detailTarget && (
             <>
               <DialogHeader>

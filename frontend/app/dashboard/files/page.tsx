@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { FileText, Download, Trash2, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Pagination, usePagination } from '@/components/ui/data-pagination';
@@ -37,7 +36,7 @@ export default function FilesPage() {
   const [files, setFiles] = useState<MinioFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
-  const { page, pageSize, setPage, setPageSize, paginate } = usePagination(20);
+  const { page, pageSize, setPage, setPageSize } = usePagination(20);
   const [deleting, setDeleting] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -53,9 +52,9 @@ export default function FilesPage() {
   }, [page, pageSize]);
 
   useEffect(() => {
-    if (!user) return;
-    if (!canView) { setLoading(false); return; }
-    load();
+    if (!user || !canView) return;
+    const timeoutId = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timeoutId);
   }, [user, canView, load]);
 
   const handleDelete = async (name: string) => {

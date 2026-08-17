@@ -11,7 +11,12 @@ import { PrismaService } from '../prisma.service';
 import { Reflector } from '@nestjs/core';
 
 @Module({
-  imports: [PassportModule, JwtModule.register({ secret: process.env.JWT_SECRET || 'secret' }), UsersModule, MailModule],
+  imports: [
+    PassportModule,
+    JwtModule.register({ secret: process.env.JWT_SECRET || 'secret' }),
+    UsersModule,
+    MailModule,
+  ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, PrismaService, RolesGuard, Reflector],
   exports: [AuthService],

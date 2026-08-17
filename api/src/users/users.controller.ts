@@ -1,10 +1,21 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
+import type { AuthenticatedRequest } from '../auth/authenticated-request';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -43,7 +54,7 @@ export class UsersController {
 
   @Delete(':id')
   @Permissions('USERS_DELETE')
-  remove(@Param('id') id: string, @Req() req: any) {
+  remove(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
     return this.usersService.remove(id, req.user.userId);
   }
 }

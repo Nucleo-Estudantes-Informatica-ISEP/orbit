@@ -15,19 +15,37 @@ services:
     environment:
       NODE_ENV: production
       PORT: "3090"
+      HOSTNAME: "0.0.0.0"
       SERVICE_URL_FRONTEND_3090: ${SERVICE_URL_FRONTEND_3090}
     depends_on:
       api:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3090').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     expose:
       - "3090"
 
+  migrator:
+    image: orbit-api
+    exclude_from_hc: true
+    command: ["npx", "prisma", "migrate", "deploy"]
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@db:5432/orbit?schema=public
+    depends_on:
+      db:
+        condition: service_healthy
+
   api:
+    image: orbit-api
     build:
       context: ./api
       dockerfile: Dockerfile
     restart: unless-stopped
-    command: sh -c "npx prisma migrate deploy && node dist/src/main"
     environment:
       NODE_ENV: production
       PORT: "3000"
@@ -44,14 +62,20 @@ services:
       SMTP_HOST: mail.nei-isep.org
       SMTP_PORT: "465"
       SMTP_SECURE: "true"
-      SMTP_USER: noreply@nei-isep.org
-      SMTP_PASS: "2;$$mmpYRl1asVe!4"
-      SMTP_FROM: ORBIT <noreply@nei-isep.org>
+      SMTP_USER: no-reply@nei-isep.org
+      SMTP_PASS: ${SMTP_PASS:?Configure SMTP_PASS in Coolify}
+      SMTP_FROM: ORBIT <no-reply@nei-isep.org>
     depends_on:
-      db:
-        condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
       minio:
         condition: service_started
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     expose:
       - "3000"
 
@@ -79,6 +103,12 @@ services:
       MINIO_ROOT_PASSWORD: ${SERVICE_PASSWORD_MINIO}
     volumes:
       - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     expose:
       - "9000"
 

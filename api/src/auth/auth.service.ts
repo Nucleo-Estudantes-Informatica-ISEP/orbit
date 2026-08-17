@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma.service';
 import { MailService } from '../mail/mail.service';
@@ -6,6 +10,18 @@ import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+interface LoginUser {
+  id: string;
+  email: string;
+}
+
+interface RefreshPayload {
+  sub: string;
+  email: string;
+  roles?: string[];
+  permissions?: string[];
+}
 
 @Injectable()
 export class AuthService {
@@ -36,9 +52,7 @@ export class AuthService {
     }
 
     const permissions = Array.from(
-      new Set(
-        user.userRoles.flatMap(({ role }) => role.permissions ?? []),
-      ),
+      new Set(user.userRoles.flatMap(({ role }) => role.permissions ?? [])),
     );
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -54,20 +68,24 @@ export class AuthService {
     if (user.status !== 'ACTIVE') return null;
     const match = await bcrypt.compare(pass, user.password);
     if (match) {
-      // exclude password
-      // @ts-ignore
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { password, ...rest } = user;
       return rest;
     }
     return null;
   }
 
-  async login(user: any) {
+  login(user: LoginUser) {
     const payload = { sub: user.id, email: user.email };
     return { access_token: this.jwtService.sign(payload) };
   }
 
-  private signTokens(payload: { sub: string; email: string; roles: string[]; permissions: string[] }) {
+  private signTokens(payload: {
+    sub: string;
+    email: string;
+    roles: string[];
+    permissions: string[];
+  }) {
     return {
       access_token: this.jwtService.sign(payload, { expiresIn: '15m' }),
       refresh_token: this.jwtService.sign(payload, { expiresIn: '15m' }),
@@ -84,7 +102,12 @@ export class AuthService {
     if (!ok) throw new UnauthorizedException();
 
     const profile = await this.buildUserPayload(user.id);
-    const tokens = this.signTokens({ sub: user.id, email: user.email, roles: profile.roles, permissions: profile.permissions });
+    const tokens = this.signTokens({
+      sub: user.id,
+      email: user.email,
+      roles: profile.roles,
+      permissions: profile.permissions,
+    });
 
     return {
       user: profile,
@@ -92,15 +115,18 @@ export class AuthService {
     };
   }
 
-  async refreshToken(refreshToken: string) {
+  refreshToken(refreshToken: string) {
     try {
-      const payload = this.jwtService.verify(refreshToken);
-      const access_token = this.jwtService.sign({
-        sub: payload.sub,
-        email: payload.email,
-        roles: payload.roles ?? [],
-        permissions: payload.permissions ?? [],
-      }, { expiresIn: '8h' });
+      const payload = this.jwtService.verify<RefreshPayload>(refreshToken);
+      const access_token = this.jwtService.sign(
+        {
+          sub: payload.sub,
+          email: payload.email,
+          roles: payload.roles ?? [],
+          permissions: payload.permissions ?? [],
+        },
+        { expiresIn: '8h' },
+      );
       return { access_token };
     } catch {
       throw new UnauthorizedException('Invalid or expired refresh token');
@@ -135,7 +161,10 @@ export class AuthService {
       },
     });
 
-    const appUrl = (process.env.APP_URL || 'http://localhost:3090').replace(/\/$/, '');
+    const appUrl = (process.env.APP_URL || 'http://localhost:3090').replace(
+      /\/$/,
+      '',
+    );
     const resetUrl = `${appUrl}/reset-password?token=${rawToken}`;
     await this.mailService.sendPasswordReset(user.email, resetUrl);
 
@@ -148,7 +177,9 @@ export class AuthService {
     });
 
     if (!record || record.usedAt || record.expiresAt < new Date()) {
-      throw new BadRequestException('O link de reposição é inválido ou expirou.');
+      throw new BadRequestException(
+        'O link de reposição é inválido ou expirou.',
+      );
     }
 
     const hashed = await bcrypt.hash(newPassword, 10);

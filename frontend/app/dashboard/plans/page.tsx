@@ -5,12 +5,12 @@ import { Plus, ClipboardList, CheckCircle2, XCircle, Clock, Calendar, Download, 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Pagination, usePagination } from '@/components/ui/data-pagination';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { EmptyState } from '@/components/empty-state';
 import { FileUpload } from '@/components/file-upload';
 import { useAuth } from '@/lib/auth-context';
@@ -96,7 +96,10 @@ export default function PlansPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [load]);
 
   const filtered = plans.filter((p) => statusFilter === 'ALL' || p.status === statusFilter);
 
@@ -265,7 +268,7 @@ export default function PlansPage() {
 
       {/* Detail Dialog */}
       <Dialog open={!!selectedPlan} onOpenChange={(o) => !o && setSelectedPlan(null)}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-lg">
           {selectedPlan && (() => {
             const sc = statusConfig[selectedPlan.status];
             const StatusIcon = sc.icon;
@@ -399,7 +402,7 @@ export default function PlansPage() {
 
       {/* Create Modal */}
       <Dialog open={modalOpen} onOpenChange={(o) => !o && setModalOpen(false)}>
-        <DialogContent className="max-w-full sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{t('plans.submit')}</DialogTitle>
           </DialogHeader>
@@ -419,13 +422,14 @@ export default function PlansPage() {
             </div>
             <div className="space-y-1.5">
               <Label>{t('plans.descriptionLabel')}</Label>
-              <Input
+              <Textarea
                 value={form.description}
                 onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
                 placeholder={t('plans.descriptionPlaceholder')}
+                rows={4}
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>{t('plans.departmentLabel')}</Label>
                 <Select

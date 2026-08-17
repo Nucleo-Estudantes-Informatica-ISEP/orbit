@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { Plus, Pencil, Trash2, Package, MoreHorizontal, AlertTriangle, FileDown } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +21,7 @@ import { usePermission } from '@/lib/use-permission';
 import { useLocale } from '@/lib/locale-context';
 import { api, getFileUrl } from '@/lib/api';
 import { toast } from 'sonner';
+import { downloadSpreadsheet } from '@/lib/spreadsheet-export';
 
 interface InventoryItem {
   id: string;
@@ -126,7 +127,10 @@ export default function InventoryPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [load]);
 
   const filtered = items.filter((item) => {
     if (deptFilter !== 'ALL' && item.department?.id !== deptFilter) return false;
@@ -203,7 +207,7 @@ export default function InventoryPage() {
     }
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     let data = [...items];
 
     if (exportParams.search) {
@@ -251,7 +255,7 @@ export default function InventoryPage() {
         groups.get(key)!.push(d);
       }
 
-      const wsData: any[][] = [];
+      const wsData: unknown[][] = [];
       const cols = buildInvColumns();
       wsData.push(cols);
       let grandTotal = 0;
@@ -271,11 +275,12 @@ export default function InventoryPage() {
       if (exportParams.includeSummary) {
         wsData.push([t('inventory.exportGrandTotal'), formatInvCurrency(grandTotal)]);
       }
-      const ws = XLSX.utils.aoa_to_sheet(wsData);
-      invColWidths(ws, cols);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, t('inventory.title'));
-      XLSX.writeFile(wb, `inventario_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      await downloadSpreadsheet(
+        wsData,
+        cols,
+        t('inventory.title'),
+        `inventario_${new Date().toISOString().slice(0, 10)}.xlsx`,
+      );
       setExportOpen(false);
       return;
     }
@@ -288,11 +293,12 @@ export default function InventoryPage() {
       wsData.push([]);
       wsData.push([t('inventory.exportGrandTotal'), formatInvCurrency(total)]);
     }
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
-    invColWidths(ws, cols);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, t('inventory.title'));
-    XLSX.writeFile(wb, `inventario_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    await downloadSpreadsheet(
+      wsData,
+      cols,
+      t('inventory.title'),
+      `inventario_${new Date().toISOString().slice(0, 10)}.xlsx`,
+    );
     setExportOpen(false);
   };
 
@@ -324,10 +330,6 @@ export default function InventoryPage() {
     if (c.purchasedBy) row.push(d.purchasedBy?.name || '—');
     if (c.createdAt) row.push(new Date(d.createdAt).toLocaleDateString('pt-PT'));
     return row;
-  };
-
-  const invColWidths = (ws: XLSX.WorkSheet, cols: string[]) => {
-    ws['!cols'] = cols.map((h) => ({ wch: Math.max(h.length * 2, 14) }));
   };
 
   const formatInvCurrency = (v: number) =>
@@ -395,9 +397,11 @@ export default function InventoryPage() {
                 {/* Photo */}
                 <div className="relative h-40 bg-muted flex items-center justify-center shrink-0">
                   {item.photoKey ? (
-                    <img
+                    <Image
                       src={getFileUrl(item.photoKey)}
                       alt={item.name}
+                      fill
+                      unoptimized
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -492,7 +496,7 @@ export default function InventoryPage() {
 
       {/* Modal */}
       <Dialog open={modalOpen} onOpenChange={(o) => !o && setModalOpen(false)}>
-        <DialogContent className="max-w-full sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{editTarget ? t('common.edit') : t('inventory.newItem')}</DialogTitle>
           </DialogHeader>
@@ -518,7 +522,7 @@ export default function InventoryPage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>{t('inventory.valueLabel')}</Label>
                 <Input
@@ -541,7 +545,7 @@ export default function InventoryPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>{t('inventory.purchaseDateLabel')}</Label>
                 <Input
@@ -560,7 +564,7 @@ export default function InventoryPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>{t('inventory.departmentLabel')}</Label>
                 <Select
@@ -611,7 +615,7 @@ export default function InventoryPage() {
       </Dialog>
 
       <Dialog open={exportOpen} onOpenChange={setExportOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{t('inventory.exportDialogTitle')}</DialogTitle>
           </DialogHeader>
@@ -625,7 +629,7 @@ export default function InventoryPage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>{t('inventory.exportDateFrom')}</Label>
                 <Input type="date" value={exportParams.dateFrom} onChange={(e) => setExportParams((p) => ({ ...p, dateFrom: e.target.value }))} />
@@ -636,7 +640,7 @@ export default function InventoryPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>{t('inventory.exportColDepartment')}</Label>
                 <Select value={exportParams.department} onValueChange={(v) => setExportParams((p) => ({ ...p, department: v }))}>
@@ -651,7 +655,7 @@ export default function InventoryPage() {
               </div>
               <div className="space-y-1.5">
                 <Label>{t('inventory.exportGroupBy')}</Label>
-                <Select value={exportParams.groupBy} onValueChange={(v) => setExportParams((p) => ({ ...p, groupBy: v as any }))}>
+                <Select value={exportParams.groupBy} onValueChange={(groupBy) => setExportParams((previous) => ({ ...previous, groupBy: groupBy as typeof exportParams.groupBy }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">{t('inventory.exportGroupNone')}</SelectItem>
@@ -662,10 +666,10 @@ export default function InventoryPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>{t('inventory.exportSortBy')}</Label>
-                <Select value={exportParams.sortBy} onValueChange={(v) => setExportParams((p) => ({ ...p, sortBy: v as any }))}>
+                <Select value={exportParams.sortBy} onValueChange={(sortBy) => setExportParams((previous) => ({ ...previous, sortBy: sortBy as typeof exportParams.sortBy }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="createdAt">{t('inventory.exportColCreatedAt')}</SelectItem>

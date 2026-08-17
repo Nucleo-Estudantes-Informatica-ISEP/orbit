@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Pencil, Trash2, Users, Calendar, MoreHorizontal, CheckSquare, ArrowRight, Briefcase } from 'lucide-react';
+import { Plus, Pencil, Trash2, Calendar, MoreHorizontal, CheckSquare, ArrowRight, Briefcase } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -79,7 +79,10 @@ export default function ProjectsPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [load]);
 
   const filtered = projects.filter((p) => statusFilter === 'ALL' || p.status === statusFilter);
 
@@ -103,7 +106,7 @@ export default function ProjectsPage() {
         setProjects((prev) => [created, ...prev]);
       }
       setModalOpen(false);
-    } catch (e: any) { setError(e.message || t('common.saveError')); }
+    } catch (error: unknown) { setError(error instanceof Error ? error.message : t('common.saveError')); }
     setSaving(false);
   };
 
@@ -214,7 +217,7 @@ export default function ProjectsPage() {
       )}
 
       <Dialog open={modalOpen} onOpenChange={(o) => !o && setModalOpen(false)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>{editTarget ? t('common.edit') : t('projects.new')}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
@@ -222,7 +225,7 @@ export default function ProjectsPage() {
               <Label>{t('projects.nameLabel')}</Label>
               <Input value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} placeholder={t('projects.namePlaceholder')} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>{t('projects.statusLabel')}</Label>
                 <Select value={form.status} onValueChange={(v) => setForm((p) => ({ ...p, status: v }))}>
@@ -256,4 +259,3 @@ export default function ProjectsPage() {
     </div>
   );
 }
-

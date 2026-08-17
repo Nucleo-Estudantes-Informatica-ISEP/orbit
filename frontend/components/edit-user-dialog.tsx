@@ -64,7 +64,8 @@ export function EditUserDialog({ user, open, onOpenChange, onSave, roles, depart
 
   // Update form data when modal opens/changes
   useEffect(() => {
-    if (open) {
+    if (!open) return;
+    const timeoutId = window.setTimeout(() => {
       setFormData({
         name: user?.name || '',
         email: user?.email || '',
@@ -75,7 +76,8 @@ export function EditUserDialog({ user, open, onOpenChange, onSave, roles, depart
         active: user ? user.active !== false : true,
       });
       setError('');
-    }
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
   }, [user, open]);
 
   const handleChange = (field: string, value: string | boolean) => {
@@ -126,7 +128,7 @@ export function EditUserDialog({ user, open, onOpenChange, onSave, roles, depart
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] bg-background border-border/40">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-foreground">
             {isAddMode ? t('people.addNewUser') : t('people.editUser')}

@@ -1,5 +1,19 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Res, UseGuards } from '@nestjs/common';
-import { RecruitmentService } from './recruitment.service';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  RecruitmentService,
+  type CreateCandidateInput,
+  type UpdateCandidateInput,
+} from './recruitment.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
@@ -12,7 +26,7 @@ export class RecruitmentController {
 
   @Post()
   @Permissions('RECRUITMENT_CREATE')
-  create(@Body() body: any) {
+  create(@Body() body: CreateCandidateInput) {
     return this.svc.create(body);
   }
 
@@ -24,26 +38,26 @@ export class RecruitmentController {
 
   @Get('export/all')
   @Permissions('RECRUITMENT_READ')
-  async exportAll(@Res({ passthrough: true }) res: Response) {
+  async exportAll(@Res() res: Response) {
     const buffer = await this.svc.exportAll();
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': 'attachment; filename="candidatos.pdf"',
       'Content-Length': buffer.length,
     });
-    return buffer;
+    res.send(buffer);
   }
 
   @Get('export/:id')
   @Permissions('RECRUITMENT_READ')
-  async exportOne(@Param('id') id: string, @Res({ passthrough: true }) res: Response) {
+  async exportOne(@Param('id') id: string, @Res() res: Response) {
     const buffer = await this.svc.exportOne(id);
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="candidato-${id}.pdf"`,
       'Content-Length': buffer.length,
     });
-    return buffer;
+    res.send(buffer);
   }
 
   @Get(':id')
@@ -54,7 +68,7 @@ export class RecruitmentController {
 
   @Put(':id')
   @Permissions('RECRUITMENT_UPDATE')
-  update(@Param('id') id: string, @Body() body: any) {
+  update(@Param('id') id: string, @Body() body: UpdateCandidateInput) {
     return this.svc.update(id, body);
   }
 

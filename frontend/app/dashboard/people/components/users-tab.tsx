@@ -1,11 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Loader2, Edit2, Trash2, Plus, Users as UsersIcon } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Pagination, usePagination } from '@/components/ui/data-pagination';
@@ -33,6 +32,11 @@ interface PeopleUser {
 
 interface RoleOption { id: string; name: string }
 interface DepartmentOption { id: string; name: string }
+interface ApiUser extends Omit<PeopleUser, 'roles' | 'permissions' | 'active'> {
+  userRoles?: Array<{
+    role?: { id: string; name: string; permissions?: string[] } | null;
+  }>;
+}
 
 export default function UsersTab() {
   const { t } = useLocale();
@@ -55,20 +59,20 @@ export default function UsersTab() {
 
   const { page, pageSize, setPage, setPageSize, paginate } = usePagination(10);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       setIsLoading(true);
-      const data = await api.get<any[]>('/users');
+      const data = await api.get<ApiUser[]>('/users');
       const usersList = Array.isArray(data) ? data : [];
       setUsers(
-        usersList.map((user: any) => ({
+        usersList.map((user) => ({
           id: user.id,
           name: user.name,
           email: user.email,
           departmentId: user.departmentId,
           department: user.department,
-          roles: user.userRoles?.map((ur: any) => ur.role?.name).filter(Boolean) ?? [],
-          permissions: user.userRoles?.flatMap((ur: any) => ur.role?.permissions ?? []) ?? [],
+          roles: user.userRoles?.flatMap((userRole) => userRole.role?.name ? [userRole.role.name] : []) ?? [],
+          permissions: user.userRoles?.flatMap((userRole) => userRole.role?.permissions ?? []) ?? [],
           userRoles: user.userRoles ?? [],
           active: user.status === 'ACTIVE',
           status: user.status,
@@ -80,9 +84,9 @@ export default function UsersTab() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [t]);
 
-  const fetchReferenceData = async () => {
+  const fetchReferenceData = useCallback(async () => {
     try {
       setIsReferenceLoading(true);
       const [rolesData, deptsData] = await Promise.all([
@@ -96,14 +100,16 @@ export default function UsersTab() {
     } finally {
       setIsReferenceLoading(false);
     }
-  };
+  }, [t]);
 
   useEffect(() => {
-    if (token) {
+    if (!token) return;
+    const timeoutId = window.setTimeout(() => {
       void fetchReferenceData();
       void fetchUsers();
-    }
-  }, [token]);
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [fetchReferenceData, fetchUsers, token]);
 
   const filtered = users.filter(
     (u) =>
@@ -164,7 +170,7 @@ export default function UsersTab() {
           </CardTitle>
           <CardDescription className="mt-1">{t('people.subtitle')}</CardDescription>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <SearchInput value={search} onChange={(value) => { setSearch(value); setPage(1); }} className="w-48" />
           {canCreateUsers && (
             <Button

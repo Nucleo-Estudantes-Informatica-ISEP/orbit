@@ -129,3 +129,42 @@
   }
 }
 
+/* Custom scrollbar — consistent across the entire app */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--muted-foreground);
+}
+
+/* Dark mode scrollbar adjustments */
+.dark ::-webkit-scrollbar-thumb {
+  background-color: oklch(1 0 0 / 15%);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background-color: oklch(1 0 0 / 30%);
+}
+
+/* Dialog content — prevent horizontal overflow and handle long text */
+[data-slot="dialog-content"] {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+

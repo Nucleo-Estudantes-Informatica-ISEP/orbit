@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { OrbitLogo } from '@/components/orbit-logo';
 
 export const metadata: Metadata = {
   title: "Privacy Policy | ORBIT | NEI-ISEP",
@@ -13,8 +14,7 @@ export default function PrivacyPage() {
 
       <header className="mx-auto max-w-3xl px-4 pt-12 pb-8">
         <Link href="/" className="inline-flex items-center gap-2 mb-8">
-          <img src="/logo-extended-dark.svg" alt="ORBIT" className="h-8 w-auto block dark:hidden" />
-          <img src="/logo-extended.svg" alt="ORBIT" className="h-8 w-auto hidden dark:block" />
+          <OrbitLogo />
           <Badge variant="secondary" className="text-[10px] font-medium tracking-wider uppercase">
             NEI-ISEP
           </Badge>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Loader2, Plus, Building2, Edit2, Trash2 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,7 +41,7 @@ export default function DepartmentsTab() {
   const canDeleteDepartments = usePermission('DEPARTMENTS_DELETE');
   const { page, pageSize, setPage, setPageSize, paginate } = usePagination(10);
 
-  const fetchDepartments = async () => {
+  const fetchDepartments = useCallback(async () => {
     try {
       setIsLoading(true);
       const data = await api.get<Department[]>('/departments');
@@ -64,11 +64,13 @@ export default function DepartmentsTab() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [t]);
 
   useEffect(() => {
-    if (token) void fetchDepartments();
-  }, [token]);
+    if (!token) return;
+    const timeoutId = window.setTimeout(() => void fetchDepartments(), 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [fetchDepartments, token]);
 
   const handleSaveDepartment = async (updatedData: Partial<Department>) => {
     const isEditing = !!selectedDepartment;
@@ -165,7 +167,7 @@ export default function DepartmentsTab() {
             <div className="overflow-x-auto rounded-md border border-border/40">
               <Table>
                 <TableHeader className="bg-muted/30">
-                  <TableRow className="hover:bg-transparent">
+                  <TableRow className="hover:bg-transparent whitespace-nowrap">
                     <TableHead>{t('common.name')}</TableHead>
                     <TableHead>{t('common.description')}</TableHead>
                     <TableHead>{t('people.users')}</TableHead>
@@ -176,7 +178,7 @@ export default function DepartmentsTab() {
                 </TableHeader>
                 <TableBody>
                   {paginate(departments).map((dept) => (
-                    <TableRow key={dept.id} className="transition-colors hover:bg-muted/50">
+                    <TableRow key={dept.id} className="transition-colors hover:bg-muted/50 whitespace-nowrap">
                       <TableCell className="align-middle font-medium">{dept.name}</TableCell>
                       <TableCell className="align-middle text-muted-foreground">
                         {dept.description || '—'}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useProtectedRoute } from '@/lib/use-protected-route';
 import { useAuth } from '@/lib/auth-context';
 import { DashboardSidebar } from '@/components/dashboard-sidebar';
@@ -14,40 +14,25 @@ export default function DashboardLayout({
 }) {
   const isLoading = useProtectedRoute();
   const { user } = useAuth();
-  const [showSplash, setShowSplash] = useState(false);
   const [showContent, setShowContent] = useState(false);
-
-  useEffect(() => {
-    if (!isLoading && !showContent) {
-      setShowSplash(true);
-    }
-  }, [isLoading, showContent]);
 
   if (isLoading) {
     return <LoadingScreen message="Loading..." size="lg" />;
   }
 
-  if (showSplash) {
+  if (!showContent) {
     return (
       <SplashScreen
         duration={500}
-        onComplete={() => {
-          setShowSplash(false);
-          setShowContent(true);
-        }}
+        onComplete={() => setShowContent(true)}
       />
     );
   }
 
-  if (!showContent) {
-    return null;
-  }
-
   return (
-    <div className="flex h-screen flex-col md:flex-row bg-background text-foreground selection:bg-primary/20 selection:text-primary overflow-hidden">
+    <div className="flex h-[100dvh] flex-col md:flex-row bg-background text-foreground selection:bg-primary/20 selection:text-primary overflow-hidden">
       <DashboardSidebar
         userName={user?.name || 'User'}
-        userRole={user?.roles?.[0] || 'Member'}
         userInitials={user?.name?.split(' ').map((n) => n[0]).join('').toUpperCase() || 'U'}
       />
       <main className="flex-1 overflow-auto bg-muted/20 w-full relative">

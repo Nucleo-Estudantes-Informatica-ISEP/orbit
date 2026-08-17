@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core';
-import { Plus, Mail, FileText, Trash2, MoreHorizontal, MessageSquare, History, X, Download, AlertTriangle } from 'lucide-react';
+import { Plus, Mail, FileText, Trash2, MessageSquare, History, Download, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -16,7 +16,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { KanbanColumn } from '@/components/kanban-column';
 import { KanbanCard } from '@/components/kanban-card';
-import { EmptyState } from '@/components/empty-state';
 import { useAuth } from '@/lib/auth-context';
 import { usePermission } from '@/lib/use-permission';
 import { useLocale } from '@/lib/locale-context';
@@ -122,7 +121,10 @@ export default function RecruitmentPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [load]);
 
   const openDetail = async (c: Candidate) => {
     setDetailCandidate(c);
@@ -182,7 +184,7 @@ export default function RecruitmentPage() {
       const created = await api.post<Candidate>('/candidates', payload);
       setCandidates((prev) => [created, ...prev]);
       setCreateOpen(false);
-    } catch (e: any) { setError(e.message || t('recruitment.createError')); }
+    } catch (error: unknown) { setError(error instanceof Error ? error.message : t('recruitment.createError')); }
     setSaving(false);
   };
 
@@ -230,8 +232,6 @@ export default function RecruitmentPage() {
       .toUpperCase();
   };
 
-  const getDeptName = (id: string) => departments.find((d) => d.id === id)?.name || id;
-
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -239,7 +239,7 @@ export default function RecruitmentPage() {
           <h1 className="text-2xl font-bold tracking-tight">{t('recruitment.title')}</h1>
           <p className="text-muted-foreground text-sm mt-1">{t('recruitment.subtitle')}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {canCreate && (
             <Button onClick={() => { setForm(emptyForm); setError(''); setCreateOpen(true); }}>
               <Plus className="mr-2 h-4 w-4" />{t('recruitment.newCandidate')}
@@ -476,11 +476,11 @@ export default function RecruitmentPage() {
 
       {/* Detail Drawer */}
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-full max-w-4xl">
           {detailCandidate && (
             <>
               <DialogHeader className="pb-3">
-                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pr-8">
                   <div className="flex items-start gap-3">
                     <div className="flex flex-col">
                       <DialogTitle className="text-lg sm:text-xl">{detailCandidate.name}</DialogTitle>
@@ -532,7 +532,7 @@ export default function RecruitmentPage() {
               )}
               <Separator className="my-4" />
               <Tabs defaultValue="comments">
-                <TabsList className="w-full grid grid-cols-2">
+                <TabsList className="w-full h-auto flex flex-col sm:grid sm:grid-cols-2">
                   <TabsTrigger value="comments" className="flex-1 text-left"><MessageSquare className="mr-1.5 h-3.5 w-3.5" />{t('recruitment.comments')} ({comments.length})</TabsTrigger>
                   <TabsTrigger value="history" className="flex-1 text-left"><History className="mr-1.5 h-3.5 w-3.5" />{t('recruitment.history')}</TabsTrigger>
                 </TabsList>

@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { EventsService } from './events.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -18,7 +28,11 @@ export class EventsController {
 
   @Get()
   @Permissions('EVENTS_READ')
-  findAll(@Query('page') page?: string, @Query('pageSize') pageSize?: string, @Query('filter') filter?: string) {
+  findAll(
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('filter') filter?: string,
+  ) {
     if (!page && !pageSize) {
       return this.svc.findAllRaw(filter);
     }
@@ -33,7 +47,7 @@ export class EventsController {
 
   @Put(':id')
   @Permissions('EVENTS_UPDATE')
-  update(@Param('id') id: string, @Body() body: any) {
+  update(@Param('id') id: string, @Body() body: Partial<CreateEventDto>) {
     return this.svc.update(id, body);
   }
 

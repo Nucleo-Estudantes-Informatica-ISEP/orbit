@@ -66,16 +66,19 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!user) return;
-    setProfileForm({ name: user.name, email: user.email });
-    setLoadingSettings(true);
-    api.get<UserSettings>(`/user-settings/${user.id}`)
-      .then((s) => setSettings(s))
-      .catch(() => {
-        // 404 or error — use defaults; creates on first save via upsert
-        setSettings({ userId: user.id, darkMode: false, emailNotifications: true, inAppNotifications: true, language: locale });
-      })
-      .finally(() => setLoadingSettings(false));
-  }, [user]);
+    const timeoutId = window.setTimeout(() => {
+      setProfileForm({ name: user.name, email: user.email });
+      setLoadingSettings(true);
+      api.get<UserSettings>(`/user-settings/${user.id}`)
+        .then((settings) => setSettings(settings))
+        .catch(() => {
+          // 404 or error — use defaults; creates on first save via upsert
+          setSettings({ userId: user.id, darkMode: false, emailNotifications: true, inAppNotifications: true, language: locale });
+        })
+        .finally(() => setLoadingSettings(false));
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [locale, user]);
 
   const handleSaveProfile = async () => {
     if (!user || !profileForm.name.trim()) return;
@@ -83,7 +86,7 @@ export default function SettingsPage() {
     try {
       await api.put(`/users/${user.id}`, { name: profileForm.name });
       setProfileMsg(t('settings.profileSaved'));
-    } catch (e: any) { setProfileMsg(e.message || t('settings.profileSaveError')); }
+    } catch (error: unknown) { setProfileMsg(error instanceof Error ? error.message : t('settings.profileSaveError')); }
     setProfileSaving(false);
   };
 
@@ -93,7 +96,7 @@ export default function SettingsPage() {
     try {
       await api.put(`/user-settings/${user.id}`, settings);
       setSettingsMsg(t('settings.preferencesSaved'));
-    } catch (e: any) { setSettingsMsg(e.message || t('settings.profileSaveError')); }
+    } catch (error: unknown) { setSettingsMsg(error instanceof Error ? error.message : t('settings.profileSaveError')); }
     setSettingsSaving(false);
   };
 
@@ -107,7 +110,7 @@ export default function SettingsPage() {
       await api.put(`/users/${user?.id}`, { password: passwordForm.next });
       setPasswordForm({ current: '', next: '', confirm: '' });
       setPasswordMsg(t('settings.passwordSuccess'));
-    } catch (e: any) { setPasswordMsg(e.message || t('settings.passwordError')); }
+    } catch (error: unknown) { setPasswordMsg(error instanceof Error ? error.message : t('settings.passwordError')); }
   };
 
   const initials = user?.name?.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase() ?? 'U';
@@ -123,8 +126,8 @@ export default function SettingsPage() {
       await api.put(`/user-settings/${user?.id}`, updated);
       await setLocale(next, false);
       setSettingsMsg(t('settings.preferencesSaved'));
-    } catch (e: any) {
-      setSettingsMsg(e.message || t('settings.profileSaveError'));
+    } catch (error: unknown) {
+      setSettingsMsg(error instanceof Error ? error.message : t('settings.profileSaveError'));
     }
     setSettingsSaving(false);
   };

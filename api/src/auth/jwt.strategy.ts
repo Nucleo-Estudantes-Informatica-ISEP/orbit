@@ -1,6 +1,21 @@
 import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
+import type { Request } from 'express';
+import type { AuthenticatedUser } from './authenticated-request';
+
+interface JwtPayload {
+  sub: string;
+  email: string;
+  roles?: unknown;
+  permissions?: unknown;
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string')
+    : [];
+}
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -8,14 +23,22 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
         ExtractJwt.fromAuthHeaderAsBearerToken(),
-        (req: any) => req?.query?.token || null,
+        (request: Request) => {
+          const token = request.query.token;
+          return typeof token === 'string' ? token : null;
+        },
       ]),
       ignoreExpiration: false,
       secretOrKey: process.env.JWT_SECRET || 'secret',
     });
   }
 
-  async validate(payload: any) {
-    return { userId: payload.sub, email: payload.email, roles: payload.roles ?? [], permissions: payload.permissions ?? [] };
+  validate(payload: JwtPayload): AuthenticatedUser {
+    return {
+      userId: payload.sub,
+      email: payload.email,
+      roles: stringArray(payload.roles),
+      permissions: stringArray(payload.permissions),
+    };
   }
 }

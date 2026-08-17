@@ -42,13 +42,15 @@ export function EditDepartmentDialog({ department, open, onOpenChange, onSave }:
 
   // Update form data when modal opens/changes
   useEffect(() => {
-    if (open) {
+    if (!open) return;
+    const timeoutId = window.setTimeout(() => {
       setFormData({
         name: department?.name || '',
         description: department?.description || '',
       });
       setError('');
-    }
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
   }, [department, open]);
 
   const handleChange = (field: string, value: string) => {
@@ -79,7 +81,7 @@ export function EditDepartmentDialog({ department, open, onOpenChange, onSave }:
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] bg-background border-border/40">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-foreground">
             {isAddMode ? t('departments.addNew') : t('departments.edit')}
