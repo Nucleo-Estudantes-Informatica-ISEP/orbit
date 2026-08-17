@@ -16,7 +16,6 @@ import { Pagination, usePagination } from '@/components/ui/data-pagination';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { EmptyState } from '@/components/empty-state';
 import { AvatarGroup } from '@/components/avatar-group';
-import { useAuth } from '@/lib/auth-context';
 import { usePermission } from '@/lib/use-permission';
 import { useLocale } from '@/lib/locale-context';
 import { api } from '@/lib/api';
@@ -49,7 +48,6 @@ const STATUSES = ['PLANNING', 'ACTIVE', 'ON_HOLD', 'COMPLETED', 'CANCELLED'];
 const emptyForm = { name: '', description: '', status: 'PLANNING', deadline: '', departmentId: '' };
 
 export default function ProjectsPage() {
-  const { user } = useAuth();
   const { t } = useLocale();
   const canCreate = usePermission('PROJECTS_CREATE');
   const canUpdate = usePermission('PROJECTS_UPDATE');
@@ -97,7 +95,7 @@ export default function ProjectsPage() {
     if (!form.name.trim() || !form.departmentId) { setError(t('projects.requiredFields')); return; }
     setSaving(true); setError('');
     try {
-      const payload = { ...form, deadline: form.deadline || undefined, performedById: user?.id };
+    const payload = { ...form, deadline: form.deadline || undefined };
       if (editTarget) {
         const updated = await api.put<Project>(`/projects/${editTarget.id}`, payload);
         setProjects((prev) => prev.map((p) => p.id === editTarget.id ? updated : p));

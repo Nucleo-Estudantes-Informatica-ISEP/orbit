@@ -12,7 +12,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Skeleton } from '@/components/ui/skeleton';
 import { Pagination, usePagination } from '@/components/ui/data-pagination';
 import { EmptyState } from '@/components/empty-state';
-import { useAuth } from '@/lib/auth-context';
 import { usePermission } from '@/lib/use-permission';
 import { useLocale } from '@/lib/locale-context';
 import { api, getFileUrl } from '@/lib/api';
@@ -77,7 +76,6 @@ const statusConfig = {
 };
 
 export default function IncidentsPage() {
-  const { user } = useAuth();
   const { t, formatDate } = useLocale();
   const canCreate = usePermission('INCIDENTS_CREATE');
   const canUpdate = usePermission('INCIDENTS_UPDATE');
@@ -196,7 +194,6 @@ export default function IncidentsPage() {
         priority: form.priority,
         status: form.status,
         fileKeys: form.fileKeys,
-        createdById: user?.id,
       };
       if (editTarget) {
         const updated = await api.put<Incident>(`/incidents/${editTarget.id}`, payload);
@@ -223,7 +220,6 @@ export default function IncidentsPage() {
     try {
       const updated = await api.post<Incident>(`/incidents/${selectedIncident.id}/comments`, {
         content: commentText.trim(),
-        createdById: user?.id,
       });
       setSelectedIncident(updated);
       setIncidents((prev) => prev.map((d) => d.id === updated.id ? updated : d));

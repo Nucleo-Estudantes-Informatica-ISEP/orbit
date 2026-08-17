@@ -7,26 +7,26 @@ import {
   Post,
   Put,
   Query,
+  Request,
   UseGuards,
 } from '@nestjs/common';
 import { TasksService } from './tasks.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
-import type { Priority, TaskStatus } from '@prisma/client';
+import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import {
+  CreateTaskDto,
+  IdParamDto,
+  TaskQueryDto,
+  UpdateTaskDto,
+} from '../contracts/request.dto';
+import { TaskResponseDto } from '../contracts/response.dto';
+import { ApiProtectedController } from '../contracts/openapi.decorators';
+import type { AuthenticatedRequest } from '../auth/authenticated-request';
 
-interface TaskInput {
-  title: string;
-  description?: string;
-  deadline?: Date | string;
-  priority?: Priority;
-  status?: TaskStatus;
-  boardId?: string;
-  projectId?: string;
-  assigneeIds?: string[];
-  performedById?: string;
-}
-
+@ApiTags('tasks')
+@ApiProtectedController()
 @Controller('tasks')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class TasksController {
@@ -34,39 +34,43 @@ export class TasksController {
 
   @Post()
   @Permissions('TASKS_CREATE')
-  create(@Body() body: TaskInput) {
-    return this.svc.create(body);
+  @ApiCreatedResponse({ type: TaskResponseDto })
+  create(
+    @Request() request: AuthenticatedRequest,
+    @Body() body: CreateTaskDto,
+  ) {
+    return this.svc.create(body, request.user.userId);
   }
 
   @Get()
   @Permissions('TASKS_READ')
-  findAll(
-    @Query('boardId') boardId?: string,
-    @Query('projectId') projectId?: string,
-    @Query('assigneeId') assigneeId?: string,
-    @Query('status') status?: string,
-  ) {
-    return this.svc.findAll({ boardId, projectId, assigneeId, status });
+  @ApiOkResponse({ type: TaskResponseDto, isArray: true })
+  findAll(@Query() query: TaskQueryDto) {
+    return this.svc.findAll(query);
   }
 
   @Get(':id')
   @Permissions('TASKS_READ')
-  findOne(@Param('id') id: string) {
-    return this.svc.findOne(id);
+  @ApiOkResponse({ type: TaskResponseDto })
+  findOne(@Param() params: IdParamDto) {
+    return this.svc.findOne(params.id);
   }
 
   @Put(':id')
   @Permissions('TASKS_UPDATE')
+  @ApiOkResponse({ type: TaskResponseDto })
   update(
-    @Param('id') id: string,
-    @Body() body: Partial<TaskInput> & { deadline?: Date | string | null },
+    @Request() request: AuthenticatedRequest,
+    @Param() params: IdParamDto,
+    @Body() body: UpdateTaskDto,
   ) {
-    return this.svc.update(id, body);
+    return this.svc.update(params.id, body, request.user.userId);
   }
 
   @Delete(':id')
   @Permissions('TASKS_DELETE')
-  remove(@Param('id') id: string) {
-    return this.svc.remove(id);
+  @ApiOkResponse({ type: TaskResponseDto })
+  remove(@Param() params: IdParamDto) {
+    return this.svc.remove(params.id);
   }
 }

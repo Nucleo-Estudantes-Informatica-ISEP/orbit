@@ -2,11 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { MinioService } from '../files/minio.service';
 import { CreateResourceDto } from './dto/create-resource.dto';
-import type { Prisma } from '@prisma/client';
-
-export type UpdateResourceInput = Partial<CreateResourceDto> & {
-  performedById?: string;
-};
+import { UpdateResourceDto } from './dto/update-resource.dto';
 
 @Injectable()
 export class ResourcesService {
@@ -43,8 +39,8 @@ export class ResourcesService {
   }
 
   async findAll(filters?: {
-    page?: string;
-    pageSize?: string;
+    page?: number;
+    pageSize?: number;
     category?: string;
     search?: string;
   }) {
@@ -53,7 +49,7 @@ export class ResourcesService {
       1,
       Math.min(100, Number(filters?.pageSize ?? 6) || 6),
     );
-    const where: Prisma.ResourceWhereInput = {
+    const where: any = {
       ...(filters?.category && filters.category !== 'ALL'
         ? { category: filters.category }
         : {}),
@@ -82,7 +78,7 @@ export class ResourcesService {
   }
 
   findAllRaw(filters?: { category?: string; search?: string }) {
-    const where: Prisma.ResourceWhereInput = {};
+    const where: any = {};
     if (filters?.category) where.category = filters.category;
     if (filters?.search) {
       where.OR = [
@@ -105,9 +101,8 @@ export class ResourcesService {
     return r;
   }
 
-  async update(id: string, data: UpdateResourceInput) {
-    const { performedById, departmentIds, ...updateData } = data;
-    void performedById;
+  async update(id: string, data: UpdateResourceDto) {
+    const { departmentIds, ...updateData } = data;
     return this.prisma.$transaction(async (tx) => {
       if (departmentIds !== undefined) {
         await tx.resourceDepartment.deleteMany({ where: { resourceId: id } });

@@ -1,18 +1,5 @@
-import {
-  IsArray,
-  IsEmail,
-  IsEnum,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  IsUUID,
-} from 'class-validator';
-
-enum UserStatus {
-  ACTIVE = 'ACTIVE',
-  INACTIVE = 'INACTIVE',
-  SUSPENDED = 'SUSPENDED',
-}
+import { IsArray, IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+import { UserStatus } from '@prisma/client';
 
 export class CreateUserDto {
   @IsString()
@@ -23,15 +10,15 @@ export class CreateUserDto {
   email: string;
 
   @IsString()
+  @MinLength(8)
   password: string;
 
-  @IsString()
   @IsUUID()
   departmentId: string;
 
   @IsOptional()
   @IsArray()
-  @IsString({ each: true })
+  @IsUUID(undefined, { each: true })
   roles?: string[];
 
   @IsOptional()

@@ -44,8 +44,4 @@ export class CreateInventoryItemDto {
   @IsOptional()
   @IsUUID()
   departmentId?: string;
-
-  @IsOptional()
-  @IsUUID()
-  performedById?: string;
 }

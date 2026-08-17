@@ -16,7 +16,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Pagination, usePagination } from '@/components/ui/data-pagination';
 import { EmptyState } from '@/components/empty-state';
 import { FileUpload } from '@/components/file-upload';
-import { useAuth } from '@/lib/auth-context';
 import { usePermission } from '@/lib/use-permission';
 import { useLocale } from '@/lib/locale-context';
 import { api, getFileUrl } from '@/lib/api';
@@ -68,7 +67,6 @@ function isWarrantyExpiringSoon(warrantyDate?: string) {
 }
 
 export default function InventoryPage() {
-  const { user } = useAuth();
   const { t } = useLocale();
   const canCreate = usePermission('INVENTORY_CREATE');
   const canUpdate = usePermission('INVENTORY_UPDATE');
@@ -179,7 +177,6 @@ export default function InventoryPage() {
         quantity: form.quantity,
         purchasedById: form.purchasedById || undefined,
         departmentId: form.departmentId || undefined,
-        performedById: user?.id,
       };
       if (editTarget) {
         const updated = await api.put<InventoryItem>(`/inventory/${editTarget.id}`, payload);

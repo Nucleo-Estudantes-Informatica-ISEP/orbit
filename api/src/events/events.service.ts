@@ -6,7 +6,6 @@ import {
 import { PrismaService } from '../prisma.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { AnnouncementsService } from '../announcements/announcements.service';
-import type { Prisma } from '@prisma/client';
 
 @Injectable()
 export class EventsService {
@@ -35,29 +34,27 @@ export class EventsService {
     return parsed.toISOString();
   }
 
-  create(data: CreateEventDto) {
-    const {
-      departmentIds,
-      performedById,
-      start,
-      end,
-      startDate,
-      endDate,
-      ...eventData
-    } = data;
+  create(data: CreateEventDto, actorId: string) {
+    const { departmentIds, start, end, startDate, endDate, ...eventData } =
+      data as CreateEventDto & {
+        startDate?: Date;
+        endDate?: Date;
+      };
+
+    const prismaData: any = {
+      ...eventData,
+    };
 
     const parsedStartDate = this.parseDate(startDate ?? start);
     const parsedEndDate = this.parseDate(endDate ?? end);
 
-    if (!parsedStartDate || !parsedEndDate) {
-      throw new BadRequestException('Event start and end dates are required');
+    if (parsedStartDate) {
+      prismaData.startDate = parsedStartDate;
     }
 
-    const prismaData: Prisma.EventCreateInput = {
-      ...eventData,
-      startDate: parsedStartDate,
-      endDate: parsedEndDate,
-    };
+    if (parsedEndDate) {
+      prismaData.endDate = parsedEndDate;
+    }
 
     if (departmentIds && departmentIds.length > 0) {
       prismaData.eventDepartments = {
@@ -79,7 +76,7 @@ export class EventsService {
               departmentIds,
               'EVENT_CREATED',
               `Novo evento disponível: ${e.title}.`,
-              performedById,
+              actorId,
             )
             .catch(() => {});
         }
@@ -89,8 +86,8 @@ export class EventsService {
   }
 
   async findAll(filters?: {
-    page?: string;
-    pageSize?: string;
+    page?: number;
+    pageSize?: number;
     filter?: string;
   }) {
     const page = Math.max(1, Number(filters?.page ?? 1) || 1);
@@ -99,7 +96,7 @@ export class EventsService {
       Math.min(100, Number(filters?.pageSize ?? 6) || 6),
     );
     const now = new Date();
-    const where: Prisma.EventWhereInput | undefined =
+    const where: any =
       filters?.filter === 'UPCOMING'
         ? { startDate: { gte: now } }
         : filters?.filter === 'PAST'
@@ -120,7 +117,7 @@ export class EventsService {
 
   findAllRaw(filter?: string) {
     const now = new Date();
-    const where: Prisma.EventWhereInput | undefined =
+    const where: any =
       filter === 'UPCOMING'
         ? { startDate: { gte: now } }
         : filter === 'PAST'
@@ -142,17 +139,9 @@ export class EventsService {
     return e;
   }
 
-  async update(id: string, data: Partial<CreateEventDto>) {
-    const {
-      performedById,
-      departmentIds,
-      start,
-      end,
-      startDate,
-      endDate,
-      ...updateData
-    } = data;
-    void performedById;
+  async update(id: string, data: any) {
+    const { departmentIds, start, end, startDate, endDate, ...updateData } =
+      data;
     return this.prisma.$transaction(async (tx) => {
       if (departmentIds !== undefined) {
         await tx.eventDepartment.deleteMany({ where: { eventId: id } });

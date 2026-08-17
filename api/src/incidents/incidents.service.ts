@@ -5,21 +5,19 @@ import type { Prisma } from '@prisma/client';
 
 export type CreateIncidentInput = Omit<
   Prisma.IncidentUncheckedCreateInput,
-  'occurredAt'
+  'occurredAt' | 'createdById'
 > & {
   occurredAt?: Date | string;
 };
 
 export type UpdateIncidentInput = Omit<
   Prisma.IncidentUncheckedUpdateInput,
-  'occurredAt'
+  'occurredAt' | 'createdById'
 > & {
   occurredAt?: Date | string;
-  createdById?: string | null;
 };
 
 export interface CreateIncidentCommentInput {
-  createdById?: string | null;
   content: string;
 }
 
@@ -39,8 +37,8 @@ export class IncidentsService {
     },
   };
 
-  create(data: CreateIncidentInput) {
-    const { createdById, ...rest } = data;
+  create(data: CreateIncidentInput, actorId: string) {
+    const rest = data;
     if (
       rest.occurredAt &&
       typeof rest.occurredAt === 'string' &&
@@ -49,7 +47,7 @@ export class IncidentsService {
       rest.occurredAt = new Date(rest.occurredAt);
     }
     return this.prisma.incident.create({
-      data: { ...rest, createdById },
+      data: { ...rest, createdById: actorId },
       include: this.include,
     });
   }
@@ -72,8 +70,7 @@ export class IncidentsService {
   }
 
   async update(id: string, data: UpdateIncidentInput) {
-    const { createdById, ...rest } = data;
-    void createdById;
+    const rest = data;
     if (
       rest.occurredAt &&
       typeof rest.occurredAt === 'string' &&
@@ -88,10 +85,14 @@ export class IncidentsService {
     });
   }
 
-  async addComment(incidentId: string, data: CreateIncidentCommentInput) {
-    const { createdById, content } = data;
+  async addComment(
+    incidentId: string,
+    data: CreateIncidentCommentInput,
+    actorId: string,
+  ) {
+    const { content } = data;
     await this.prisma.incidentComment.create({
-      data: { incidentId, content, createdById },
+      data: { incidentId, content, createdById: actorId },
     });
     return this.prisma.incident.findUnique({
       where: { id: incidentId },

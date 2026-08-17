@@ -11,12 +11,15 @@
     "prisma:dev": "prisma migrate dev --name init --skip-seed",
     "seed:prod": "ts-node prisma/seed.prod.ts",
     "build": "nest build",
+    "openapi:generate": "npm run build && node dist/src/generate-openapi.js",
+    "openapi:check": "npm run build && node dist/src/generate-openapi.js --check",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/src/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
+    "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
@@ -24,11 +27,12 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
-    "@nestjs/common": "^11.2.1",
-    "@nestjs/core": "^11.2.1",
+    "@nestjs/common": "^11.1.28",
+    "@nestjs/core": "^11.1.28",
     "@nestjs/jwt": "^11.0.0",
     "@nestjs/passport": "^11.0.5",
-    "@nestjs/platform-express": "^11.2.1",
+    "@nestjs/platform-express": "^11.1.28",
+    "@nestjs/swagger": "11.4.5",
     "@prisma/client": "^6.19.3",
     "bcryptjs": "^2.4.3",
     "class-transformer": "^0.5.1",
@@ -46,7 +50,7 @@
     "@eslint/js": "^9.18.0",
     "@nestjs/cli": "^11.0.0",
     "@nestjs/schematics": "^11.0.0",
-    "@nestjs/testing": "^11.0.1",
+    "@nestjs/testing": "^11.1.28",
     "@types/bcryptjs": "^2.4.6",
     "@types/express": "^5.0.0",
     "@types/jest": "^30.0.0",
@@ -88,6 +92,9 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
+  },
+  "overrides": {
+    "js-yaml": "4.3.1"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"

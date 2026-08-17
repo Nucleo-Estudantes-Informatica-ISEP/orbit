@@ -2,13 +2,6 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { MailService } from '../mail/mail.service';
 import { CreateAnnouncementDto } from './dto/create-announcement.dto';
-import { Visibility, type Prisma } from '@prisma/client';
-
-function parseVisibility(value?: string): Visibility | undefined {
-  return Object.values(Visibility).includes(value as Visibility)
-    ? (value as Visibility)
-    : undefined;
-}
 
 @Injectable()
 export class AnnouncementsService {
@@ -38,14 +31,12 @@ export class AnnouncementsService {
     },
   };
 
-  async create(data: CreateAnnouncementDto) {
+  async create(data: CreateAnnouncementDto, actorId: string) {
     const {
       departmentIds,
       targetUserIds,
       content,
       description,
-      createdById,
-      performedById,
       targetUserId,
       visibility,
       type,
@@ -56,9 +47,8 @@ export class AnnouncementsService {
     } = data;
 
     const resolvedContent = content ?? description ?? '';
-    const title = announcementData.title || resolvedContent.slice(0, 80);
-    void performedById;
-    void viewed;
+    const title =
+      (announcementData as any).title || resolvedContent.slice(0, 80);
 
     // PRIVATE with multiple target users → one announcement per user
     if (visibility === 'PRIVATE' && targetUserIds && targetUserIds.length > 0) {
@@ -66,7 +56,7 @@ export class AnnouncementsService {
         data: targetUserIds.map((uid) => ({
           ...announcementData,
           content: resolvedContent,
-          createdById,
+          createdById: actorId,
           targetUserId: uid,
           type: type ?? 'ANNOUNCEMENT',
           visibility: 'PRIVATE' as const,
@@ -83,7 +73,7 @@ export class AnnouncementsService {
       data: {
         ...announcementData,
         content: resolvedContent,
-        createdById,
+        createdById: actorId,
         targetUserId,
         type: type ?? 'ANNOUNCEMENT',
         visibility,
@@ -163,7 +153,7 @@ export class AnnouncementsService {
 
   async findAll(
     userId: string,
-    filters?: { page?: string; pageSize?: string; visibility?: string },
+    filters?: { page?: number; pageSize?: number; visibility?: string },
   ) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -174,8 +164,7 @@ export class AnnouncementsService {
       1,
       Math.min(100, Number(filters?.pageSize ?? 6) || 6),
     );
-    const visibility = parseVisibility(filters?.visibility);
-    const where: Prisma.AnnouncementWhereInput = {
+    const where: any = {
       AND: [
         {
           OR: [
@@ -198,7 +187,9 @@ export class AnnouncementsService {
             },
           ],
         },
-        ...(visibility ? [{ visibility }] : []),
+        ...(filters?.visibility && filters.visibility !== 'ALL'
+          ? [{ visibility: filters.visibility }]
+          : []),
       ],
     };
     const [total, items] = await Promise.all([
@@ -219,8 +210,7 @@ export class AnnouncementsService {
       where: { id: userId },
       select: { departmentId: true },
     });
-    const visibilityFilter = parseVisibility(visibility);
-    const where: Prisma.AnnouncementWhereInput = {
+    const where: any = {
       OR: [
         { visibility: 'PUBLIC' },
         {
@@ -232,7 +222,7 @@ export class AnnouncementsService {
         { visibility: 'PRIVATE', targetUserId: userId, type: 'ANNOUNCEMENT' },
         { visibility: 'PRIVATE', createdById: userId, type: 'ANNOUNCEMENT' },
       ],
-      ...(visibilityFilter ? { visibility: visibilityFilter } : {}),
+      ...(visibility && visibility !== 'ALL' ? { visibility } : {}),
     };
     return this.prisma.announcement.findMany({
       where,
@@ -328,10 +318,8 @@ export class AnnouncementsService {
     });
   }
 
-  async update(id: string, data: Partial<CreateAnnouncementDto>) {
-    const { performedById, departmentIds, targetUserIds, ...updateData } = data;
-    void performedById;
-    void targetUserIds;
+  async update(id: string, data: any) {
+    const { departmentIds, targetUserIds, ...updateData } = data;
     return this.prisma.$transaction(async (tx) => {
       if (departmentIds !== undefined) {
         await tx.announcementDepartment.deleteMany({
