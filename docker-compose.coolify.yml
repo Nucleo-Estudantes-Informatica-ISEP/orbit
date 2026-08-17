@@ -15,6 +15,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: "3090"
+      HOSTNAME: "0.0.0.0"
       SERVICE_URL_FRONTEND_3090: ${SERVICE_URL_FRONTEND_3090}
     depends_on:
       api:
@@ -30,6 +31,7 @@ services:
 
   migrator:
     image: orbit-api
+    exclude_from_hc: true
     command: ["npx", "prisma", "migrate", "deploy"]
     restart: "no"
     environment:
@@ -101,6 +103,12 @@ services:
       MINIO_ROOT_PASSWORD: ${SERVICE_PASSWORD_MINIO}
     volumes:
       - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     expose:
       - "9000"
 

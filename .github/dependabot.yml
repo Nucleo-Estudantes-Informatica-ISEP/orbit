@@ -2,38 +2,39 @@ version: 2
 updates:
   - package-ecosystem: npm
     directory: /api
+    target-branch: dev
     schedule:
       interval: weekly
     groups:
       api-dependencies:
         patterns: ["*"]
-        update-types: ["minor", "patch"]
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
+
   - package-ecosystem: npm
     directory: /frontend
+    target-branch: dev
     schedule:
       interval: weekly
     groups:
       frontend-dependencies:
         patterns: ["*"]
-        update-types: ["minor", "patch"]
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
+
   - package-ecosystem: github-actions
     directory: /
+    target-branch: dev
     schedule:
       interval: weekly
     groups:
       actions:
         patterns: ["*"]
+
   - package-ecosystem: docker
     directory: /api
+    target-branch: dev
     schedule:
       interval: weekly
+
   - package-ecosystem: docker
     directory: /frontend
+    target-branch: dev
     schedule:
       interval: weekly
