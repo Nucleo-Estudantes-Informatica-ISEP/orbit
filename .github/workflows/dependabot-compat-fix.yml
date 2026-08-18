@@ -1,0 +1,49 @@
+name: Dependabot compatibility fix
+
+on:
+  push:
+    branches:
+      - dependabot/npm_and_yarn/api/api-dependencies-8eee7dde8e
+
+permissions:
+  contents: write
+
+env:
+  DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/orbit_test?schema=public
+  JWT_SECRET: ci-only-jwt-secret
+  CORS_ORIGIN: https://ci.invalid
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Dependabot branch
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+
+      - name: Merge current dev
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin dev
+          git merge --no-commit --no-ff origin/dev
+
+      - name: Restore supported API toolchain
+        working-directory: api
+        run: npm install --save-dev typescript@5.9.3 eslint@9.39.4 @eslint/js@9.39.4
+
+      - name: Commit repaired dependency set
+        run: |
+          git add api/package.json api/package-lock.json
+          git commit -m "fix(deps): keep API toolchain compatible"
+          git push origin HEAD:${GITHUB_REF_NAME}
