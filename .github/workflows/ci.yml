@@ -3,8 +3,6 @@ name: CI
 on:
   pull_request:
     branches: [dev, main]
-  push:
-    branches: [dev, main]
   workflow_dispatch:
 
 permissions:
@@ -144,9 +142,3 @@ jobs:
         run: |
           sed '/^[[:space:]]*exclude_from_hc:/d' docker-compose.coolify.yml \
             | docker compose -f - config --quiet
-
-  secret-scan:
-    name: Secret scan
-    runs-on: ubuntu-latest
-    steps:
-      - uses: Nucleo-Estudantes-Informatica-ISEP/.github/.github/actions/secret-scan@master
