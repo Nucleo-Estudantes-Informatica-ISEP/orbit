@@ -1,4 +1,4 @@
-FROM node:20-slim AS builder
+FROM node:26-slim AS builder
 WORKDIR /app
 
 RUN apt-get update -y && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
@@ -15,7 +15,7 @@ COPY . .
 RUN npx prisma generate
 RUN npm run build
 
-FROM node:20-slim AS runner
+FROM node:26-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV DATABASE_URL=postgresql://postgres:postgres@db:5432/orbit?schema=public
