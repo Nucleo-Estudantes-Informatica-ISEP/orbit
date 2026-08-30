@@ -6,7 +6,6 @@ import {
   Param,
   Post,
   Put,
-  Req,
   UseGuards,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
@@ -15,8 +14,17 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
-import type { AuthenticatedRequest } from '../auth/authenticated-request';
+import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { IdParamDto } from '../contracts/request.dto';
+import {
+  UserResponseDto,
+  UserStatsResponseDto,
+} from '../contracts/response.dto';
+import { ApiProtectedController } from '../contracts/openapi.decorators';
+import { CurrentUser } from '../auth/current-user.decorator';
 
+@ApiTags('users')
+@ApiProtectedController()
 @Controller('users')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class UsersController {
@@ -24,37 +32,46 @@ export class UsersController {
 
   @Post()
   @Permissions('USERS_CREATE')
+  @ApiCreatedResponse({ type: UserResponseDto })
   create(@Body() dto: CreateUserDto) {
     return this.usersService.create(dto);
   }
 
   @Get()
   @Permissions('USERS_READ')
+  @ApiOkResponse({ type: UserResponseDto, isArray: true })
   findAll() {
     return this.usersService.findAll();
   }
 
   @Get('stats/overview')
   @Permissions('USERS_READ')
+  @ApiOkResponse({ type: UserStatsResponseDto })
   getStats() {
     return this.usersService.getStats();
   }
 
   @Get(':id')
   @Permissions('USERS_READ')
-  findOne(@Param('id') id: string) {
-    return this.usersService.findOne(id);
+  @ApiOkResponse({ type: UserResponseDto })
+  findOne(@Param() params: IdParamDto) {
+    return this.usersService.findOne(params.id);
   }
 
   @Put(':id')
   @Permissions('USERS_UPDATE')
-  update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
-    return this.usersService.update(id, dto);
+  @ApiOkResponse({ type: UserResponseDto })
+  update(@Param() params: IdParamDto, @Body() dto: UpdateUserDto) {
+    return this.usersService.update(params.id, dto);
   }
 
   @Delete(':id')
   @Permissions('USERS_DELETE')
-  remove(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
-    return this.usersService.remove(id, req.user.userId);
+  @ApiOkResponse({ type: UserResponseDto })
+  remove(
+    @Param() params: IdParamDto,
+    @CurrentUser('userId') requestingUserId: string,
+  ) {
+    return this.usersService.remove(params.id, requestingUserId);
   }
 }

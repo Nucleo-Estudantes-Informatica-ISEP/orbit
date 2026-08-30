@@ -10,15 +10,13 @@ import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
-
-interface LoginUser {
-  id: string;
-  email: string;
-}
+const ACCESS_TOKEN_TTL = '15m';
+const REFRESH_TOKEN_TTL = '7d';
 
 interface RefreshPayload {
   sub: string;
   email: string;
+  type: 'refresh';
   roles?: string[];
   permissions?: string[];
 }
@@ -47,7 +45,7 @@ export class AuthService {
       },
     });
 
-    if (!user) {
+    if (!user || user.status !== 'ACTIVE') {
       throw new UnauthorizedException('User not found');
     }
 
@@ -62,24 +60,6 @@ export class AuthService {
     return { ...rest, roles, permissions };
   }
 
-  async validateUser(email: string, pass: string) {
-    const user = await this.prisma.user.findUnique({ where: { email } });
-    if (!user) return null;
-    if (user.status !== 'ACTIVE') return null;
-    const match = await bcrypt.compare(pass, user.password);
-    if (match) {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { password, ...rest } = user;
-      return rest;
-    }
-    return null;
-  }
-
-  login(user: LoginUser) {
-    const payload = { sub: user.id, email: user.email };
-    return { access_token: this.jwtService.sign(payload) };
-  }
-
   private signTokens(payload: {
     sub: string;
     email: string;
@@ -87,8 +67,14 @@ export class AuthService {
     permissions: string[];
   }) {
     return {
-      access_token: this.jwtService.sign(payload, { expiresIn: '15m' }),
-      refresh_token: this.jwtService.sign(payload, { expiresIn: '15m' }),
+      access_token: this.jwtService.sign(
+        { ...payload, type: 'access' },
+        { expiresIn: ACCESS_TOKEN_TTL },
+      ),
+      refresh_token: this.jwtService.sign(
+        { ...payload, type: 'refresh' },
+        { expiresIn: REFRESH_TOKEN_TTL },
+      ),
     };
   }
 
@@ -115,19 +101,25 @@ export class AuthService {
     };
   }
 
-  refreshToken(refreshToken: string) {
+  async refreshToken(refreshToken: string) {
     try {
       const payload = this.jwtService.verify<RefreshPayload>(refreshToken);
-      const access_token = this.jwtService.sign(
-        {
-          sub: payload.sub,
-          email: payload.email,
-          roles: payload.roles ?? [],
-          permissions: payload.permissions ?? [],
-        },
-        { expiresIn: '8h' },
-      );
-      return { access_token };
+      if (payload.type !== 'refresh') {
+        throw new UnauthorizedException('Invalid refresh token type');
+      }
+
+      // Reload status, roles, and permissions on every rotation so revoked
+      // access takes effect within one access-token lifetime.
+      const profile = await this.buildUserPayload(payload.sub);
+      return {
+        user: profile,
+        ...this.signTokens({
+          sub: profile.id,
+          email: profile.email,
+          roles: profile.roles,
+          permissions: profile.permissions,
+        }),
+      };
     } catch {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
@@ -135,6 +127,45 @@ export class AuthService {
 
   async getProfile(userId: string) {
     return this.buildUserPayload(userId);
+  }
+
+  async updateOwnProfile(userId: string, name: string) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { name: name.trim() },
+    });
+    return this.buildUserPayload(userId);
+  }
+
+  async changeOwnPassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.status !== 'ACTIVE') {
+      throw new UnauthorizedException('User not found');
+    }
+
+    if (!(await bcrypt.compare(currentPassword, user.password))) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    const password = await bcrypt.hash(newPassword, 10);
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: userId },
+        data: { password },
+      }),
+      this.prisma.passwordResetToken.updateMany({
+        where: { userId, usedAt: null },
+        data: { usedAt: new Date() },
+      }),
+    ]);
+
+    this.mailService.sendPasswordChanged(user.email, user.name).catch(() => {});
+
+    return { message: 'Palavra-passe alterada com sucesso.' };
   }
 
   async requestPasswordReset(email: string) {

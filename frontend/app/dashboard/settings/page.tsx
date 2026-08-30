@@ -51,7 +51,7 @@ function ToggleRow({ label, description, checked, onChange }: ToggleRowProps) {
 }
 
 export default function SettingsPage() {
-  const { user } = useAuth();
+  const { user, logout, refreshProfile } = useAuth();
   const { locale, setLocale, t } = useLocale();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [loadingSettings, setLoadingSettings] = useState(true);
@@ -84,7 +84,8 @@ export default function SettingsPage() {
     if (!user || !profileForm.name.trim()) return;
     setProfileSaving(true); setProfileMsg('');
     try {
-      await api.put(`/users/${user.id}`, { name: profileForm.name });
+      await api.put('/auth/me', { name: profileForm.name });
+      await refreshProfile();
       setProfileMsg(t('settings.profileSaved'));
     } catch (error: unknown) { setProfileMsg(error instanceof Error ? error.message : t('settings.profileSaveError')); }
     setProfileSaving(false);
@@ -94,7 +95,12 @@ export default function SettingsPage() {
     if (!settings || !user) return;
     setSettingsSaving(true); setSettingsMsg('');
     try {
-      await api.put(`/user-settings/${user.id}`, settings);
+      await api.put(`/user-settings/${user.id}`, {
+        darkMode: settings.darkMode,
+        emailNotifications: settings.emailNotifications,
+        inAppNotifications: settings.inAppNotifications,
+        language: settings.language,
+      });
       setSettingsMsg(t('settings.preferencesSaved'));
     } catch (error: unknown) { setSettingsMsg(error instanceof Error ? error.message : t('settings.profileSaveError')); }
     setSettingsSaving(false);
@@ -104,12 +110,19 @@ export default function SettingsPage() {
     if (!passwordForm.next || passwordForm.next !== passwordForm.confirm) {
       setPasswordMsg(t('settings.passwordMismatch')); return;
     }
-    if (passwordForm.next.length < 6) { setPasswordMsg(t('settings.passwordLength')); return; }
+    if (passwordForm.next.length < 8) { setPasswordMsg(t('settings.passwordLength')); return; }
     setPasswordMsg('');
     try {
-      await api.put(`/users/${user?.id}`, { password: passwordForm.next });
+      await api.put('/auth/change-password', {
+        current_password: passwordForm.current,
+        new_password: passwordForm.next,
+      });
       setPasswordForm({ current: '', next: '', confirm: '' });
       setPasswordMsg(t('settings.passwordSuccess'));
+      window.setTimeout(() => {
+        logout();
+        window.location.assign(new URL('/login', window.location.origin));
+      }, 750);
     } catch (error: unknown) { setPasswordMsg(error instanceof Error ? error.message : t('settings.passwordError')); }
   };
 
@@ -123,7 +136,7 @@ export default function SettingsPage() {
     setSettingsSaving(true);
     setSettingsMsg('');
     try {
-      await api.put(`/user-settings/${user?.id}`, updated);
+      await api.put(`/user-settings/${user?.id}`, { language: updated.language });
       await setLocale(next, false);
       setSettingsMsg(t('settings.preferencesSaved'));
     } catch (error: unknown) {

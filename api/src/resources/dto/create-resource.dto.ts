@@ -1,7 +1,16 @@
-import { IsString, IsOptional, IsArray } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsArray,
+  IsEnum,
+  IsUUID,
+  IsNotEmpty,
+} from 'class-validator';
+import { Visibility } from '@prisma/client';
 
 export class CreateResourceDto {
   @IsString()
+  @IsNotEmpty()
   title: string;
 
   @IsOptional()
@@ -18,7 +27,7 @@ export class CreateResourceDto {
 
   @IsOptional()
   @IsArray()
-  @IsString({ each: true })
+  @IsUUID(undefined, { each: true })
   departmentIds?: string[];
 
   @IsOptional()
@@ -26,6 +35,6 @@ export class CreateResourceDto {
   category?: string;
 
   @IsOptional()
-  @IsString()
-  visibility?: 'PUBLIC' | 'DEPARTMENT' | 'PRIVATE';
+  @IsEnum(Visibility)
+  visibility?: Visibility;
 }

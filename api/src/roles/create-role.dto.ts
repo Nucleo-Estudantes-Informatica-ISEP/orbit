@@ -1,4 +1,5 @@
-import { IsArray, IsOptional, IsString, IsNotEmpty } from 'class-validator';
+import { IsArray, IsOptional, IsString, IsNotEmpty, IsEnum } from 'class-validator';
+import { SystemPermission } from '@prisma/client';
 
 export class CreateRoleDto {
   @IsString()
@@ -11,5 +12,6 @@ export class CreateRoleDto {
 
   @IsOptional()
   @IsArray()
-  permissions?: string[];
+  @IsEnum(SystemPermission, { each: true })
+  permissions?: SystemPermission[];
 }

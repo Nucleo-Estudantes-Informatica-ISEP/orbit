@@ -6,51 +6,70 @@ import {
   Param,
   Post,
   Put,
-  Req,
   UseGuards,
   ForbiddenException,
 } from '@nestjs/common';
 import { UserSettingsService } from './user-settings.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import type { AuthenticatedRequest } from '../auth/authenticated-request';
-import type { UserSettingsInput } from './user-settings.service';
+import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import {
+  CreateUserSettingsDto,
+  UpdateUserSettingsDto,
+  UserIdParamDto,
+} from '../contracts/request.dto';
+import { UserSettingsResponseDto } from '../contracts/response.dto';
+import { ApiProtectedController } from '../contracts/openapi.decorators';
+import { CurrentUser } from '../auth/current-user.decorator';
+import type { AuthenticatedUser } from '../auth/authenticated-request';
 
+@ApiTags('user-settings')
+@ApiProtectedController()
 @Controller('user-settings')
 @UseGuards(JwtAuthGuard)
 export class UserSettingsController {
   constructor(private svc: UserSettingsService) {}
 
   @Post()
-  create(@Body() body: UserSettingsInput) {
-    return this.svc.create(body);
+  @ApiCreatedResponse({ type: UserSettingsResponseDto })
+  create(
+    @CurrentUser('userId') userId: string,
+    @Body() body: CreateUserSettingsDto,
+  ) {
+    return this.svc.create({ ...body, userId });
   }
 
   @Get(':userId')
-  findOne(@Param('userId') userId: string, @Req() req: AuthenticatedRequest) {
-    this.ensureOwnOrAdmin(userId, req.user);
-    return this.svc.findOne(userId);
+  @ApiOkResponse({ type: UserSettingsResponseDto })
+  findOne(
+    @Param() params: UserIdParamDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    this.ensureOwnOrAdmin(params.userId, user);
+    return this.svc.findOne(params.userId);
   }
 
   @Put(':userId')
+  @ApiOkResponse({ type: UserSettingsResponseDto })
   update(
-    @Param('userId') userId: string,
-    @Body() body: Partial<UserSettingsInput>,
-    @Req() req: AuthenticatedRequest,
+    @Param() params: UserIdParamDto,
+    @Body() body: UpdateUserSettingsDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    this.ensureOwnOrAdmin(userId, req.user);
-    return this.svc.update(userId, body);
+    this.ensureOwnOrAdmin(params.userId, user);
+    return this.svc.update(params.userId, body);
   }
 
   @Delete(':userId')
-  remove(@Param('userId') userId: string, @Req() req: AuthenticatedRequest) {
-    this.ensureOwnOrAdmin(userId, req.user);
-    return this.svc.remove(userId);
+  @ApiOkResponse({ type: UserSettingsResponseDto })
+  remove(
+    @Param() params: UserIdParamDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    this.ensureOwnOrAdmin(params.userId, user);
+    return this.svc.remove(params.userId);
   }
 
-  private ensureOwnOrAdmin(
-    targetUserId: string,
-    user: AuthenticatedRequest['user'],
-  ) {
+  private ensureOwnOrAdmin(targetUserId: string, user: AuthenticatedUser) {
     if (
       targetUserId !== user.userId &&
       !user.permissions?.includes('USERS_UPDATE')
