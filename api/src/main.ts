@@ -9,15 +9,22 @@ async function bootstrap() {
   app.enableShutdownHooks();
   app.useGlobalPipes(createValidationPipe());
 
-  const openApiDocument = createOpenApiDocument(app);
-  SwaggerModule.setup('docs', app, openApiDocument, {
-    jsonDocumentUrl: 'openapi.json',
-  });
-  
+  if (process.env.NODE_ENV !== 'production') {
+    const openApiDocument = createOpenApiDocument(app);
+    SwaggerModule.setup('docs', app, openApiDocument, {
+      jsonDocumentUrl: 'openapi.json',
+    });
+  }
+
   // Habilitar CORS
   const corsOrigins = process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(',')
-    : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3090', 'http://127.0.0.1:3001'];
+    : [
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'http://localhost:3090',
+        'http://127.0.0.1:3001',
+      ];
   app.enableCors({
     origin: corsOrigins,
     credentials: true,
@@ -28,4 +35,4 @@ async function bootstrap() {
   await app.listen(process.env.PORT ?? 3000);
 }
 
-bootstrap();
+void bootstrap();

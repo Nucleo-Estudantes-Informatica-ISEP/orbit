@@ -51,12 +51,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const freshUser = await apiFetch<User>('/auth/me');
         localStorage.setItem('auth_user', JSON.stringify(freshUser));
         setUser(freshUser);
-      } catch {
-        // Network / parse error — server may be temporarily unreachable.
-        // Use stale data as a best-effort fallback only when the server couldn't respond at all.
-        if (localStorage.getItem('auth_token') && storedUser) {
-          setUser(JSON.parse(storedUser));
+      } catch (error) {
+        // Fetch rejects with TypeError when no HTTP response was received.
+        // Only that case may use cached identity; server errors and invalid
+        // responses must not restore stale roles or permissions.
+        if (
+          error instanceof TypeError &&
+          localStorage.getItem('auth_token') &&
+          storedUser
+        ) {
+          try {
+            setUser(JSON.parse(storedUser) as User);
+          } catch {
+            clearStoredSession();
+            setToken(null);
+            setUser(null);
+          }
         } else {
+          clearStoredSession();
           setToken(null);
           setUser(null);
         }

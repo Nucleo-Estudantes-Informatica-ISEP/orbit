@@ -1,4 +1,5 @@
 import { Transform, Type } from 'class-transformer';
+import { PartialType } from '@nestjs/swagger';
 import {
   ArrayMaxSize,
   IsArray,
@@ -15,7 +16,6 @@ import {
   Max,
   MaxLength,
   Min,
-  MinLength,
   Matches,
   ValidateNested,
 } from 'class-validator';
@@ -198,62 +198,7 @@ export class CreateDebtDto {
   depositAccount?: string;
 }
 
-export class UpdateDebtDto {
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  description?: string;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber({ maxDecimalPlaces: 2 })
-  @Min(0.01)
-  value?: number;
-
-  @IsOptional()
-  @IsEnum(DebtType)
-  type?: DebtType;
-
-  @IsOptional()
-  @IsEnum(DebtStatus)
-  status?: DebtStatus;
-
-  @IsOptional()
-  @IsDateString()
-  occurredAt?: string;
-
-  @IsOptional()
-  @IsString()
-  debtorName?: string;
-
-  @IsOptional()
-  @IsString()
-  debtorContact?: string;
-
-  @IsOptional()
-  @IsString()
-  creditorName?: string;
-
-  @IsOptional()
-  @IsString()
-  creditorContact?: string;
-
-  @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(20)
-  @IsString({ each: true })
-  fileKeys?: string[];
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(64)
-  receivingAccount?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(64)
-  depositAccount?: string;
-}
+export class UpdateDebtDto extends PartialType(CreateDebtDto) {}
 
 export class DebtQueryDto {
   @IsOptional()
@@ -293,39 +238,7 @@ export class CreateIncidentDto {
   fileKeys?: string[];
 }
 
-export class UpdateIncidentDto {
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  name?: string;
-
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  description?: string;
-
-  @IsOptional()
-  @IsDateString()
-  occurredAt?: string;
-
-  @IsOptional()
-  @IsUUID()
-  departmentId?: string;
-
-  @IsOptional()
-  @IsEnum(IncidentPriority)
-  priority?: IncidentPriority;
-
-  @IsOptional()
-  @IsEnum(IncidentStatus)
-  status?: IncidentStatus;
-
-  @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(20)
-  @IsString({ each: true })
-  fileKeys?: string[];
-}
+export class UpdateIncidentDto extends PartialType(CreateIncidentDto) {}
 
 export class IncidentQueryDto {
   @IsOptional()
@@ -360,28 +273,7 @@ export class CreateProjectDto {
   deadline?: string;
 }
 
-export class UpdateProjectDto {
-  @IsOptional()
-  @IsUUID()
-  departmentId?: string;
-
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  name?: string;
-
-  @IsOptional()
-  @IsString()
-  description?: string;
-
-  @IsOptional()
-  @IsEnum(ProjectStatus)
-  status?: ProjectStatus;
-
-  @IsOptional()
-  @IsDateString()
-  deadline?: string;
-}
+export class UpdateProjectDto extends PartialType(CreateProjectDto) {}
 
 export class ProjectMemberDto {
   @IsUUID()
@@ -426,44 +318,7 @@ export class CreateTaskDto {
   assigneeIds?: string[];
 }
 
-export class UpdateTaskDto {
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  title?: string;
-
-  @IsOptional()
-  @IsString()
-  description?: string;
-
-  @IsOptional()
-  @IsDateString()
-  deadline?: string;
-
-  @IsOptional()
-  @IsEnum(Priority)
-  priority?: Priority;
-
-  @IsOptional()
-  @IsEnum(TaskStatus)
-  status?: TaskStatus;
-
-  @IsOptional()
-  @Transform(({ value }) => (value === '' ? undefined : value))
-  @IsUUID()
-  boardId?: string;
-
-  @IsOptional()
-  @Transform(({ value }) => (value === '' ? undefined : value))
-  @IsUUID()
-  projectId?: string;
-
-  @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(100)
-  @IsUUID(undefined, { each: true })
-  assigneeIds?: string[];
-}
+export class UpdateTaskDto extends PartialType(CreateTaskDto) {}
 
 export class TaskQueryDto {
   @IsOptional()
@@ -532,45 +387,7 @@ export class CreateCandidateDto {
   departmentChoices?: CandidateDepartmentChoiceDto[];
 }
 
-export class UpdateCandidateDto {
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  name?: string;
-
-  @IsOptional()
-  @IsEmail()
-  email?: string;
-
-  @IsOptional()
-  @IsString()
-  course?: string;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  year?: number;
-
-  @IsOptional()
-  @IsString()
-  cvUrl?: string;
-
-  @IsOptional()
-  @IsString()
-  notes?: string;
-
-  @IsOptional()
-  @IsEnum(RecruitmentStage)
-  stage?: RecruitmentStage;
-
-  @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(4)
-  @ValidateNested({ each: true })
-  @Type(() => CandidateDepartmentChoiceDto)
-  departmentChoices?: CandidateDepartmentChoiceDto[];
-}
+export class UpdateCandidateDto extends PartialType(CreateCandidateDto) {}
 
 export class CreateRecruitmentCommentDto {
   @IsUUID()
@@ -582,9 +399,6 @@ export class CreateRecruitmentCommentDto {
 }
 
 export class CreateUserSettingsDto {
-  @IsUUID()
-  userId: string;
-
   @IsOptional()
   @IsBoolean()
   darkMode?: boolean;
@@ -603,24 +417,7 @@ export class CreateUserSettingsDto {
   language?: string;
 }
 
-export class UpdateUserSettingsDto {
-  @IsOptional()
-  @IsBoolean()
-  darkMode?: boolean;
-
-  @IsOptional()
-  @IsBoolean()
-  emailNotifications?: boolean;
-
-  @IsOptional()
-  @IsBoolean()
-  inAppNotifications?: boolean;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(16)
-  language?: string;
-}
+export class UpdateUserSettingsDto extends PartialType(CreateUserSettingsDto) {}
 
 export class TransferDepartmentDto {
   @IsUUID()
@@ -646,8 +443,8 @@ export class AnnouncementQueryDto extends PaginationQueryDto {
 
 export class EventQueryDto extends PaginationQueryDto {
   @IsOptional()
-  @IsEnum({ ALL: 'ALL', UPCOMING: 'UPCOMING' })
-  filter?: 'ALL' | 'UPCOMING';
+  @IsEnum({ ALL: 'ALL', UPCOMING: 'UPCOMING', PAST: 'PAST' })
+  filter?: 'ALL' | 'UPCOMING' | 'PAST';
 }
 
 export class ResourceQueryDto extends PaginationQueryDto {

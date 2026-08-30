@@ -5,7 +5,6 @@ import {
   Get,
   Param,
   Post,
-  Request,
   UseGuards,
 } from '@nestjs/common';
 import { RecruitmentCommentService } from './recruitment-comment.service';
@@ -20,7 +19,7 @@ import {
 } from '../contracts/request.dto';
 import { RecruitmentCommentResponseDto } from '../contracts/response.dto';
 import { ApiProtectedController } from '../contracts/openapi.decorators';
-import type { AuthenticatedRequest } from '../auth/authenticated-request';
+import { CurrentUser } from '../auth/current-user.decorator';
 
 @ApiTags('recruitment-comments')
 @ApiProtectedController()
@@ -33,10 +32,10 @@ export class RecruitmentCommentController {
   @Permissions('RECRUITMENT_CREATE')
   @ApiCreatedResponse({ type: RecruitmentCommentResponseDto })
   create(
-    @Request() request: AuthenticatedRequest,
+    @CurrentUser('userId') actorId: string,
     @Body() body: CreateRecruitmentCommentDto,
   ) {
-    return this.svc.create({ ...body, createdById: request.user.userId });
+    return this.svc.create({ ...body, createdById: actorId });
   }
 
   @Get('candidate/:candidateId')

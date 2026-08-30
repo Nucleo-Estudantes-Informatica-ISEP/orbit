@@ -7,6 +7,16 @@ interface SessionResponse {
   user: unknown;
 }
 
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
 function getToken(): string | null {
   if (typeof window === 'undefined') return null;
   return localStorage.getItem('auth_token');
@@ -126,7 +136,7 @@ export async function apiFetch<T = unknown>(
 
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
-    throw new Error(text || `HTTP ${res.status}`);
+    throw new ApiError(text || `HTTP ${res.status}`, res.status);
   }
   // 204 No Content
   if (res.status === 204) return undefined as T;

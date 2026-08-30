@@ -17,11 +17,12 @@ export class InventoryService {
     department: { select: { id: true, name: true } },
   };
 
-  async create(dto: CreateInventoryItemDto) {
+  async create(dto: CreateInventoryItemDto, actorId: string) {
     const { value, purchaseDate, warrantyDate, ...rest } = dto;
     return this.prisma.inventoryItem.create({
       data: {
         ...rest,
+        purchasedById: actorId,
         value: new Decimal(value),
         ...(purchaseDate ? { purchaseDate: new Date(purchaseDate) } : {}),
         ...(warrantyDate ? { warrantyDate: new Date(warrantyDate) } : {}),

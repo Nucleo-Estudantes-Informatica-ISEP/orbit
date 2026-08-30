@@ -5,7 +5,6 @@ import {
   HttpCode,
   Post,
   Put,
-  Req,
   UseGuards,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
@@ -29,7 +28,7 @@ import {
   MessageResponseDto,
   SessionUserResponseDto,
 } from '../contracts/response.dto';
-import type { AuthenticatedRequest } from './authenticated-request';
+import { CurrentUser } from './current-user.decorator';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -73,8 +72,8 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOkResponse({ type: SessionUserResponseDto })
   @ApiUnauthorizedResponse({ type: ErrorResponseDto })
-  async me(@Req() req: AuthenticatedRequest) {
-    return this.authService.getProfile(req.user.userId);
+  async me(@CurrentUser('userId') userId: string) {
+    return this.authService.getProfile(userId);
   }
 
   @Put('me')
@@ -84,10 +83,10 @@ export class AuthController {
   @ApiBadRequestResponse({ type: ErrorResponseDto })
   @ApiUnauthorizedResponse({ type: ErrorResponseDto })
   async updateMe(
-    @Req() req: AuthenticatedRequest,
+    @CurrentUser('userId') userId: string,
     @Body() dto: UpdateOwnProfileDto,
   ) {
-    return this.authService.updateOwnProfile(req.user.userId, dto.name);
+    return this.authService.updateOwnProfile(userId, dto.name);
   }
 
   @Put('change-password')
@@ -97,11 +96,11 @@ export class AuthController {
   @ApiBadRequestResponse({ type: ErrorResponseDto })
   @ApiUnauthorizedResponse({ type: ErrorResponseDto })
   async changePassword(
-    @Req() req: AuthenticatedRequest,
+    @CurrentUser('userId') userId: string,
     @Body() dto: ChangeOwnPasswordDto,
   ) {
     return this.authService.changeOwnPassword(
-      req.user.userId,
+      userId,
       dto.current_password,
       dto.new_password,
     );

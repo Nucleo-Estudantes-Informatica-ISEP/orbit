@@ -7,7 +7,6 @@ import {
   Body,
   Param,
   Query,
-  Request,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -24,7 +23,7 @@ import {
 } from '../contracts/request.dto';
 import { PlanResponseDto } from '../contracts/response.dto';
 import { ApiProtectedController } from '../contracts/openapi.decorators';
-import type { AuthenticatedRequest } from '../auth/authenticated-request';
+import { CurrentUser } from '../auth/current-user.decorator';
 
 @ApiTags('plans')
 @ApiProtectedController()
@@ -36,8 +35,8 @@ export class PlansController {
   @Post()
   @Permissions('PLANS_CREATE')
   @ApiCreatedResponse({ type: PlanResponseDto })
-  create(@Request() request: AuthenticatedRequest, @Body() dto: CreatePlanDto) {
-    return this.svc.create(dto, request.user.userId);
+  create(@CurrentUser('userId') actorId: string, @Body() dto: CreatePlanDto) {
+    return this.svc.create(dto, actorId);
   }
 
   @Get()
@@ -64,22 +63,19 @@ export class PlansController {
   @Put(':id/approve')
   @Permissions('PLANS_APPROVE')
   @ApiOkResponse({ type: PlanResponseDto })
-  approve(
-    @Request() request: AuthenticatedRequest,
-    @Param() params: IdParamDto,
-  ) {
-    return this.svc.approve(params.id, request.user.userId);
+  approve(@CurrentUser('userId') actorId: string, @Param() params: IdParamDto) {
+    return this.svc.approve(params.id, actorId);
   }
 
   @Put(':id/reject')
   @Permissions('PLANS_APPROVE')
   @ApiOkResponse({ type: PlanResponseDto })
   reject(
-    @Request() request: AuthenticatedRequest,
+    @CurrentUser('userId') actorId: string,
     @Param() params: IdParamDto,
     @Body() body: PlanDecisionDto,
   ) {
-    return this.svc.reject(params.id, request.user.userId, body.rejectionNote);
+    return this.svc.reject(params.id, actorId, body.rejectionNote);
   }
 
   @Delete(':id')

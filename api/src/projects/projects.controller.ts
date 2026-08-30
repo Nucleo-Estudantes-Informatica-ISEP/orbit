@@ -6,7 +6,6 @@ import {
   Param,
   Post,
   Put,
-  Request,
   UseGuards,
 } from '@nestjs/common';
 import { ProjectsService } from './projects.service';
@@ -23,7 +22,7 @@ import {
 } from '../contracts/request.dto';
 import { ProjectResponseDto } from '../contracts/response.dto';
 import { ApiProtectedController } from '../contracts/openapi.decorators';
-import type { AuthenticatedRequest } from '../auth/authenticated-request';
+import { CurrentUser } from '../auth/current-user.decorator';
 
 @ApiTags('projects')
 @ApiProtectedController()
@@ -36,10 +35,10 @@ export class ProjectsController {
   @Permissions('PROJECTS_CREATE')
   @ApiCreatedResponse({ type: ProjectResponseDto })
   create(
-    @Request() request: AuthenticatedRequest,
+    @CurrentUser('userId') actorId: string,
     @Body() body: CreateProjectDto,
   ) {
-    return this.svc.create(body, request.user.userId);
+    return this.svc.create(body, actorId);
   }
 
   @Get()

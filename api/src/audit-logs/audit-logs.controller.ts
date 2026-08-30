@@ -1,11 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Post,
-  Request,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { AuditLogsService } from './audit-logs.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
@@ -14,7 +7,7 @@ import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { CreateAuditLogDto } from '../contracts/request.dto';
 import { AuditLogResponseDto } from '../contracts/response.dto';
 import { ApiProtectedController } from '../contracts/openapi.decorators';
-import type { AuthenticatedRequest } from '../auth/authenticated-request';
+import { CurrentUser } from '../auth/current-user.decorator';
 
 @ApiTags('audit-logs')
 @ApiProtectedController()
@@ -27,10 +20,10 @@ export class AuditLogsController {
   @Permissions('USERS_CREATE')
   @ApiCreatedResponse({ type: AuditLogResponseDto })
   create(
-    @Request() request: AuthenticatedRequest,
+    @CurrentUser('userId') actorId: string,
     @Body() body: CreateAuditLogDto,
   ) {
-    return this.svc.create({ ...body, performedById: request.user.userId });
+    return this.svc.create({ ...body, performedById: actorId });
   }
 
   @Get()

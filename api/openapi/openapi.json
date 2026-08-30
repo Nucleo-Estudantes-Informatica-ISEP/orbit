@@ -697,10 +697,6 @@
           "purchaseDate": {
             "type": "string"
           },
-          "purchasedById": {
-            "format": "uuid",
-            "type": "string"
-          },
           "quantity": {
             "minimum": 1,
             "type": "number"
@@ -1004,7 +1000,6 @@
           },
           "roles": {
             "items": {
-              "format": "uuid",
               "type": "string"
             },
             "type": "array"
@@ -1041,15 +1036,8 @@
           "language": {
             "maxLength": 16,
             "type": "string"
-          },
-          "userId": {
-            "format": "uuid",
-            "type": "string"
           }
         },
-        "required": [
-          "userId"
-        ],
         "type": "object"
       },
       "DebtResponseDto": {
@@ -2395,10 +2383,6 @@
             "type": "string"
           },
           "purchaseDate": {
-            "type": "string"
-          },
-          "purchasedById": {
-            "format": "uuid",
             "type": "string"
           },
           "quantity": {
@@ -6521,7 +6505,8 @@
             "schema": {
               "enum": [
                 "ALL",
-                "UPCOMING"
+                "UPCOMING",
+                "PAST"
               ],
               "type": "string"
             }

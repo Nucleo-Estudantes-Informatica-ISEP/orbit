@@ -1,4 +1,13 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  UseGuards,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -7,8 +16,12 @@ import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
 import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { IdParamDto } from '../contracts/request.dto';
-import { UserResponseDto, UserStatsResponseDto } from '../contracts/response.dto';
+import {
+  UserResponseDto,
+  UserStatsResponseDto,
+} from '../contracts/response.dto';
 import { ApiProtectedController } from '../contracts/openapi.decorators';
+import { CurrentUser } from '../auth/current-user.decorator';
 
 @ApiTags('users')
 @ApiProtectedController()
@@ -55,7 +68,10 @@ export class UsersController {
   @Delete(':id')
   @Permissions('USERS_DELETE')
   @ApiOkResponse({ type: UserResponseDto })
-  remove(@Param() params: IdParamDto, @Req() req: any) {
-    return this.usersService.remove(params.id, req.user.userId);
+  remove(
+    @Param() params: IdParamDto,
+    @CurrentUser('userId') requestingUserId: string,
+  ) {
+    return this.usersService.remove(params.id, requestingUserId);
   }
 }

@@ -41,9 +41,5 @@ export class UpdateInventoryItemDto {
 
   @IsOptional()
   @IsUUID()
-  purchasedById?: string;
-
-  @IsOptional()
-  @IsUUID()
   departmentId?: string;
 }

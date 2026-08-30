@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { beforeEach, test } from 'node:test';
 import {
+  ApiError,
   apiFetch,
   clearStoredSession,
   refreshSession,
@@ -111,4 +112,17 @@ test('clears and redirects when the refresh token is rejected', async () => {
   assert.equal(localStorage.getItem('refresh_token'), null);
   assert.equal(localStorage.getItem('auth_user'), null);
   assert.deepEqual(redirects, ['https://orbit.example.test/login']);
+});
+
+test('preserves HTTP status on API failures', async () => {
+  globalThis.fetch = async () =>
+    new Response('temporarily unavailable', { status: 503 });
+
+  await assert.rejects(
+    () => apiFetch('/auth/me'),
+    (error) =>
+      error instanceof ApiError &&
+      error.status === 503 &&
+      error.message === 'temporarily unavailable',
+  );
 });

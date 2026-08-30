@@ -8,7 +8,6 @@ import {
   Param,
   Query,
   UseGuards,
-  Request,
 } from '@nestjs/common';
 import { AnnouncementsService } from './announcements.service';
 import { CreateAnnouncementDto } from './dto/create-announcement.dto';
@@ -29,7 +28,7 @@ import {
 } from '../contracts/response.dto';
 import { ApiProtectedController } from '../contracts/openapi.decorators';
 import { UpdateAnnouncementDto } from './dto/update-announcement.dto';
-import type { AuthenticatedRequest } from '../auth/authenticated-request';
+import { CurrentUser } from '../auth/current-user.decorator';
 
 @ApiTags('announcements')
 @ApiProtectedController()
@@ -42,10 +41,10 @@ export class AnnouncementsController {
   @Permissions('ANNOUNCEMENTS_CREATE')
   @ApiCreatedResponse({ type: AnnouncementResponseDto })
   create(
-    @Request() request: AuthenticatedRequest,
+    @CurrentUser('userId') userId: string,
     @Body() dto: CreateAnnouncementDto,
   ) {
-    return this.svc.create(dto, request.user.userId);
+    return this.svc.create(dto, userId);
   }
 
   @Get()
@@ -62,27 +61,27 @@ export class AnnouncementsController {
     },
   })
   findAll(
-    @Request() req: AuthenticatedRequest,
+    @CurrentUser('userId') userId: string,
     @Query() query: AnnouncementQueryDto,
   ) {
     if (!query.page && !query.pageSize) {
-      return this.svc.findAllRaw(req.user.userId, query.visibility);
+      return this.svc.findAllRaw(userId, query.visibility);
     }
-    return this.svc.findAll(req.user.userId, query);
+    return this.svc.findAll(userId, query);
   }
 
   @Get('me')
   @Permissions('ANNOUNCEMENTS_READ')
   @ApiOkResponse({ type: AnnouncementResponseDto, isArray: true })
-  findForMe(@Request() req: AuthenticatedRequest) {
-    return this.svc.findAllForUser(req.user.userId);
+  findForMe(@CurrentUser('userId') userId: string) {
+    return this.svc.findAllForUser(userId);
   }
 
   @Put('me/read-all')
   @Permissions('ANNOUNCEMENTS_READ')
   @ApiOkResponse({ type: CountResponseDto })
-  markAllRead(@Request() req: AuthenticatedRequest) {
-    return this.svc.markAllRead(req.user.userId);
+  markAllRead(@CurrentUser('userId') userId: string) {
+    return this.svc.markAllRead(userId);
   }
 
   @Get(':id')

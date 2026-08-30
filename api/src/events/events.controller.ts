@@ -7,7 +7,6 @@ import {
   Body,
   Param,
   Query,
-  Request,
   UseGuards,
 } from '@nestjs/common';
 import { EventsService } from './events.service';
@@ -28,7 +27,7 @@ import {
 } from '../contracts/response.dto';
 import { ApiProtectedController } from '../contracts/openapi.decorators';
 import { UpdateEventDto } from './dto/update-event.dto';
-import type { AuthenticatedRequest } from '../auth/authenticated-request';
+import { CurrentUser } from '../auth/current-user.decorator';
 
 @ApiTags('events')
 @ApiProtectedController()
@@ -40,11 +39,8 @@ export class EventsController {
   @Post()
   @Permissions('EVENTS_CREATE')
   @ApiCreatedResponse({ type: EventResponseDto })
-  create(
-    @Request() request: AuthenticatedRequest,
-    @Body() dto: CreateEventDto,
-  ) {
-    return this.svc.create(dto, request.user.userId);
+  create(@CurrentUser('userId') actorId: string, @Body() dto: CreateEventDto) {
+    return this.svc.create(dto, actorId);
   }
 
   @Get()

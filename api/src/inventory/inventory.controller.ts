@@ -18,6 +18,7 @@ import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { IdParamDto } from '../contracts/request.dto';
 import { InventoryItemResponseDto } from '../contracts/response.dto';
 import { ApiProtectedController } from '../contracts/openapi.decorators';
+import { CurrentUser } from '../auth/current-user.decorator';
 
 @ApiTags('inventory')
 @ApiProtectedController()
@@ -29,8 +30,11 @@ export class InventoryController {
   @Post()
   @Permissions('INVENTORY_CREATE')
   @ApiCreatedResponse({ type: InventoryItemResponseDto })
-  create(@Body() dto: CreateInventoryItemDto) {
-    return this.svc.create(dto);
+  create(
+    @CurrentUser('userId') actorId: string,
+    @Body() dto: CreateInventoryItemDto,
+  ) {
+    return this.svc.create(dto, actorId);
   }
 
   @Get()

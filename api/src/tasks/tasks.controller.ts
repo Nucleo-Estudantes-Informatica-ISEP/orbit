@@ -7,7 +7,6 @@ import {
   Post,
   Put,
   Query,
-  Request,
   UseGuards,
 } from '@nestjs/common';
 import { TasksService } from './tasks.service';
@@ -23,7 +22,7 @@ import {
 } from '../contracts/request.dto';
 import { TaskResponseDto } from '../contracts/response.dto';
 import { ApiProtectedController } from '../contracts/openapi.decorators';
-import type { AuthenticatedRequest } from '../auth/authenticated-request';
+import { CurrentUser } from '../auth/current-user.decorator';
 
 @ApiTags('tasks')
 @ApiProtectedController()
@@ -35,11 +34,8 @@ export class TasksController {
   @Post()
   @Permissions('TASKS_CREATE')
   @ApiCreatedResponse({ type: TaskResponseDto })
-  create(
-    @Request() request: AuthenticatedRequest,
-    @Body() body: CreateTaskDto,
-  ) {
-    return this.svc.create(body, request.user.userId);
+  create(@CurrentUser('userId') actorId: string, @Body() body: CreateTaskDto) {
+    return this.svc.create(body, actorId);
   }
 
   @Get()
@@ -60,11 +56,11 @@ export class TasksController {
   @Permissions('TASKS_UPDATE')
   @ApiOkResponse({ type: TaskResponseDto })
   update(
-    @Request() request: AuthenticatedRequest,
+    @CurrentUser('userId') actorId: string,
     @Param() params: IdParamDto,
     @Body() body: UpdateTaskDto,
   ) {
-    return this.svc.update(params.id, body, request.user.userId);
+    return this.svc.update(params.id, body, actorId);
   }
 
   @Delete(':id')

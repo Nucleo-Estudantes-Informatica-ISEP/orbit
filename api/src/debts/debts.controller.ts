@@ -7,7 +7,6 @@ import {
   Post,
   Put,
   Query,
-  Request,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -23,7 +22,7 @@ import {
 } from '../contracts/request.dto';
 import { DebtResponseDto } from '../contracts/response.dto';
 import { ApiProtectedController } from '../contracts/openapi.decorators';
-import type { AuthenticatedRequest } from '../auth/authenticated-request';
+import { CurrentUser } from '../auth/current-user.decorator';
 
 @ApiTags('debts')
 @ApiProtectedController()
@@ -35,11 +34,8 @@ export class DebtsController {
   @Post()
   @Permissions('DEBTS_CREATE')
   @ApiCreatedResponse({ type: DebtResponseDto })
-  create(
-    @Request() request: AuthenticatedRequest,
-    @Body() body: CreateDebtDto,
-  ) {
-    return this.svc.create({ ...body, createdById: request.user.userId });
+  create(@CurrentUser('userId') actorId: string, @Body() body: CreateDebtDto) {
+    return this.svc.create({ ...body, createdById: actorId });
   }
 
   @Get()

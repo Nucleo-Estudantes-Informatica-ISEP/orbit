@@ -108,6 +108,8 @@ export class AuthService {
         throw new UnauthorizedException('Invalid refresh token type');
       }
 
+      // Reload status, roles, and permissions on every rotation so revoked
+      // access takes effect within one access-token lifetime.
       const profile = await this.buildUserPayload(payload.sub);
       return {
         user: profile,

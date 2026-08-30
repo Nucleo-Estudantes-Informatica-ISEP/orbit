@@ -7,6 +7,8 @@ import { PermissionsGuard } from '../src/auth/permissions.guard';
 import { TasksController } from '../src/tasks/tasks.controller';
 import { TasksService } from '../src/tasks/tasks.service';
 import { createValidationPipe } from '../src/validation';
+import { InventoryController } from '../src/inventory/inventory.controller';
+import { InventoryService } from '../src/inventory/inventory.service';
 
 describe('API contract validation (e2e)', () => {
   let app: INestApplication<App>;
@@ -18,11 +20,21 @@ describe('API contract validation (e2e)', () => {
     update: jest.fn(),
     remove: jest.fn(),
   };
+  const inventoryService = {
+    create: jest.fn((body: unknown) => body),
+    findAll: jest.fn(),
+    findOne: jest.fn(),
+    update: jest.fn(),
+    remove: jest.fn(),
+  };
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      controllers: [TasksController],
-      providers: [{ provide: TasksService, useValue: service }],
+      controllers: [TasksController, InventoryController],
+      providers: [
+        { provide: TasksService, useValue: service },
+        { provide: InventoryService, useValue: inventoryService },
+      ],
     })
       .overrideGuard(JwtAuthGuard)
       .useValue({
@@ -86,6 +98,29 @@ describe('API contract validation (e2e)', () => {
       .expect(({ body }: { body: { message: string[] } }) => {
         expect(body.message).toContain(
           'property performedById should not exist',
+        );
+      });
+  });
+
+  it('derives inventory purchaser from the authenticated user', async () => {
+    const body = { name: 'Laptop', value: '1200.00' };
+
+    await request(app.getHttpServer())
+      .post('/inventory')
+      .send(body)
+      .expect(201)
+      .expect(body);
+    expect(inventoryService.create).toHaveBeenCalledWith(body, id);
+  });
+
+  it('rejects client-supplied inventory purchaser ids', async () => {
+    await request(app.getHttpServer())
+      .post('/inventory')
+      .send({ name: 'Laptop', value: '1200.00', purchasedById: id })
+      .expect(400)
+      .expect(({ body }: { body: { message: string[] } }) => {
+        expect(body.message).toContain(
+          'property purchasedById should not exist',
         );
       });
   });
