@@ -18,9 +18,7 @@ interface LoginUser {
 
 interface RefreshPayload {
   sub: string;
-  email: string;
-  roles?: string[];
-  permissions?: string[];
+  token_use?: string;
 }
 
 @Injectable()
@@ -76,8 +74,29 @@ export class AuthService {
   }
 
   login(user: LoginUser) {
-    const payload = { sub: user.id, email: user.email };
-    return { access_token: this.jwtService.sign(payload) };
+    const payload = { sub: user.id, email: user.email, token_use: 'access' };
+    return {
+      access_token: this.jwtService.sign(payload, { expiresIn: '15m' }),
+    };
+  }
+
+  private signAccessToken(payload: {
+    sub: string;
+    email: string;
+    roles: string[];
+    permissions: string[];
+  }) {
+    return this.jwtService.sign(
+      { ...payload, token_use: 'access' },
+      { expiresIn: '15m' },
+    );
+  }
+
+  private signRefreshToken(userId: string) {
+    return this.jwtService.sign(
+      { sub: userId, token_use: 'refresh' },
+      { expiresIn: '30d' },
+    );
   }
 
   private signTokens(payload: {
@@ -87,8 +106,8 @@ export class AuthService {
     permissions: string[];
   }) {
     return {
-      access_token: this.jwtService.sign(payload, { expiresIn: '8h' }),
-      refresh_token: this.jwtService.sign(payload, { expiresIn: '30d' }),
+      access_token: this.signAccessToken(payload),
+      refresh_token: this.signRefreshToken(payload.sub),
     };
   }
 
@@ -115,20 +134,31 @@ export class AuthService {
     };
   }
 
-  refreshToken(refreshToken: string) {
+  async refreshToken(refreshToken: string) {
     try {
       const payload = this.jwtService.verify<RefreshPayload>(refreshToken);
-      const access_token = this.jwtService.sign(
-        {
-          sub: payload.sub,
-          email: payload.email,
-          roles: payload.roles ?? [],
-          permissions: payload.permissions ?? [],
-        },
-        { expiresIn: '8h' },
-      );
+
+      if (payload.token_use !== 'refresh' || !payload.sub) {
+        throw new UnauthorizedException('Invalid refresh token');
+      }
+
+      // Rebuild authorization claims from the database so role/permission
+      // changes and account deactivation are respected on refresh.
+      const profile = await this.buildUserPayload(payload.sub);
+      if (profile.status !== 'ACTIVE') {
+        throw new UnauthorizedException('Account is inactive');
+      }
+
+      const access_token = this.signAccessToken({
+        sub: profile.id,
+        email: profile.email,
+        roles: profile.roles,
+        permissions: profile.permissions,
+      });
+
       return { access_token };
-    } catch {
+    } catch (error) {
+      if (error instanceof UnauthorizedException) throw error;
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
   }

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import type { Request } from 'express';
@@ -6,9 +6,10 @@ import type { AuthenticatedUser } from './authenticated-request';
 
 interface JwtPayload {
   sub: string;
-  email: string;
+  email?: string;
   roles?: unknown;
   permissions?: unknown;
+  token_use?: unknown;
 }
 
 function stringArray(value: unknown): string[] {
@@ -34,6 +35,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   validate(payload: JwtPayload): AuthenticatedUser {
+    // Refresh tokens must never be accepted as bearer access tokens.
+    if (payload.token_use !== 'access' || typeof payload.email !== 'string') {
+      throw new UnauthorizedException('Invalid access token');
+    }
+
     return {
       userId: payload.sub,
       email: payload.email,
