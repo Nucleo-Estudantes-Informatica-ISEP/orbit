@@ -81,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(JSON.parse(storedUser));
         } else {
           localStorage.removeItem('auth_token');
+          localStorage.removeItem('auth_refresh_token');
           localStorage.removeItem('auth_user');
           setToken(null);
         }

@@ -19,6 +19,7 @@ interface LoginUser {
 interface RefreshPayload {
   sub: string;
   token_use?: string;
+  password_version?: string;
 }
 
 @Injectable()
@@ -33,7 +34,7 @@ export class AuthService {
     return crypto.createHash('sha256').update(token).digest('hex');
   }
 
-  private async buildUserPayload(userId: string) {
+  private async buildUserPayload(userId: string, passwordVersion?: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -47,6 +48,15 @@ export class AuthService {
 
     if (!user) {
       throw new UnauthorizedException('User not found');
+    }
+
+    // Every password change invalidates refresh tokens, including resets and
+    // admin updates, without exposing the stored bcrypt hash in the token.
+    if (
+      passwordVersion !== undefined &&
+      passwordVersion !== this.hashToken(user.password)
+    ) {
+      throw new UnauthorizedException('Refresh token revoked');
     }
 
     const permissions = Array.from(
@@ -92,22 +102,29 @@ export class AuthService {
     );
   }
 
-  private signRefreshToken(userId: string) {
+  private signRefreshToken(userId: string, passwordHash: string) {
     return this.jwtService.sign(
-      { sub: userId, token_use: 'refresh' },
+      {
+        sub: userId,
+        token_use: 'refresh',
+        password_version: this.hashToken(passwordHash),
+      },
       { expiresIn: '30d' },
     );
   }
 
-  private signTokens(payload: {
-    sub: string;
-    email: string;
-    roles: string[];
-    permissions: string[];
-  }) {
+  private signTokens(
+    payload: {
+      sub: string;
+      email: string;
+      roles: string[];
+      permissions: string[];
+    },
+    passwordHash: string,
+  ) {
     return {
       access_token: this.signAccessToken(payload),
-      refresh_token: this.signRefreshToken(payload.sub),
+      refresh_token: this.signRefreshToken(payload.sub, passwordHash),
     };
   }
 
@@ -121,12 +138,15 @@ export class AuthService {
     if (!ok) throw new UnauthorizedException();
 
     const profile = await this.buildUserPayload(user.id);
-    const tokens = this.signTokens({
-      sub: user.id,
-      email: user.email,
-      roles: profile.roles,
-      permissions: profile.permissions,
-    });
+    const tokens = this.signTokens(
+      {
+        sub: user.id,
+        email: user.email,
+        roles: profile.roles,
+        permissions: profile.permissions,
+      },
+      user.password,
+    );
 
     return {
       user: profile,
@@ -138,13 +158,21 @@ export class AuthService {
     try {
       const payload = this.jwtService.verify<RefreshPayload>(refreshToken);
 
-      if (payload.token_use !== 'refresh' || !payload.sub) {
+      if (
+        payload.token_use !== 'refresh' ||
+        typeof payload.sub !== 'string' ||
+        !payload.sub ||
+        typeof payload.password_version !== 'string'
+      ) {
         throw new UnauthorizedException('Invalid refresh token');
       }
 
       // Rebuild authorization claims from the database so role/permission
       // changes and account deactivation are respected on refresh.
-      const profile = await this.buildUserPayload(payload.sub);
+      const profile = await this.buildUserPayload(
+        payload.sub,
+        payload.password_version,
+      );
       if (profile.status !== 'ACTIVE') {
         throw new UnauthorizedException('Account is inactive');
       }
