@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { API_BASE } from '@/lib/api';
+import { API_BASE, refreshAccessToken } from '@/lib/api';
 
 export interface User {
   id: string;
@@ -31,24 +31,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const storedToken = localStorage.getItem('auth_token');
     const storedUser = localStorage.getItem('auth_user');
+    const storedRefreshToken = localStorage.getItem('auth_refresh_token');
 
     const restoreSession = async () => {
-      if (!storedToken) {
+      if (!storedToken && !storedRefreshToken) {
         setIsLoading(false);
         return;
       }
 
-      setToken(storedToken);
+      if (storedToken) setToken(storedToken);
 
       try {
-        const response = await fetch(`${API_BASE}/auth/me`, {
-          headers: { Authorization: `Bearer ${storedToken}` },
-        });
+        let activeToken = storedToken;
+        let response = activeToken
+          ? await fetch(`${API_BASE}/auth/me`, {
+              headers: { Authorization: `Bearer ${activeToken}` },
+            })
+          : null;
 
-        if (!response.ok) {
-          // Server explicitly rejected the token (401/403/404) — session is invalid.
-          // Do NOT fall back to stale localStorage data; force a clean re-login.
+        // If the access token expired (or only a refresh token remains),
+        // silently obtain a new access token before forcing a re-login.
+        if (!response || response.status === 401) {
+          activeToken = await refreshAccessToken();
+          if (activeToken) {
+            setToken(activeToken);
+            response = await fetch(`${API_BASE}/auth/me`, {
+              headers: { Authorization: `Bearer ${activeToken}` },
+            });
+          }
+        }
+
+        if (!response?.ok) {
           localStorage.removeItem('auth_token');
+          localStorage.removeItem('auth_refresh_token');
           localStorage.removeItem('auth_user');
           setToken(null);
           setUser(null);
@@ -91,10 +106,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const data = await response.json();
-      const { user: userData, access_token } = data;
+      const { user: userData, access_token, refresh_token } = data;
 
       // Store token and user
       localStorage.setItem('auth_token', access_token);
+      localStorage.setItem('auth_refresh_token', refresh_token);
       localStorage.setItem('auth_user', JSON.stringify(userData));
 
       setToken(access_token);
@@ -106,6 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_refresh_token');
     localStorage.removeItem('auth_user');
     setToken(null);
     setUser(null);
