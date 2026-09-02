@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import Image from 'next/image';
+import { FileImage } from '@/components/authenticated-file';
 import { Upload, X, FileText, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -113,9 +114,9 @@ export function FileUpload({
         <div className="flex items-center gap-2 rounded-lg border border-border/40 bg-muted/40 p-3">
           {preview ? (
             <Image src={preview} alt="preview" width={48} height={48} unoptimized className="h-12 w-12 rounded object-cover shrink-0" />
-          ) : displayKey && isImage(undefined, displayName ?? displayKey) ? (
-            <Image
-              src={getFileUrl(displayKey)}
+          ) : displayKey && (isImage(undefined, displayName) || isImage(undefined, displayKey)) ? (
+            <FileImage
+              fileKey={displayKey}
               alt="preview"
               width={48}
               height={48}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import Image from 'next/image';
+import { FileImage } from '@/components/authenticated-file';
 import { Plus, Pencil, Trash2, Package, MoreHorizontal, AlertTriangle, FileDown } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,7 +19,7 @@ import { FileUpload } from '@/components/file-upload';
 import { useAuth } from '@/lib/auth-context';
 import { usePermission } from '@/lib/use-permission';
 import { useLocale } from '@/lib/locale-context';
-import { api, getFileUrl } from '@/lib/api';
+import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { downloadSpreadsheet } from '@/lib/spreadsheet-export';
 
@@ -397,8 +397,8 @@ export default function InventoryPage() {
                 {/* Photo */}
                 <div className="relative h-40 bg-muted flex items-center justify-center shrink-0">
                   {item.photoKey ? (
-                    <Image
-                      src={getFileUrl(item.photoKey)}
+                    <FileImage
+                      fileKey={item.photoKey}
                       alt={item.name}
                       fill
                       unoptimized

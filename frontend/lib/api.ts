@@ -98,13 +98,11 @@ export async function apiFetch<T = unknown>(
 }
 
 export function getFileUrl(key: string): string {
-  if (typeof window === 'undefined') return `${API_BASE}/files/${key}`;
-  const token = localStorage.getItem('auth_token');
-  return `${API_BASE}/files/${key}?token=${encodeURIComponent(token ?? '')}`;
+  return `/file?key=${encodeURIComponent(key)}`;
 }
 
 /** Resolve a stored URL/value to a downloadable file URL.
- *  - Old persisted file URL with expired token → extracts key, regenerates fresh
+ *  - Old persisted file URL with expired token → extracts key, removes credentials
  *  - MinIO object key (no protocol) → wraps with getFileUrl
  *  - External URL (https://…) → returned as-is */
 export function resolveFileUrl(value: string | null | undefined): string | undefined {
@@ -139,6 +137,20 @@ async function authorizedBinaryFetch(
   }
   if (res.status === 401) clearAuthAndRedirect();
   return res;
+}
+
+export async function fetchFileBlob(key: string, signal?: AbortSignal): Promise<Blob> {
+  const parts = key.split('/');
+  if (!key || parts.some((part) => part === '.' || part === '..')) {
+    throw new Error('Invalid file key');
+  }
+  const res = await authorizedBinaryFetch(
+    `/files/${parts.map(encodeURIComponent).join('/')}`,
+    { signal, cache: 'no-store' },
+  );
+  if (!res.ok) throw new Error(`File request failed: HTTP ${res.status}`);
+  // ponytail: buffers files (uploads max 10 MB); stream downloads if that limit grows.
+  return res.blob();
 }
 
 export const api = {
