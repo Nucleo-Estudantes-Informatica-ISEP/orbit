@@ -54,7 +54,7 @@ export class AuthService {
     // admin updates, without exposing the stored bcrypt hash in the token.
     if (
       passwordVersion !== undefined &&
-      passwordVersion !== this.hashToken(user.password)
+      !(await bcrypt.compare(user.password, passwordVersion))
     ) {
       throw new UnauthorizedException('Refresh token revoked');
     }
@@ -102,18 +102,18 @@ export class AuthService {
     );
   }
 
-  private signRefreshToken(userId: string, passwordHash: string) {
+  private async signRefreshToken(userId: string, passwordHash: string) {
     return this.jwtService.sign(
       {
         sub: userId,
         token_use: 'refresh',
-        password_version: this.hashToken(passwordHash),
+        password_version: await bcrypt.hash(passwordHash, 10),
       },
       { expiresIn: '30d' },
     );
   }
 
-  private signTokens(
+  private async signTokens(
     payload: {
       sub: string;
       email: string;
@@ -124,7 +124,7 @@ export class AuthService {
   ) {
     return {
       access_token: this.signAccessToken(payload),
-      refresh_token: this.signRefreshToken(payload.sub, passwordHash),
+      refresh_token: await this.signRefreshToken(payload.sub, passwordHash),
     };
   }
 
@@ -138,7 +138,7 @@ export class AuthService {
     if (!ok) throw new UnauthorizedException();
 
     const profile = await this.buildUserPayload(user.id);
-    const tokens = this.signTokens(
+    const tokens = await this.signTokens(
       {
         sub: user.id,
         email: user.email,

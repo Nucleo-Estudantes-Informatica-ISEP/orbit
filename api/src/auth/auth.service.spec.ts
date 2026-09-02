@@ -84,6 +84,9 @@ describe('AuthService refresh tokens', () => {
     expect(claims.exp - claims.iat).toBe(30 * 24 * 60 * 60);
     expect(claims).not.toHaveProperty('password');
     expect(claims.password_version).not.toBe(user.password);
+    expect(
+      await bcrypt.compare(user.password, claims.password_version ?? ''),
+    ).toBe(true);
     expect(login.user).not.toHaveProperty('password');
     await expect(
       auth.refreshToken(login.refresh_token),
