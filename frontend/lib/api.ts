@@ -11,10 +11,10 @@ function getRefreshToken(): string | null {
 }
 
 function clearAuthAndRedirect(): never {
-  localStorage.removeItem('auth_token');
-  localStorage.removeItem('auth_refresh_token');
-  localStorage.removeItem('auth_user');
   if (typeof window !== 'undefined') {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_refresh_token');
+    localStorage.removeItem('auth_user');
     window.location.assign(new URL('/login', window.location.origin));
   }
   throw new Error('Sessão expirada. Por favor, faz login novamente.');
