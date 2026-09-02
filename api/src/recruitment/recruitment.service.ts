@@ -247,7 +247,6 @@ export class RecruitmentService {
         doc.text('Data de Criação:', leftX, y);
         doc.font('Helvetica').fillColor('#000');
         doc.text(new Date(c.createdAt).toLocaleDateString('pt-PT'), rightX, y);
-        y += 22;
 
         if (c.notes) {
           doc.moveDown(0.5);
