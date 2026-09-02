@@ -137,8 +137,17 @@ describe('AuthService refresh tokens', () => {
   it('rejects access, legacy, malformed, and expired refresh tokens', async () => {
     const login = await auth.authenticate(user.email, 'old-password');
     const claims = jwt.verify<TokenClaims>(login.refresh_token);
+    // Before token_use, access and refresh tokens had the same payload shape.
+    const legacyClaims = {
+      sub: user.id,
+      email: user.email,
+      roles: ['Member'],
+      permissions: [SystemPermission.USERS_READ],
+    };
+    const legacyToken = jwt.sign(legacyClaims, { expiresIn: '15m' });
     const invalidTokens = [
       login.access_token,
+      legacyToken,
       jwt.sign({ sub: user.id, token_use: 'refresh' }),
       jwt.sign({ ...claims, password_version: null }),
       jwt.sign({ ...claims, exp: 1 }),
@@ -150,6 +159,9 @@ describe('AuthService refresh tokens', () => {
       );
     }
     const strategy = new JwtStrategy();
+    expect(() => strategy.validate(legacyClaims)).toThrow(
+      'Invalid access token',
+    );
     expect(() => strategy.validate(claims)).toThrow(UnauthorizedException);
     expect(
       strategy.validate(jwt.verify<TokenClaims>(login.access_token)).userId,

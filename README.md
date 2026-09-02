@@ -11,7 +11,7 @@ Sistema interno da **NEI-ISEP** (Núcleo de Estudantes de Informática do ISEP) 
 | Backend | NestJS 11 · Prisma 6 · PostgreSQL 16 |
 | Frontend | Next.js 16 · React 19 · Tailwind CSS 4 · shadcn/ui |
 | Ficheiros | MinIO (armazenamento interno) |
-| Auth | JWT (8h) + Refresh Token (7d) · bcrypt · RBAC por permissões |
+| Auth | JWT (15 min) + Refresh Token (30 dias) · bcrypt · RBAC por permissões |
 | Drag & Drop | @dnd-kit |
 | Editor de texto | Tiptap |
 
@@ -82,6 +82,12 @@ docker compose exec api npx prisma db seed
 ---
 
 ## Produção
+
+### Compatibilidade de sessões
+
+Ao publicar o novo formato de tokens, os tokens anteriores sem `token_use` são rejeitados no próximo pedido autenticado, mesmo que ainda não tenham expirado. Os refresh tokens anteriores sem `password_version` também são rejeitados. Os utilizadores com sessões antigas terão de iniciar sessão novamente; não existe uma janela de transição de 15 minutos.
+
+Os novos access tokens têm uma validade de 15 minutos e os novos refresh tokens de 30 dias. Uma reposição ou alteração da palavra-passe invalida os refresh tokens existentes. Apenas os access tokens emitidos no novo formato continuam válidos até à sua expiração após essa alteração.
 
 ### Seed de produção
 
@@ -214,3 +220,4 @@ orbit/
 - Apenas a porta `3090` (frontend) está exposta publicamente no Docker.
 - API, base de dados e MinIO comunicam exclusivamente pela rede interna Docker.
 - O JWT armazena as permissões do utilizador — após alteração de permissões, o utilizador precisa renovar o token (refrescar ou re-login).
+- Seguimento de segurança: adicionar rate limiting a `/auth/login` e `/auth/refresh`, tendo em conta o proxy Next.js e eventuais réplicas da API. Ainda não existe limitação de pedidos nestes endpoints. A assinatura e a expiração do refresh token são verificadas antes da consulta à base de dados e do `bcrypt.compare`; um token roubado ainda válido pode repetir esse trabalho.
