@@ -9,17 +9,26 @@ import { UsersService } from '../users/users.service';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 
-interface TokenClaims {
+interface AccessClaims {
   sub: string;
-  email?: string;
+  email: string;
   token_use: string;
-  password_version?: string;
-  permissions?: string[];
+  permissions: string[];
   iat: number;
   exp: number;
 }
 
-describe('AuthService refresh tokens', () => {
+interface StoredSession {
+  id: string;
+  userId: string;
+  tokenHash: string;
+  familyId: string;
+  expiresAt: Date;
+  revokedAt: Date | null;
+  createdAt: Date;
+}
+
+describe('AuthService sessions', () => {
   const jwt = new JwtService({ secret: 'refresh-token-test-secret' });
   const user = {
     id: 'user-1',
@@ -36,19 +45,106 @@ describe('AuthService refresh tokens', () => {
       },
     ],
   };
+  let sessions: StoredSession[];
   let auth: AuthService;
   let users: UsersService;
 
   beforeEach(async () => {
+    sessions = [];
     user.password = await bcrypt.hash('old-password', 10);
     user.status = UserStatus.ACTIVE;
     user.userRoles[0].role.permissions = [SystemPermission.USERS_READ];
-    const prisma = {
+    let sessionSequence = 0;
+
+    const matches = (
+      session: StoredSession,
+      where: Record<string, unknown>,
+    ) => {
+      if (where.id !== undefined && session.id !== where.id) return false;
+      if (where.userId !== undefined && session.userId !== where.userId)
+        return false;
+      if (where.familyId !== undefined && session.familyId !== where.familyId)
+        return false;
+      if (where.revokedAt === null && session.revokedAt !== null) return false;
+      const expiry = where.expiresAt as { gt?: Date } | undefined;
+      if (expiry?.gt && session.expiresAt <= expiry.gt) return false;
+      return true;
+    };
+
+    const prisma: Record<string, unknown> = {
       user: {
         findUnique: jest.fn().mockResolvedValue(user),
         update: jest.fn(({ data }: { data: { password: string } }) =>
           Promise.resolve(Object.assign(user, data)),
         ),
+      },
+      authSession: {
+        create: jest.fn(
+          ({
+            data,
+          }: {
+            data: Omit<StoredSession, 'id' | 'revokedAt' | 'createdAt'>;
+          }) => {
+            const session: StoredSession = {
+              ...data,
+              id: `session-${++sessionSequence}`,
+              revokedAt: null,
+              createdAt: new Date(),
+            };
+            sessions.push(session);
+            return Promise.resolve(session);
+          },
+        ),
+        findUnique: jest.fn(
+          ({
+            where,
+            select,
+          }: {
+            where: { tokenHash: string };
+            select?: { familyId: boolean };
+          }) => {
+            const session =
+              sessions.find((item) => item.tokenHash === where.tokenHash) ??
+              null;
+            return Promise.resolve(
+              session && select ? { familyId: session.familyId } : session,
+            );
+          },
+        ),
+        update: jest.fn(
+          ({
+            where,
+            data,
+          }: {
+            where: { id: string };
+            data: Partial<StoredSession>;
+          }) => {
+            const session = sessions.find((item) => item.id === where.id);
+            if (!session) throw new Error('Session not found');
+            Object.assign(session, data);
+            return Promise.resolve(session);
+          },
+        ),
+        updateMany: jest.fn(
+          ({
+            where,
+            data,
+          }: {
+            where: Record<string, unknown>;
+            data: Partial<StoredSession>;
+          }) => {
+            const selected = sessions.filter((session) =>
+              matches(session, where),
+            );
+            selected.forEach((session) => Object.assign(session, data));
+            return Promise.resolve({ count: selected.length });
+          },
+        ),
+        deleteMany: jest.fn(({ where }: { where: Record<string, unknown> }) => {
+          const before = sessions.length;
+          sessions = sessions.filter((session) => !matches(session, where));
+          return Promise.resolve({ count: before - sessions.length });
+        }),
       },
       passwordResetToken: {
         findUnique: jest.fn().mockResolvedValue({
@@ -58,8 +154,13 @@ describe('AuthService refresh tokens', () => {
         }),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
-      $transaction: (operations: Promise<unknown>[]) => Promise.all(operations),
+      $transaction: jest.fn((operation: unknown) =>
+        typeof operation === 'function'
+          ? (operation as (client: unknown) => Promise<unknown>)(prisma)
+          : Promise.all(operation as Promise<unknown>[]),
+      ),
     };
+
     const module = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -78,93 +179,93 @@ describe('AuthService refresh tokens', () => {
     users = module.get(UsersService);
   });
 
-  it('revokes refresh tokens after resets and user password changes', async () => {
+  it('issues 15-minute access and 30-day opaque refresh tokens', async () => {
     const login = await auth.authenticate(user.email, 'old-password');
-    const claims = jwt.verify<TokenClaims>(login.refresh_token);
-    expect(claims.exp - claims.iat).toBe(30 * 24 * 60 * 60);
-    expect(claims).not.toHaveProperty('password');
-    expect(claims.password_version).not.toBe(user.password);
+    const claims = jwt.verify<AccessClaims>(login.access_token);
+
+    expect(claims.exp - claims.iat).toBe(15 * 60);
+    expect(claims.token_use).toBe('access');
+    expect(login.refresh_token).not.toContain('.');
+    expect(sessions).toHaveLength(1);
     expect(
-      await bcrypt.compare(user.password, claims.password_version ?? ''),
-    ).toBe(true);
-    expect(login.user).not.toHaveProperty('password');
-    await expect(
-      auth.refreshToken(login.refresh_token),
-    ).resolves.toHaveProperty('access_token');
-
-    await auth.resetPassword('reset-token', 'new-password');
-    await expect(auth.refreshToken(login.refresh_token)).rejects.toThrow(
-      'Refresh token revoked',
-    );
-    await expect(auth.authenticate(user.email, 'old-password')).rejects.toThrow(
-      UnauthorizedException,
-    );
-    const afterReset = await auth.authenticate(user.email, 'new-password');
-    await expect(
-      auth.refreshToken(afterReset.refresh_token),
-    ).resolves.toHaveProperty('access_token');
-
-    // Reusing the same password still changes its salted hash and revokes tokens.
-    await users.update(user.id, { password: 'new-password' });
-    await expect(auth.refreshToken(afterReset.refresh_token)).rejects.toThrow(
-      'Refresh token revoked',
-    );
-    const afterChange = await auth.authenticate(user.email, 'new-password');
-    await expect(
-      auth.refreshToken(afterChange.refresh_token),
-    ).resolves.toHaveProperty('access_token');
+      sessions[0].expiresAt.getTime() - sessions[0].createdAt.getTime(),
+    ).toBeCloseTo(30 * 24 * 60 * 60 * 1000, -3);
   });
 
-  it('keeps short access tokens and reloads permissions and active status', async () => {
+  it('rotates refresh tokens and revokes the family when an old token is replayed', async () => {
     const login = await auth.authenticate(user.email, 'old-password');
     user.userRoles[0].role.permissions = [SystemPermission.USERS_UPDATE];
+
     const refreshed = await auth.refreshToken(login.refresh_token);
-    for (const token of [login.access_token, refreshed.access_token]) {
-      const claims = jwt.verify<TokenClaims>(token);
-      expect(claims.exp - claims.iat).toBe(15 * 60);
-      expect(claims.token_use).toBe('access');
-      expect(claims).not.toHaveProperty('password_version');
-    }
-    expect(jwt.verify<TokenClaims>(refreshed.access_token).permissions).toEqual(
-      [SystemPermission.USERS_UPDATE],
+    expect(refreshed.refresh_token).not.toBe(login.refresh_token);
+    expect(refreshed.user.permissions).toEqual([SystemPermission.USERS_UPDATE]);
+    expect(
+      jwt.verify<AccessClaims>(refreshed.access_token).permissions,
+    ).toEqual([SystemPermission.USERS_UPDATE]);
+    expect(sessions.filter((session) => !session.revokedAt)).toHaveLength(1);
+
+    await expect(auth.refreshToken(login.refresh_token)).rejects.toThrow(
+      'Invalid or expired refresh token',
     );
+    expect(sessions.every((session) => session.revokedAt)).toBe(true);
+    await expect(auth.refreshToken(refreshed.refresh_token)).rejects.toThrow(
+      UnauthorizedException,
+    );
+  });
+
+  it('revokes refresh sessions after resets and user password changes', async () => {
+    const login = await auth.authenticate(user.email, 'old-password');
+    await auth.resetPassword('reset-token', 'new-password');
+    expect(sessions).toHaveLength(0);
+    await expect(auth.refreshToken(login.refresh_token)).rejects.toThrow(
+      UnauthorizedException,
+    );
+
+    const afterReset = await auth.authenticate(user.email, 'new-password');
+    await users.update(user.id, { password: 'new-password' });
+    expect(sessions).toHaveLength(0);
+    await expect(auth.refreshToken(afterReset.refresh_token)).rejects.toThrow(
+      UnauthorizedException,
+    );
+  });
+
+  it('rejects inactive users, malformed refresh values, and refresh tokens on protected routes', async () => {
+    const login = await auth.authenticate(user.email, 'old-password');
     user.status = UserStatus.INACTIVE;
     await expect(auth.refreshToken(login.refresh_token)).rejects.toThrow(
       'Account is inactive',
     );
+    expect(sessions.every((session) => session.revokedAt)).toBe(true);
+
+    await expect(auth.refreshToken(login.access_token)).rejects.toThrow(
+      UnauthorizedException,
+    );
+    await expect(auth.refreshToken('')).rejects.toThrow(UnauthorizedException);
+
+    const strategy = new JwtStrategy();
+    expect(() =>
+      strategy.validate({ sub: user.id, email: user.email }),
+    ).toThrow('Invalid access token');
+    expect(() =>
+      strategy.validate({
+        sub: '',
+        email: user.email,
+        token_use: 'access',
+      }),
+    ).toThrow('Invalid access token');
+    expect(
+      strategy.validate(jwt.verify<AccessClaims>(login.access_token)).userId,
+    ).toBe(user.id);
   });
 
-  it('rejects access, legacy, malformed, and expired refresh tokens', async () => {
+  it('revokes a session family on logout', async () => {
     const login = await auth.authenticate(user.email, 'old-password');
-    const claims = jwt.verify<TokenClaims>(login.refresh_token);
-    // Before token_use, access and refresh tokens had the same payload shape.
-    const legacyClaims = {
-      sub: user.id,
-      email: user.email,
-      roles: ['Member'],
-      permissions: [SystemPermission.USERS_READ],
-    };
-    const legacyToken = jwt.sign(legacyClaims, { expiresIn: '15m' });
-    const invalidTokens = [
-      login.access_token,
-      legacyToken,
-      jwt.sign({ sub: user.id, token_use: 'refresh' }),
-      jwt.sign({ ...claims, password_version: null }),
-      jwt.sign({ ...claims, exp: 1 }),
-      'not-a-jwt',
-    ];
-    for (const token of invalidTokens) {
-      await expect(auth.refreshToken(token)).rejects.toThrow(
-        UnauthorizedException,
-      );
-    }
-    const strategy = new JwtStrategy();
-    expect(() => strategy.validate(legacyClaims)).toThrow(
-      'Invalid access token',
+    await expect(auth.logout(login.refresh_token)).resolves.toEqual({
+      message: 'Sessão terminada.',
+    });
+    expect(sessions.every((session) => session.revokedAt)).toBe(true);
+    await expect(auth.refreshToken(login.refresh_token)).rejects.toThrow(
+      UnauthorizedException,
     );
-    expect(() => strategy.validate(claims)).toThrow(UnauthorizedException);
-    expect(
-      strategy.validate(jwt.verify<TokenClaims>(login.access_token)).userId,
-    ).toBe(user.id);
   });
 });

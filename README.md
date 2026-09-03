@@ -85,9 +85,9 @@ docker compose exec api npx prisma db seed
 
 ### Compatibilidade de sessões
 
-Ao publicar o novo formato de tokens, os tokens anteriores sem `token_use` são rejeitados no próximo pedido autenticado, mesmo que ainda não tenham expirado. Os refresh tokens anteriores sem `password_version` também são rejeitados. Os utilizadores com sessões antigas terão de iniciar sessão novamente; não existe uma janela de transição de 15 minutos.
+Ao publicar o novo formato, os access tokens anteriores sem `token_use` são rejeitados no próximo pedido autenticado, mesmo que ainda não tenham expirado. Os refresh tokens JWT anteriores também são rejeitados: os refresh tokens passam a ser valores opacos, cujo hash é guardado em `AuthSession`. Os utilizadores com sessões antigas terão de iniciar sessão novamente; não existe uma janela de transição de 15 minutos.
 
-Os novos access tokens têm uma validade de 15 minutos e os novos refresh tokens de 30 dias. Uma reposição ou alteração da palavra-passe invalida os refresh tokens existentes. Apenas os access tokens emitidos no novo formato continuam válidos até à sua expiração após essa alteração.
+Os access tokens têm uma validade de 15 minutos. Cada refresh token tem validade de 30 dias, roda em cada utilização e não pode ser reutilizado. A reutilização de um token já rodado revoga a respetiva família de sessão. Logout, reposição ou alteração da palavra-passe revogam os refresh tokens aplicáveis. Apenas access tokens já emitidos continuam válidos até à sua expiração.
 
 ### Seed de produção
 
@@ -219,5 +219,6 @@ orbit/
 
 - Apenas a porta `3090` (frontend) está exposta publicamente no Docker.
 - API, base de dados e MinIO comunicam exclusivamente pela rede interna Docker.
-- O JWT armazena as permissões do utilizador — após alteração de permissões, o utilizador precisa renovar o token (refrescar ou re-login).
-- Seguimento de segurança: adicionar rate limiting a `/auth/login` e `/auth/refresh`, tendo em conta o proxy Next.js e eventuais réplicas da API. Ainda não existe limitação de pedidos nestes endpoints. A assinatura e a expiração do refresh token são verificadas antes da consulta à base de dados e do `bcrypt.compare`; um token roubado ainda válido pode repetir esse trabalho.
+- O access JWT armazena as permissões do utilizador; refresh recarrega estado, roles e permissões da base de dados. Alterações ficam efetivas no próximo refresh ou, no máximo, após os 15 minutos do access token atual.
+- Refresh tokens opacos são guardados apenas como hashes, rodam em cada utilização e são revogados no logout e em alterações de password.
+- Seguimento de segurança: adicionar rate limiting a `/auth/login` e `/auth/refresh`, tendo em conta o proxy Next.js e eventuais réplicas da API. Ainda não existe limitação de pedidos nestes endpoints.

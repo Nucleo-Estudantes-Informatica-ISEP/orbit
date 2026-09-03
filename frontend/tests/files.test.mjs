@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { API_BASE, fetchFileBlob, getFileUrl, resolveFileUrl } from '../lib/api.ts';
+import { API_BASE, apiFetch, fetchFileBlob, getFileUrl, resolveFileUrl } from '../lib/api.ts';
 
 test('authenticated files', async (t) => {
   const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
@@ -17,10 +17,19 @@ test('authenticated files', async (t) => {
   });
   Object.defineProperty(globalThis, 'window', {
     configurable: true,
-    value: { location: { origin: 'https://orbit.test', assign: (url) => redirects.push(String(url)) } },
+    value: {
+      dispatchEvent: () => true,
+      location: {
+        origin: 'https://orbit.test',
+        assign: (url) => redirects.push(String(url)),
+      },
+    },
   });
   t.after(() => {
-    for (const [name, descriptor] of [['window', originalWindow], ['localStorage', originalStorage]]) {
+    for (const [name, descriptor] of [
+      ['window', originalWindow],
+      ['localStorage', originalStorage],
+    ]) {
       if (descriptor) Object.defineProperty(globalThis, name, descriptor);
       else delete globalThis[name];
     }
@@ -53,14 +62,22 @@ test('authenticated files', async (t) => {
       if (url === `${API_BASE}/auth/refresh`) {
         refreshes++;
         assert.equal(JSON.parse(options.body).refresh_token, 'refresh-token');
-        return Response.json({ access_token: 'fresh' });
+        return Response.json({
+          access_token: 'fresh',
+          refresh_token: 'rotated-refresh-token',
+          user: { id: 'user-1' },
+        });
       }
       const authorization = new Headers(options.headers).get('Authorization');
       fileRequests.push({ url, authorization });
       assert.equal(new URL(url, window.location.origin).search, '');
       if (authorization === 'Bearer expired') return new Response(null, { status: 401 });
       assert.equal(authorization, 'Bearer fresh');
-      return new Response('file bytes', { headers: { 'Content-Type': url.endsWith('.png') ? 'image/png' : 'application/pdf' } });
+      return new Response('file bytes', {
+        headers: {
+          'Content-Type': url.endsWith('.png') ? 'image/png' : 'application/pdf',
+        },
+      });
     });
     const [image, pdf] = await Promise.all([fetchFileBlob('photo.png'), fetchFileBlob('folder/CV & file.pdf')]);
     assert.equal(image.type, 'image/png');
@@ -70,6 +87,7 @@ test('authenticated files', async (t) => {
     assert.equal(fileRequests.length, 4);
     assert.equal(fileRequests.at(-1).url, `${API_BASE}/files/folder/CV%20%26%20file.pdf`);
     assert.equal(storage.get('auth_token'), 'fresh');
+    assert.equal(storage.get('auth_refresh_token'), 'rotated-refresh-token');
   });
 
   await t.test('revoked refresh tokens clear the session and redirect', async (t) => {
@@ -89,6 +107,37 @@ test('authenticated files', async (t) => {
     assert.deepEqual(redirects, []);
   });
 
+  await t.test('403 responses do not refresh or clear authentication', async (t) => {
+    reset();
+    const fetch = t.mock.method(globalThis, 'fetch', async () => new Response('forbidden', { status: 403 }));
+    await assert.rejects(apiFetch('/forbidden'), (error) => error.status === 403);
+    assert.equal(fetch.mock.callCount(), 1);
+    assert.equal(storage.size, 3);
+    assert.deepEqual(redirects, []);
+  });
+
+  await t.test('refresh network and server failures preserve the recoverable session', async (t) => {
+    for (const [name, refreshFailure] of [
+      ['network failure', new TypeError('offline')],
+      ['server failure', new Response('unavailable', { status: 503 })],
+    ]) {
+      await t.test(name, async (t) => {
+        reset();
+        let calls = 0;
+        t.mock.method(globalThis, 'fetch', async () => {
+          calls++;
+          if (calls === 1) return new Response(null, { status: 401 });
+          if (refreshFailure instanceof Error) throw refreshFailure;
+          return refreshFailure;
+        });
+        await assert.rejects(apiFetch('/recoverable'));
+        assert.equal(storage.get('auth_token'), 'expired');
+        assert.equal(storage.get('auth_refresh_token'), 'refresh-token');
+        assert.deepEqual(redirects, []);
+      });
+    }
+  });
+
   await t.test('cancellation is forwarded and traversal is rejected without fetching', async (t) => {
     reset();
     const controller = new AbortController();
@@ -97,7 +146,9 @@ test('authenticated files', async (t) => {
       assert.equal(options.signal, controller.signal);
       options.signal.throwIfAborted();
     });
-    await assert.rejects(fetchFileBlob('photo.png', controller.signal), { name: 'AbortError' });
+    await assert.rejects(fetchFileBlob('photo.png', controller.signal), {
+      name: 'AbortError',
+    });
     for (const key of ['', '..', '../auth/me', 'folder/../photo.png']) {
       await assert.rejects(fetchFileBlob(key), /Invalid file key/);
     }

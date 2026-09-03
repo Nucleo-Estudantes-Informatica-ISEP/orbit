@@ -27,6 +27,12 @@ export class AuthController {
     return this.authService.refreshToken(body.refresh_token);
   }
 
+  @Post('logout')
+  @HttpCode(200)
+  logout(@Body() body: { refresh_token?: string }) {
+    return this.authService.logout(body.refresh_token ?? '');
+  }
+
   @Post('forgot-password')
   @HttpCode(200)
   async forgotPassword(@Body() dto: ForgotPasswordDto) {

@@ -118,11 +118,21 @@ export class UsersService {
     if (dto.departmentId) updateData.departmentId = dto.departmentId;
     if (dto.password) updateData.password = await bcrypt.hash(dto.password, 10);
 
-    const updatedUser = await this.prisma.user.update({
-      where: { id },
-      data: updateData,
-      select: userSelect,
-    });
+    const updatedUser = dto.password
+      ? await this.prisma.$transaction(async (tx) => {
+          const user = await tx.user.update({
+            where: { id },
+            data: updateData,
+            select: userSelect,
+          });
+          await tx.authSession.deleteMany({ where: { userId: id } });
+          return user;
+        })
+      : await this.prisma.user.update({
+          where: { id },
+          data: updateData,
+          select: userSelect,
+        });
 
     if (dto.password) {
       this.mailService

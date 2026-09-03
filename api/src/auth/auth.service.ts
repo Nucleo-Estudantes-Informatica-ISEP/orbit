@@ -10,17 +10,8 @@ import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
-
-interface LoginUser {
-  id: string;
-  email: string;
-}
-
-interface RefreshPayload {
-  sub: string;
-  token_use?: string;
-  password_version?: string;
-}
+const ACCESS_TOKEN_TTL = '15m';
+const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 @Injectable()
 export class AuthService {
@@ -34,7 +25,7 @@ export class AuthService {
     return crypto.createHash('sha256').update(token).digest('hex');
   }
 
-  private async buildUserPayload(userId: string, passwordVersion?: string) {
+  private async buildUserPayload(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -48,15 +39,6 @@ export class AuthService {
 
     if (!user) {
       throw new UnauthorizedException('User not found');
-    }
-
-    // Every password change invalidates refresh tokens, including resets and
-    // admin updates, without exposing the stored bcrypt hash in the token.
-    if (
-      passwordVersion !== undefined &&
-      !(await bcrypt.compare(user.password, passwordVersion))
-    ) {
-      throw new UnauthorizedException('Refresh token revoked');
     }
 
     const permissions = Array.from(
@@ -83,13 +65,6 @@ export class AuthService {
     return null;
   }
 
-  login(user: LoginUser) {
-    const payload = { sub: user.id, email: user.email, token_use: 'access' };
-    return {
-      access_token: this.jwtService.sign(payload, { expiresIn: '15m' }),
-    };
-  }
-
   private signAccessToken(payload: {
     sub: string;
     email: string;
@@ -98,33 +73,35 @@ export class AuthService {
   }) {
     return this.jwtService.sign(
       { ...payload, token_use: 'access' },
-      { expiresIn: '15m' },
+      { expiresIn: ACCESS_TOKEN_TTL },
     );
   }
 
-  private async signRefreshToken(userId: string, passwordHash: string) {
-    return this.jwtService.sign(
-      {
-        sub: userId,
-        token_use: 'refresh',
-        password_version: await bcrypt.hash(passwordHash, 10),
-      },
-      { expiresIn: '30d' },
-    );
-  }
-
-  private async signTokens(
-    payload: {
-      sub: string;
-      email: string;
-      roles: string[];
-      permissions: string[];
-    },
-    passwordHash: string,
+  private async createRefreshSession(
+    userId: string,
+    familyId = crypto.randomUUID(),
   ) {
+    const refreshToken = crypto.randomBytes(48).toString('base64url');
+    await this.prisma.authSession.create({
+      data: {
+        userId,
+        familyId,
+        tokenHash: this.hashToken(refreshToken),
+        expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
+      },
+    });
+    return refreshToken;
+  }
+
+  private async signTokens(payload: {
+    sub: string;
+    email: string;
+    roles: string[];
+    permissions: string[];
+  }) {
     return {
       access_token: this.signAccessToken(payload),
-      refresh_token: await this.signRefreshToken(payload.sub, passwordHash),
+      refresh_token: await this.createRefreshSession(payload.sub),
     };
   }
 
@@ -138,15 +115,12 @@ export class AuthService {
     if (!ok) throw new UnauthorizedException();
 
     const profile = await this.buildUserPayload(user.id);
-    const tokens = await this.signTokens(
-      {
-        sub: user.id,
-        email: user.email,
-        roles: profile.roles,
-        permissions: profile.permissions,
-      },
-      user.password,
-    );
+    const tokens = await this.signTokens({
+      sub: user.id,
+      email: user.email,
+      roles: profile.roles,
+      permissions: profile.permissions,
+    });
 
     return {
       user: profile,
@@ -155,24 +129,75 @@ export class AuthService {
   }
 
   async refreshToken(refreshToken: string) {
-    try {
-      const payload = this.jwtService.verify<RefreshPayload>(refreshToken);
+    if (typeof refreshToken !== 'string' || !refreshToken) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
 
-      if (
-        payload.token_use !== 'refresh' ||
-        typeof payload.sub !== 'string' ||
-        !payload.sub ||
-        typeof payload.password_version !== 'string'
-      ) {
-        throw new UnauthorizedException('Invalid refresh token');
+    const now = new Date();
+    const nextToken = crypto.randomBytes(48).toString('base64url');
+    const rotation = await this.prisma.$transaction(async (tx) => {
+      const current = await tx.authSession.findUnique({
+        where: { tokenHash: this.hashToken(refreshToken) },
+      });
+
+      if (!current) return null;
+
+      if (current.revokedAt) {
+        // A rotated token was replayed. Revoke its current descendants too.
+        await tx.authSession.updateMany({
+          where: { familyId: current.familyId, revokedAt: null },
+          data: { revokedAt: now },
+        });
+        return null;
       }
 
-      // Rebuild authorization claims from the database so role/permission
-      // changes and account deactivation are respected on refresh.
-      const profile = await this.buildUserPayload(
-        payload.sub,
-        payload.password_version,
-      );
+      if (current.expiresAt <= now) {
+        await tx.authSession.update({
+          where: { id: current.id },
+          data: { revokedAt: now },
+        });
+        return null;
+      }
+
+      const consumed = await tx.authSession.updateMany({
+        where: {
+          id: current.id,
+          revokedAt: null,
+          expiresAt: { gt: now },
+        },
+        data: { revokedAt: now },
+      });
+      if (consumed.count !== 1) {
+        await tx.authSession.updateMany({
+          where: { familyId: current.familyId, revokedAt: null },
+          data: { revokedAt: now },
+        });
+        return null;
+      }
+
+      await tx.authSession.create({
+        data: {
+          userId: current.userId,
+          familyId: current.familyId,
+          tokenHash: this.hashToken(nextToken),
+          expiresAt: new Date(now.getTime() + REFRESH_TOKEN_TTL_MS),
+        },
+      });
+
+      return {
+        userId: current.userId,
+        familyId: current.familyId,
+        refreshToken: nextToken,
+      };
+    });
+
+    if (!rotation) {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
+    try {
+      // Rebuild authorization claims so role/permission/status changes apply.
+      const profile = await this.buildUserPayload(rotation.userId);
       if (profile.status !== 'ACTIVE') {
         throw new UnauthorizedException('Account is inactive');
       }
@@ -184,11 +209,35 @@ export class AuthService {
         permissions: profile.permissions,
       });
 
-      return { access_token };
+      return {
+        user: profile,
+        access_token,
+        refresh_token: rotation.refreshToken,
+      };
     } catch (error) {
+      await this.prisma.authSession.updateMany({
+        where: { familyId: rotation.familyId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
       if (error instanceof UnauthorizedException) throw error;
-      throw new UnauthorizedException('Invalid or expired refresh token');
+      throw error;
     }
+  }
+
+  async logout(refreshToken: string) {
+    if (typeof refreshToken === 'string' && refreshToken) {
+      const session = await this.prisma.authSession.findUnique({
+        where: { tokenHash: this.hashToken(refreshToken) },
+        select: { familyId: true },
+      });
+      if (session) {
+        await this.prisma.authSession.updateMany({
+          where: { familyId: session.familyId, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+      }
+    }
+    return { message: 'Sessão terminada.' };
   }
 
   async getProfile(userId: string) {
@@ -251,6 +300,9 @@ export class AuthService {
       this.prisma.passwordResetToken.updateMany({
         where: { userId: record.userId, usedAt: null },
         data: { usedAt: new Date() },
+      }),
+      this.prisma.authSession.deleteMany({
+        where: { userId: record.userId },
       }),
     ]);
 
