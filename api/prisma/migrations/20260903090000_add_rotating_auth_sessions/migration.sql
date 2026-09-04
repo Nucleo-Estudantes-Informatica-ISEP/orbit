@@ -1,4 +1,4 @@
--- Store only hashes of opaque refresh tokens. Each login starts a token family;
+-- Store only HMAC-SHA-256 fingerprints of opaque refresh tokens. Each login starts a token family;
 -- refresh rotates the token, while replay revokes the remaining family.
 
 CREATE TABLE "AuthSession" (

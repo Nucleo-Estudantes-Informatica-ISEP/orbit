@@ -85,7 +85,7 @@ docker compose exec api npx prisma db seed
 
 ### Compatibilidade de sessões
 
-Ao publicar o novo formato, os access tokens anteriores sem `token_use` são rejeitados no próximo pedido autenticado, mesmo que ainda não tenham expirado. Os refresh tokens JWT anteriores também são rejeitados: os refresh tokens passam a ser valores opacos num cookie `HttpOnly`, `SameSite=Strict`, cujo hash é guardado em `AuthSession`. Os utilizadores com sessões antigas terão de iniciar sessão novamente; não existe uma janela de transição de 15 minutos.
+Ao publicar o novo formato, os access tokens anteriores sem `token_use` são rejeitados no próximo pedido autenticado, mesmo que ainda não tenham expirado. Os refresh tokens JWT anteriores também são rejeitados: os refresh tokens passam a ser valores opacos num cookie `HttpOnly`, `SameSite=Strict`, cuja fingerprint HMAC-SHA-256 é guardada em `AuthSession`. Os utilizadores com sessões antigas terão de iniciar sessão novamente; não existe uma janela de transição de 15 minutos.
 
 Os access tokens têm uma validade de 15 minutos. Cada refresh token tem validade de 30 dias, roda em cada utilização e não pode ser reutilizado. A reutilização de um token já rodado revoga a respetiva família de sessão. Logout, reposição ou alteração da palavra-passe revogam os refresh tokens aplicáveis. Apenas access tokens já emitidos continuam válidos até à sua expiração.
 
@@ -220,5 +220,5 @@ orbit/
 - Apenas a porta `3090` (frontend) está exposta publicamente no Docker.
 - API, base de dados e MinIO comunicam exclusivamente pela rede interna Docker.
 - O access JWT armazena as permissões do utilizador; refresh recarrega estado, roles e permissões da base de dados. Alterações ficam efetivas no próximo refresh ou, no máximo, após os 15 minutos do access token atual.
-- Refresh tokens opacos ficam num cookie `HttpOnly`, `SameSite=Strict`; o servidor guarda apenas hashes, roda-os em cada utilização e revoga-os no logout e em alterações de password.
+- Refresh tokens opacos ficam num cookie `HttpOnly`, `SameSite=Strict`; o servidor guarda apenas fingerprints HMAC-SHA-256, roda-os em cada utilização e revoga-os no logout e em alterações de password.
 - Seguimento de segurança: adicionar rate limiting a `/auth/login` e `/auth/refresh`, tendo em conta o proxy Next.js e eventuais réplicas da API. Ainda não existe limitação de pedidos nestes endpoints.

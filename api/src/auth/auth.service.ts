@@ -22,8 +22,10 @@ export class AuthService {
     private mailService: MailService,
   ) {}
 
-  private hashToken(token: string) {
-    return crypto.createHash('sha256').update(token).digest('hex');
+  private fingerprintOpaqueToken(token: string) {
+    const secret =
+      process.env.REFRESH_TOKEN_SECRET || process.env.JWT_SECRET || 'secret';
+    return crypto.createHmac('sha256', secret).update(token).digest('hex');
   }
 
   private async buildUserPayload(userId: string) {
@@ -87,7 +89,7 @@ export class AuthService {
       data: {
         userId,
         familyId,
-        tokenHash: this.hashToken(refreshToken),
+        tokenHash: this.fingerprintOpaqueToken(refreshToken),
         expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
       },
     });
@@ -138,7 +140,7 @@ export class AuthService {
     const nextToken = crypto.randomBytes(48).toString('base64url');
     const rotation = await this.prisma.$transaction(async (tx) => {
       const current = await tx.authSession.findUnique({
-        where: { tokenHash: this.hashToken(refreshToken) },
+        where: { tokenHash: this.fingerprintOpaqueToken(refreshToken) },
       });
 
       if (!current) return null;
@@ -185,7 +187,7 @@ export class AuthService {
         data: {
           userId: current.userId,
           familyId: current.familyId,
-          tokenHash: this.hashToken(nextToken),
+          tokenHash: this.fingerprintOpaqueToken(nextToken),
           expiresAt: new Date(now.getTime() + REFRESH_TOKEN_TTL_MS),
         },
       });
@@ -233,7 +235,7 @@ export class AuthService {
   async logout(refreshToken: string) {
     if (typeof refreshToken === 'string' && refreshToken) {
       const session = await this.prisma.authSession.findUnique({
-        where: { tokenHash: this.hashToken(refreshToken) },
+        where: { tokenHash: this.fingerprintOpaqueToken(refreshToken) },
         select: { familyId: true },
       });
       if (session) {
@@ -269,7 +271,7 @@ export class AuthService {
     await this.prisma.passwordResetToken.create({
       data: {
         userId: user.id,
-        tokenHash: this.hashToken(rawToken),
+        tokenHash: this.fingerprintOpaqueToken(rawToken),
         expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
       },
     });
@@ -286,7 +288,7 @@ export class AuthService {
 
   async resetPassword(token: string, newPassword: string) {
     const record = await this.prisma.passwordResetToken.findUnique({
-      where: { tokenHash: this.hashToken(token) },
+      where: { tokenHash: this.fingerprintOpaqueToken(token) },
     });
 
     if (!record || record.usedAt || record.expiresAt < new Date()) {
