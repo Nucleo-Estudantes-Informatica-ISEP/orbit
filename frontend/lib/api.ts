@@ -3,9 +3,10 @@ export const AUTH_SESSION_EVENT = 'orbit-auth-session';
 
 interface SessionResponse {
   access_token: string;
-  refresh_token: string;
   user: unknown;
 }
+
+const SESSION_MARKER = 'auth_session';
 
 export class ApiError extends Error {
   readonly status: number;
@@ -22,9 +23,9 @@ function getToken(): string | null {
   return localStorage.getItem('auth_token');
 }
 
-function getRefreshToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('auth_refresh_token');
+export function hasStoredSession(): boolean {
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem(SESSION_MARKER) !== null;
 }
 
 function notifySessionChange() {
@@ -36,16 +37,18 @@ function notifySessionChange() {
 export function clearStoredSession() {
   if (typeof window === 'undefined') return;
   localStorage.removeItem('auth_token');
-  localStorage.removeItem('auth_refresh_token');
   localStorage.removeItem('auth_user');
+  localStorage.removeItem(SESSION_MARKER);
   notifySessionChange();
 }
 
 export function storeSession(session: SessionResponse) {
   if (typeof window === 'undefined') return;
   localStorage.setItem('auth_token', session.access_token);
-  localStorage.setItem('auth_refresh_token', session.refresh_token);
   localStorage.setItem('auth_user', JSON.stringify(session.user));
+  if (!localStorage.getItem(SESSION_MARKER)) {
+    localStorage.setItem(SESSION_MARKER, crypto.randomUUID());
+  }
   notifySessionChange();
 }
 
@@ -62,12 +65,10 @@ function clearAuthAndRedirect(): never {
 }
 
 export function revokeStoredSession() {
-  const refreshToken = getRefreshToken();
-  if (refreshToken) {
+  if (hasStoredSession()) {
     void fetch(`${API_BASE}/auth/logout`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: refreshToken }),
+      credentials: 'include',
       keepalive: true,
     }).catch(() => {});
   }
@@ -76,20 +77,16 @@ export function revokeStoredSession() {
 
 let refreshPromise: Promise<string> | null = null;
 
-async function exchangeRefreshToken(observedRefreshToken: string): Promise<string> {
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) clearAuthAndRedirect();
+async function exchangeRefreshToken(observedAccessToken: string | null, sessionMarker: string): Promise<string> {
+  if (localStorage.getItem(SESSION_MARKER) !== sessionMarker) clearAuthAndRedirect();
 
   // Another tab may have completed rotation while this one waited for the lock.
-  if (refreshToken !== observedRefreshToken) {
-    const currentAccessToken = getToken();
-    if (currentAccessToken) return currentAccessToken;
-  }
+  const currentAccessToken = getToken();
+  if (currentAccessToken && currentAccessToken !== observedAccessToken) return currentAccessToken;
 
   const res = await fetch(`${API_BASE}/auth/refresh`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refresh_token: refreshToken }),
+    credentials: 'include',
   });
 
   if (res.status === 401 || res.status === 403) clearAuthAndRedirect();
@@ -99,8 +96,13 @@ async function exchangeRefreshToken(observedRefreshToken: string): Promise<strin
   }
 
   const data = (await res.json()) as Partial<SessionResponse>;
-  if (!data.access_token || !data.refresh_token || !data.user) {
+  if (!data.access_token || !data.user) {
     clearAuthAndRedirect();
+  }
+
+  // Logout/session replacement while refresh was in flight must win.
+  if (localStorage.getItem(SESSION_MARKER) !== sessionMarker) {
+    throw new Error('Session changed during refresh');
   }
 
   storeSession(data as SessionResponse);
@@ -118,10 +120,11 @@ export async function refreshAccessToken(): Promise<string> {
   }
   if (refreshPromise) return refreshPromise;
 
-  const observedRefreshToken = getRefreshToken();
-  if (!observedRefreshToken) clearAuthAndRedirect();
+  const sessionMarker = localStorage.getItem(SESSION_MARKER);
+  if (!sessionMarker) clearAuthAndRedirect();
+  const observedAccessToken = getToken();
 
-  const rotate = () => exchangeRefreshToken(observedRefreshToken);
+  const rotate = () => exchangeRefreshToken(observedAccessToken, sessionMarker);
   const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
   const lockedRotation = locks
     ? locks.request<Promise<string>>('orbit-auth-refresh', rotate).then((token) => token)
@@ -134,26 +137,28 @@ export async function refreshAccessToken(): Promise<string> {
   return promise;
 }
 
-async function fetchWithAccessToken(path: string, options: RequestInit, token: string | null): Promise<Response> {
-  return fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options.headers ?? {}),
-    },
-  });
+async function authenticatedFetch(path: string, options: RequestInit = {}, json = false): Promise<Response> {
+  const request = async (token: string | null) => {
+    const headers = new Headers(options.headers);
+    if (json && !headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/json');
+    }
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+    else headers.delete('Authorization');
+
+    return fetch(`${API_BASE}${path}`, { ...options, headers });
+  };
+
+  let response = await request(getToken());
+  if (response.status === 401) {
+    response = await request(await refreshAccessToken());
+  }
+  if (response.status === 401) clearAuthAndRedirect();
+  return response;
 }
 
 export async function apiFetch<T = unknown>(path: string, options: RequestInit = {}): Promise<T> {
-  let res = await fetchWithAccessToken(path, options, getToken());
-
-  if (res.status === 401) {
-    const newToken = await refreshAccessToken();
-    res = await fetchWithAccessToken(path, options, newToken);
-  }
-
-  if (res.status === 401) clearAuthAndRedirect();
+  const res = await authenticatedFetch(path, options, true);
 
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
@@ -183,31 +188,12 @@ export function resolveFileUrl(value: string | null | undefined): string | undef
   return value;
 }
 
-async function authorizedBinaryFetch(path: string, options: RequestInit = {}): Promise<Response> {
-  const request = async (token: string | null) =>
-    fetch(`${API_BASE}${path}`, {
-      ...options,
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(options.headers ?? {}),
-      },
-    });
-
-  let res = await request(getToken());
-  if (res.status === 401) {
-    const newToken = await refreshAccessToken();
-    res = await request(newToken);
-  }
-  if (res.status === 401) clearAuthAndRedirect();
-  return res;
-}
-
 export async function fetchFileBlob(key: string, signal?: AbortSignal): Promise<Blob> {
   const parts = key.split('/');
   if (!key || parts.some((part) => part === '.' || part === '..')) {
     throw new Error('Invalid file key');
   }
-  const res = await authorizedBinaryFetch(`/files/${parts.map(encodeURIComponent).join('/')}`, {
+  const res = await authenticatedFetch(`/files/${parts.map(encodeURIComponent).join('/')}`, {
     signal,
     cache: 'no-store',
   });
@@ -222,7 +208,7 @@ export const api = {
   put: <T = unknown>(path: string, body: unknown) => apiFetch<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
   del: <T = unknown>(path: string) => apiFetch<T>(path, { method: 'DELETE' }),
   downloadPdf: async (path: string, filename: string) => {
-    const res = await authorizedBinaryFetch(path);
+    const res = await authenticatedFetch(path);
     if (!res.ok) throw new Error(`Download failed: HTTP ${res.status}`);
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
@@ -237,7 +223,7 @@ export const api = {
   upload: async <T = unknown>(path: string, file: File): Promise<T> => {
     const formData = new FormData();
     formData.append('file', file);
-    const res = await authorizedBinaryFetch(path, {
+    const res = await authenticatedFetch(path, {
       method: 'POST',
       // Do NOT set Content-Type — browser sets multipart boundary automatically
       body: formData,

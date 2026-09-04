@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { API_BASE, apiFetch, fetchFileBlob, getFileUrl, resolveFileUrl } from '../lib/api.ts';
+import { API_BASE, apiFetch, clearStoredSession, fetchFileBlob, getFileUrl, resolveFileUrl } from '../lib/api.ts';
 
 test('authenticated files', async (t) => {
   const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
@@ -36,8 +36,8 @@ test('authenticated files', async (t) => {
   });
   const reset = () => {
     storage.set('auth_token', 'expired');
-    storage.set('auth_refresh_token', 'refresh-token');
     storage.set('auth_user', '{}');
+    storage.set('auth_session', 'session-marker');
     redirects.length = 0;
   };
 
@@ -61,10 +61,10 @@ test('authenticated files', async (t) => {
     t.mock.method(globalThis, 'fetch', async (url, options) => {
       if (url === `${API_BASE}/auth/refresh`) {
         refreshes++;
-        assert.equal(JSON.parse(options.body).refresh_token, 'refresh-token');
+        assert.equal(options.credentials, 'include');
+        assert.equal(options.body, undefined);
         return Response.json({
           access_token: 'fresh',
-          refresh_token: 'rotated-refresh-token',
           user: { id: 'user-1' },
         });
       }
@@ -87,7 +87,7 @@ test('authenticated files', async (t) => {
     assert.equal(fileRequests.length, 4);
     assert.equal(fileRequests.at(-1).url, `${API_BASE}/files/folder/CV%20%26%20file.pdf`);
     assert.equal(storage.get('auth_token'), 'fresh');
-    assert.equal(storage.get('auth_refresh_token'), 'rotated-refresh-token');
+    assert.equal(storage.get('auth_session'), 'session-marker');
   });
 
   await t.test('revoked refresh tokens clear the session and redirect', async (t) => {
@@ -132,10 +132,35 @@ test('authenticated files', async (t) => {
         });
         await assert.rejects(apiFetch('/recoverable'));
         assert.equal(storage.get('auth_token'), 'expired');
-        assert.equal(storage.get('auth_refresh_token'), 'refresh-token');
+        assert.equal(storage.get('auth_session'), 'session-marker');
         assert.deepEqual(redirects, []);
       });
     }
+  });
+
+  await t.test('logout wins over an in-flight refresh response', async (t) => {
+    reset();
+    let releaseRefresh;
+    const refreshResponse = new Promise((resolve) => {
+      releaseRefresh = resolve;
+    });
+    let refreshStarted;
+    const started = new Promise((resolve) => {
+      refreshStarted = resolve;
+    });
+    t.mock.method(globalThis, 'fetch', async (url) => {
+      if (url.endsWith('/files/cv.pdf')) return new Response(null, { status: 401 });
+      refreshStarted();
+      return refreshResponse;
+    });
+
+    const request = fetchFileBlob('cv.pdf');
+    await started;
+    clearStoredSession();
+    releaseRefresh(Response.json({ access_token: 'resurrected', user: { id: 'user-1' } }));
+
+    await assert.rejects(request, /Session changed during refresh/);
+    assert.equal(storage.size, 0);
   });
 
   await t.test('cancellation is forwarded and traversal is rejected without fetching', async (t) => {

@@ -12,6 +12,7 @@ import * as crypto from 'crypto';
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 const ACCESS_TOKEN_TTL = '15m';
 const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const ROTATION_RACE_GRACE_MS = 10_000;
 
 @Injectable()
 export class AuthService {
@@ -143,11 +144,18 @@ export class AuthService {
       if (!current) return null;
 
       if (current.revokedAt) {
-        // A rotated token was replayed. Revoke its current descendants too.
-        await tx.authSession.updateMany({
-          where: { familyId: current.familyId, revokedAt: null },
-          data: { revokedAt: now },
-        });
+        // A near-simultaneous duplicate may have read the old browser cookie
+        // before rotation completed. Reject it without invalidating the winner.
+        // Replays outside this narrow race window revoke the token family.
+        if (
+          now.getTime() - current.revokedAt.getTime() >
+          ROTATION_RACE_GRACE_MS
+        ) {
+          await tx.authSession.updateMany({
+            where: { familyId: current.familyId, revokedAt: null },
+            data: { revokedAt: now },
+          });
+        }
         return null;
       }
 
@@ -168,10 +176,8 @@ export class AuthService {
         data: { revokedAt: now },
       });
       if (consumed.count !== 1) {
-        await tx.authSession.updateMany({
-          where: { familyId: current.familyId, revokedAt: null },
-          data: { revokedAt: now },
-        });
+        // Lost a concurrent conditional consume. The winning request owns the
+        // successor; do not revoke it as if this duplicate were a late replay.
         return null;
       }
 

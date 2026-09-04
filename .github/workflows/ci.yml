@@ -68,11 +68,11 @@ jobs:
       - name: Unit tests
         run: npm test -- --runInBand
 
-      - name: End-to-end smoke test
-        run: npm run test:e2e -- --runInBand
-
       - name: Apply migrations to an isolated database
         run: npx prisma migrate deploy
+
+      - name: End-to-end tests
+        run: npm run test:e2e -- --runInBand
 
       - name: Production build
         run: npm run build

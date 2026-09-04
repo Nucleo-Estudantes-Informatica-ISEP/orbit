@@ -192,7 +192,7 @@ describe('AuthService sessions', () => {
     ).toBeCloseTo(30 * 24 * 60 * 60 * 1000, -3);
   });
 
-  it('rotates refresh tokens and revokes the family when an old token is replayed', async () => {
+  it('rotates refresh tokens, tolerates request races, and revokes late replays', async () => {
     const login = await auth.authenticate(user.email, 'old-password');
     user.userRoles[0].role.permissions = [SystemPermission.USERS_UPDATE];
 
@@ -207,10 +207,15 @@ describe('AuthService sessions', () => {
     await expect(auth.refreshToken(login.refresh_token)).rejects.toThrow(
       'Invalid or expired refresh token',
     );
-    expect(sessions.every((session) => session.revokedAt)).toBe(true);
-    await expect(auth.refreshToken(refreshed.refresh_token)).rejects.toThrow(
-      UnauthorizedException,
+    await expect(
+      auth.refreshToken(refreshed.refresh_token),
+    ).resolves.toHaveProperty('refresh_token');
+
+    sessions[0].revokedAt = new Date(Date.now() - 11_000);
+    await expect(auth.refreshToken(login.refresh_token)).rejects.toThrow(
+      'Invalid or expired refresh token',
     );
+    expect(sessions.every((session) => session.revokedAt)).toBe(true);
   });
 
   it('revokes refresh sessions after resets and user password changes', async () => {

@@ -4,8 +4,10 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import {
   API_BASE,
   AUTH_SESSION_EVENT,
+  ApiError,
   apiFetch,
   clearStoredSession,
+  hasStoredSession,
   revokeStoredSession,
   storeSession,
 } from '@/lib/api';
@@ -38,10 +40,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const storedToken = localStorage.getItem('auth_token');
     const storedUser = localStorage.getItem('auth_user');
-    const storedRefreshToken = localStorage.getItem('auth_refresh_token');
 
     const restoreSession = async () => {
-      if (!storedToken && !storedRefreshToken) {
+      if (!storedToken && !hasStoredSession()) {
         clearStoredSession();
         setIsLoading(false);
         return;
@@ -65,6 +66,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setToken(null);
             setUser(null);
           }
+        } else if (error instanceof ApiError && error.status >= 500) {
+          // Server failure is not proof that credentials are invalid. Keep the
+          // session marker/token but fail closed on cached permissions.
+          setToken(localStorage.getItem('auth_token'));
+          setUser(null);
         } else {
           clearStoredSession();
           setToken(null);
@@ -103,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email, password }),
       });
 
@@ -111,9 +118,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const data = await response.json();
-      const { user: userData, access_token, refresh_token } = data;
+      const { user: userData, access_token } = data;
 
-      storeSession({ access_token, refresh_token, user: userData });
+      storeSession({ access_token, user: userData });
 
       setToken(access_token);
       setUser(userData);
