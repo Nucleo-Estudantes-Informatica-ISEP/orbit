@@ -25,6 +25,9 @@ export class AuthService {
   private fingerprintOpaqueToken(token: string) {
     const secret =
       process.env.REFRESH_TOKEN_SECRET || process.env.JWT_SECRET || 'secret';
+    // Tokens are 384-bit random values, not passwords; a fast keyed lookup
+    // fingerprint is intentional so the database can enforce uniqueness.
+    // codeql[js/insufficient-password-hash]
     return crypto.createHmac('sha256', secret).update(token).digest('hex');
   }
 
