@@ -1,0 +1,182 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { API_BASE, apiFetch, clearStoredSession, fetchFileBlob, getFileUrl, resolveFileUrl } from '../lib/api.ts';
+
+test('authenticated files', async (t) => {
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  const originalStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  const storage = new Map();
+  const redirects = [];
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: {
+      getItem: (key) => storage.get(key) ?? null,
+      setItem: (key, value) => storage.set(key, value),
+      removeItem: (key) => storage.delete(key),
+    },
+  });
+  Object.defineProperty(globalThis, 'window', {
+    configurable: true,
+    value: {
+      dispatchEvent: () => true,
+      location: {
+        origin: 'https://orbit.test',
+        assign: (url) => redirects.push(String(url)),
+      },
+    },
+  });
+  t.after(() => {
+    for (const [name, descriptor] of [
+      ['window', originalWindow],
+      ['localStorage', originalStorage],
+    ]) {
+      if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+      else delete globalThis[name];
+    }
+  });
+  const reset = () => {
+    storage.set('auth_token', 'expired');
+    storage.set('auth_user', '{}');
+    storage.set('auth_session', 'session-marker');
+    redirects.length = 0;
+  };
+
+  await t.test('links stay token-free and preserve external URLs', () => {
+    reset();
+    const key = 'folder/CV & photo.png';
+    const url = getFileUrl(key);
+    storage.set('auth_token', 'replacement');
+    assert.equal(getFileUrl(key), url);
+    assert.equal(new URL(url, window.location.origin).searchParams.get('key'), key);
+    assert.equal(resolveFileUrl(`${API_BASE}/files/cv.pdf?token=old#page=1`), '/file?key=cv.pdf');
+    assert.equal(resolveFileUrl('cv.pdf'), '/file?key=cv.pdf');
+    assert.equal(resolveFileUrl('https://external.test/cv.pdf'), 'https://external.test/cv.pdf');
+    assert.equal(resolveFileUrl(null), undefined);
+  });
+
+  await t.test('expired image and PDF requests share a refresh and retry with the new token', async (t) => {
+    reset();
+    let refreshes = 0;
+    const fileRequests = [];
+    t.mock.method(globalThis, 'fetch', async (url, options) => {
+      if (url === `${API_BASE}/auth/refresh`) {
+        refreshes++;
+        assert.equal(options.credentials, 'include');
+        assert.equal(options.body, undefined);
+        return Response.json({
+          access_token: 'fresh',
+          user: { id: 'user-1' },
+        });
+      }
+      const authorization = new Headers(options.headers).get('Authorization');
+      fileRequests.push({ url, authorization });
+      assert.equal(new URL(url, window.location.origin).search, '');
+      if (authorization === 'Bearer expired') return new Response(null, { status: 401 });
+      assert.equal(authorization, 'Bearer fresh');
+      return new Response('file bytes', {
+        headers: {
+          'Content-Type': url.endsWith('.png') ? 'image/png' : 'application/pdf',
+        },
+      });
+    });
+    const [image, pdf] = await Promise.all([fetchFileBlob('photo.png'), fetchFileBlob('folder/CV & file.pdf')]);
+    assert.equal(image.type, 'image/png');
+    assert.equal(pdf.type, 'application/pdf');
+    assert.equal(await pdf.text(), 'file bytes');
+    assert.equal(refreshes, 1);
+    assert.equal(fileRequests.length, 4);
+    assert.equal(fileRequests.at(-1).url, `${API_BASE}/files/folder/CV%20%26%20file.pdf`);
+    assert.equal(storage.get('auth_token'), 'fresh');
+    assert.equal(storage.get('auth_session'), 'session-marker');
+  });
+
+  await t.test('revoked refresh tokens clear the session and redirect', async (t) => {
+    reset();
+    t.mock.method(globalThis, 'fetch', async () => new Response(null, { status: 401 }));
+    await assert.rejects(fetchFileBlob('cv.pdf'), /Sessão expirada/);
+    assert.equal(storage.size, 0);
+    assert.deepEqual(redirects, ['https://orbit.test/login']);
+  });
+
+  await t.test('missing files do not refresh or clear authentication', async (t) => {
+    reset();
+    const fetch = t.mock.method(globalThis, 'fetch', async () => new Response(null, { status: 404 }));
+    await assert.rejects(fetchFileBlob('missing.pdf'), /HTTP 404/);
+    assert.equal(fetch.mock.callCount(), 1);
+    assert.equal(storage.size, 3);
+    assert.deepEqual(redirects, []);
+  });
+
+  await t.test('403 responses do not refresh or clear authentication', async (t) => {
+    reset();
+    const fetch = t.mock.method(globalThis, 'fetch', async () => new Response('forbidden', { status: 403 }));
+    await assert.rejects(apiFetch('/forbidden'), (error) => error.status === 403);
+    assert.equal(fetch.mock.callCount(), 1);
+    assert.equal(storage.size, 3);
+    assert.deepEqual(redirects, []);
+  });
+
+  await t.test('refresh network and server failures preserve the recoverable session', async (t) => {
+    for (const [name, refreshFailure] of [
+      ['network failure', new TypeError('offline')],
+      ['server failure', new Response('unavailable', { status: 503 })],
+    ]) {
+      await t.test(name, async (t) => {
+        reset();
+        let calls = 0;
+        t.mock.method(globalThis, 'fetch', async () => {
+          calls++;
+          if (calls === 1) return new Response(null, { status: 401 });
+          if (refreshFailure instanceof Error) throw refreshFailure;
+          return refreshFailure;
+        });
+        await assert.rejects(apiFetch('/recoverable'));
+        assert.equal(storage.get('auth_token'), 'expired');
+        assert.equal(storage.get('auth_session'), 'session-marker');
+        assert.deepEqual(redirects, []);
+      });
+    }
+  });
+
+  await t.test('logout wins over an in-flight refresh response', async (t) => {
+    reset();
+    let releaseRefresh;
+    const refreshResponse = new Promise((resolve) => {
+      releaseRefresh = resolve;
+    });
+    let refreshStarted;
+    const started = new Promise((resolve) => {
+      refreshStarted = resolve;
+    });
+    t.mock.method(globalThis, 'fetch', async (url) => {
+      if (url.endsWith('/files/cv.pdf')) return new Response(null, { status: 401 });
+      refreshStarted();
+      return refreshResponse;
+    });
+
+    const request = fetchFileBlob('cv.pdf');
+    await started;
+    clearStoredSession();
+    releaseRefresh(Response.json({ access_token: 'resurrected', user: { id: 'user-1' } }));
+
+    await assert.rejects(request, /Session changed during refresh/);
+    assert.equal(storage.size, 0);
+  });
+
+  await t.test('cancellation is forwarded and traversal is rejected without fetching', async (t) => {
+    reset();
+    const controller = new AbortController();
+    controller.abort();
+    const fetch = t.mock.method(globalThis, 'fetch', async (_url, options) => {
+      assert.equal(options.signal, controller.signal);
+      options.signal.throwIfAborted();
+    });
+    await assert.rejects(fetchFileBlob('photo.png', controller.signal), {
+      name: 'AbortError',
+    });
+    for (const key of ['', '..', '../auth/me', 'folder/../photo.png']) {
+      await assert.rejects(fetchFileBlob(key), /Invalid file key/);
+    }
+    assert.equal(fetch.mock.callCount(), 1);
+  });
+});

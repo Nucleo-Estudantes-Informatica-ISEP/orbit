@@ -1,7 +1,16 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { API_BASE } from '@/lib/api';
+import {
+  API_BASE,
+  AUTH_SESSION_EVENT,
+  ApiError,
+  apiFetch,
+  clearStoredSession,
+  hasStoredSession,
+  revokeStoredSession,
+  storeSession,
+} from '@/lib/api';
 
 export interface User {
   id: string;
@@ -33,41 +42,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const storedUser = localStorage.getItem('auth_user');
 
     const restoreSession = async () => {
-      if (!storedToken) {
+      if (!storedToken && !hasStoredSession()) {
+        clearStoredSession();
         setIsLoading(false);
         return;
       }
 
-      setToken(storedToken);
+      if (storedToken) setToken(storedToken);
 
       try {
-        const response = await fetch(`${API_BASE}/auth/me`, {
-          headers: { Authorization: `Bearer ${storedToken}` },
-        });
-
-        if (!response.ok) {
-          // Server explicitly rejected the token (401/403/404) — session is invalid.
-          // Do NOT fall back to stale localStorage data; force a clean re-login.
-          localStorage.removeItem('auth_token');
-          localStorage.removeItem('auth_user');
+        const freshUser = await apiFetch<User>('/auth/me');
+        localStorage.setItem('auth_user', JSON.stringify(freshUser));
+        setToken(localStorage.getItem('auth_token'));
+        setUser(freshUser);
+      } catch (error) {
+        // Only a transport failure may temporarily retain cached identity.
+        // HTTP errors and invalid JSON must never restore stale permissions.
+        if (error instanceof TypeError && localStorage.getItem('auth_token') && storedUser) {
+          try {
+            setUser(JSON.parse(storedUser) as User);
+          } catch {
+            clearStoredSession();
+            setToken(null);
+            setUser(null);
+          }
+        } else if (error instanceof ApiError && error.status >= 500) {
+          // Server failure is not proof that credentials are invalid. Keep the
+          // session marker/token but fail closed on cached permissions.
+          setToken(localStorage.getItem('auth_token'));
+          setUser(null);
+        } else {
+          clearStoredSession();
           setToken(null);
           setUser(null);
-          setIsLoading(false);
-          return;
-        }
-
-        const freshUser = await response.json();
-        localStorage.setItem('auth_user', JSON.stringify(freshUser));
-        setUser(freshUser);
-      } catch {
-        // Network / parse error — server may be temporarily unreachable.
-        // Use stale data as a best-effort fallback only when the server couldn't respond at all.
-        if (storedUser) {
-          setUser(JSON.parse(storedUser));
-        } else {
-          localStorage.removeItem('auth_token');
-          localStorage.removeItem('auth_user');
-          setToken(null);
         }
       } finally {
         setIsLoading(false);
@@ -75,6 +82,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     void restoreSession();
+
+    const syncSession = () => {
+      const currentToken = localStorage.getItem('auth_token');
+      const currentUser = localStorage.getItem('auth_user');
+      setToken(currentToken);
+      try {
+        setUser(currentUser ? (JSON.parse(currentUser) as User) : null);
+      } catch {
+        clearStoredSession();
+        setToken(null);
+        setUser(null);
+      }
+    };
+    window.addEventListener(AUTH_SESSION_EVENT, syncSession);
+    window.addEventListener('storage', syncSession);
+    return () => {
+      window.removeEventListener(AUTH_SESSION_EVENT, syncSession);
+      window.removeEventListener('storage', syncSession);
+    };
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -83,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email, password }),
       });
 
@@ -93,9 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await response.json();
       const { user: userData, access_token } = data;
 
-      // Store token and user
-      localStorage.setItem('auth_token', access_token);
-      localStorage.setItem('auth_user', JSON.stringify(userData));
+      storeSession({ access_token, user: userData });
 
       setToken(access_token);
       setUser(userData);
@@ -105,14 +130,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('auth_user');
+    revokeStoredSession();
     setToken(null);
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, logout, isAuthenticated: !!token }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        isLoading,
+        login,
+        logout,
+        isAuthenticated: !!token,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

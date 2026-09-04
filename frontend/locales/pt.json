@@ -688,6 +688,8 @@
   "files.size": "Tamanho",
   "files.lastModified": "Última modificação",
   "files.download": "Descarregar",
+  "files.loadError": "Não foi possível carregar este ficheiro.",
+  "files.retry": "Tentar novamente",
   "files.delete": "Eliminar",
   "files.deleteConfirm": "Tens a certeza que queres eliminar este ficheiro?",
   "files.deleted": "Ficheiro eliminado com sucesso"

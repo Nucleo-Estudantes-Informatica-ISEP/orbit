@@ -120,14 +120,14 @@ enum SystemPermission {
   DEBTS_READ
   DEBTS_UPDATE
   DEBTS_DELETE
-   AUDITS_READ
-   INCIDENTS_VIEW
-   INCIDENTS_CREATE
-   INCIDENTS_READ
-   INCIDENTS_UPDATE
-   INCIDENTS_DELETE
-   CAN_BE_DELETED
- }
+  AUDITS_READ
+  INCIDENTS_VIEW
+  INCIDENTS_CREATE
+  INCIDENTS_READ
+  INCIDENTS_UPDATE
+  INCIDENTS_DELETE
+  CAN_BE_DELETED
+}
 
 enum IncidentPriority {
   LOW
@@ -161,8 +161,8 @@ enum DebtStatus {
 }
 
 model Department {
-  id                      String                       @id @default(uuid())
-  name                    String                       @unique
+  id                      String                      @id @default(uuid())
+  name                    String                      @unique
   description             String?
   users                   User[]
   boardDepartments        BoardDepartment[]
@@ -171,39 +171,54 @@ model Department {
   announcementDepartments AnnouncementDepartment[]
   resourceDepartments     ResourceDepartment[]
   inventoryItems          InventoryItem[]
-  plans                   Plan[]                       @relation("PlanDepartment")
+  plans                   Plan[]                      @relation("PlanDepartment")
   incidents               Incident[]
   candidateChoices        CandidateDepartmentChoice[]
-  createdAt               DateTime                     @default(now())
-  updatedAt               DateTime                     @updatedAt
+  createdAt               DateTime                    @default(now())
+  updatedAt               DateTime                    @updatedAt
 }
 
 model User {
-  id                   String                  @id @default(uuid())
-  name                 String
-  email                String                  @unique
-  password             String
-  status               UserStatus              @default(ACTIVE)
-  departmentId         String
-  department           Department              @relation(fields: [departmentId], references: [id], onDelete: Restrict)
-  userRoles            UserRole[]
-  userSettings         UserSettings?
-  taskAssignees        TaskAssignee[]
-  projectMembers       ProjectMember[]
-  announcementsTarget        Announcement[]          @relation("AnnouncementTarget")
-  announcementsCreated        Announcement[]          @relation("AnnouncementCreatedBy")
-  recruitmentComments         RecruitmentComment[]    @relation("RecruitmentCommentCreatedBy")
-  notifications        Notification[]          @relation("NotificationTarget")
-  auditLogs            AuditLog[]              @relation("AuditLogPerformedBy")
-  inventoryPurchased   InventoryItem[]         @relation("InventoryPurchasedBy")
-  plansCreated         Plan[]                  @relation("PlanCreatedBy")
-  plansApproved        Plan[]                  @relation("PlanApprovedBy")
-  debtsCreated         Debt[]                  @relation("DebtCreatedBy")
-  incidentsCreated     Incident[]              @relation("IncidentCreatedBy")
+  id                      String               @id @default(uuid())
+  name                    String
+  email                   String               @unique
+  password                String
+  status                  UserStatus           @default(ACTIVE)
+  departmentId            String
+  department              Department           @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  userRoles               UserRole[]
+  userSettings            UserSettings?
+  taskAssignees           TaskAssignee[]
+  projectMembers          ProjectMember[]
+  announcementsTarget     Announcement[]       @relation("AnnouncementTarget")
+  announcementsCreated    Announcement[]       @relation("AnnouncementCreatedBy")
+  recruitmentComments     RecruitmentComment[] @relation("RecruitmentCommentCreatedBy")
+  notifications           Notification[]       @relation("NotificationTarget")
+  auditLogs               AuditLog[]           @relation("AuditLogPerformedBy")
+  inventoryPurchased      InventoryItem[]      @relation("InventoryPurchasedBy")
+  plansCreated            Plan[]               @relation("PlanCreatedBy")
+  plansApproved           Plan[]               @relation("PlanApprovedBy")
+  debtsCreated            Debt[]               @relation("DebtCreatedBy")
+  incidentsCreated        Incident[]           @relation("IncidentCreatedBy")
   incidentCommentsCreated IncidentComment[]    @relation("IncidentCommentCreatedBy")
-  passwordResetTokens  PasswordResetToken[]
-  createdAt            DateTime                @default(now())
-  updatedAt            DateTime                @updatedAt
+  passwordResetTokens     PasswordResetToken[]
+  authSessions            AuthSession[]
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+}
+
+model AuthSession {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  familyId  String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([familyId])
 }
 
 model PasswordResetToken {
@@ -243,21 +258,21 @@ model UserSettings {
   userId             String   @unique
   user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   darkMode           Boolean  @default(false)
-  emailNotifications  Boolean  @default(true)
-  inAppNotifications  Boolean  @default(true)
+  emailNotifications Boolean  @default(true)
+  inAppNotifications Boolean  @default(true)
   language           String   @default("en")
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 }
 
 model Board {
-  id              String            @id @default(uuid())
-  name            String
-  description     String?
+  id               String            @id @default(uuid())
+  name             String
+  description      String?
   boardDepartments BoardDepartment[]
-  tasks           Task[]
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  tasks            Task[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 }
 
 model BoardDepartment {
@@ -270,17 +285,17 @@ model BoardDepartment {
 }
 
 model Project {
-  id             String           @id @default(uuid())
+  id             String          @id @default(uuid())
   departmentId   String
-  department     Department       @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  department     Department      @relation(fields: [departmentId], references: [id], onDelete: Restrict)
   name           String
   description    String?
-  status         ProjectStatus    @default(PLANNING)
+  status         ProjectStatus   @default(PLANNING)
   deadline       DateTime?
   tasks          Task[]
   projectMembers ProjectMember[]
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 }
 
 model ProjectMember {
@@ -311,25 +326,25 @@ model Task {
 model TaskAssignee {
   taskId String
   userId String
-  task   Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([taskId, userId])
 }
 
 model Candidate {
-  id                String                       @id @default(uuid())
+  id                String                      @id @default(uuid())
   name              String
   email             String
   course            String?
   year              Int?
   cvUrl             String?
   notes             String?
-  stage             RecruitmentStage             @default(RECEIVED)
+  stage             RecruitmentStage            @default(RECEIVED)
   comments          RecruitmentComment[]
   departmentChoices CandidateDepartmentChoice[]
-  createdAt         DateTime                     @default(now())
-  updatedAt         DateTime                     @updatedAt
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
 }
 
 model CandidateDepartmentChoice {
@@ -355,20 +370,20 @@ model RecruitmentComment {
 }
 
 model Announcement {
-  id                      String                    @id @default(uuid())
+  id                      String                   @id @default(uuid())
   createdById             String?
-  createdBy               User?                     @relation("AnnouncementCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy               User?                    @relation("AnnouncementCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   targetUserId            String?
-  targetUser              User?                     @relation("AnnouncementTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  targetUser              User?                    @relation("AnnouncementTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
   title                   String
   content                 String
-  type                    String                    @default("ANNOUNCEMENT")
-  visibility              Visibility                @default(PUBLIC)
-  read                    Boolean                   @default(false)
-  pinned                  Boolean                   @default(false)
+  type                    String                   @default("ANNOUNCEMENT")
+  visibility              Visibility               @default(PUBLIC)
+  read                    Boolean                  @default(false)
+  pinned                  Boolean                  @default(false)
   announcementDepartments AnnouncementDepartment[]
-  createdAt               DateTime                  @default(now())
-  updatedAt               DateTime                  @updatedAt
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
 }
 
 model AnnouncementDepartment {
@@ -381,15 +396,15 @@ model AnnouncementDepartment {
 }
 
 model Resource {
-  id                   String                 @id @default(uuid())
-  title                String
-  url                  String
-  category             String?
-  description          String?
-  visibility           Visibility             @default(PUBLIC)
-  resourceDepartments  ResourceDepartment[]
-  createdAt            DateTime               @default(now())
-  updatedAt            DateTime               @updatedAt
+  id                  String               @id @default(uuid())
+  title               String
+  url                 String
+  category            String?
+  description         String?
+  visibility          Visibility           @default(PUBLIC)
+  resourceDepartments ResourceDepartment[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
 }
 
 model ResourceDepartment {
@@ -480,9 +495,9 @@ model Plan {
 }
 
 model Debt {
-  id               String    @id @default(uuid())
+  id               String     @id @default(uuid())
   description      String
-  value            Decimal   @db.Decimal(10, 2)
+  value            Decimal    @db.Decimal(10, 2)
   type             DebtType
   status           DebtStatus @default(PENDING)
   occurredAt       DateTime   @default(now())
@@ -491,30 +506,30 @@ model Debt {
   debtorContact    String?
   creditorName     String?
   creditorContact  String?
-  fileKeys         String[]  @default([])
-  receivingAccount String?   @db.VarChar(64)
-  depositAccount   String?   @db.VarChar(64)
+  fileKeys         String[]   @default([])
+  receivingAccount String?    @db.VarChar(64)
+  depositAccount   String?    @db.VarChar(64)
   createdById      String?
-  createdBy        User?     @relation("DebtCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  createdBy        User?      @relation("DebtCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
 }
 
 model Incident {
-  id           String           @id @default(uuid())
+  id           String            @id @default(uuid())
   name         String
   description  String
-  occurredAt   DateTime         @default(now())
+  occurredAt   DateTime          @default(now())
   departmentId String?
-  department   Department?      @relation(fields: [departmentId], references: [id])
-  priority     IncidentPriority @default(MEDIUM)
-  status       IncidentStatus   @default(OPEN)
-  fileKeys     String[]         @default([])
+  department   Department?       @relation(fields: [departmentId], references: [id])
+  priority     IncidentPriority  @default(MEDIUM)
+  status       IncidentStatus    @default(OPEN)
+  fileKeys     String[]          @default([])
   createdById  String?
-  createdBy    User?            @relation("IncidentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy    User?             @relation("IncidentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   comments     IncidentComment[]
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
 }
 
 model IncidentComment {

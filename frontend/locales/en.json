@@ -688,6 +688,8 @@
   "files.size": "Size",
   "files.lastModified": "Last modified",
   "files.download": "Download",
+  "files.loadError": "Could not load this file.",
+  "files.retry": "Try again",
   "files.delete": "Delete",
   "files.deleteConfirm": "Are you sure you want to delete this file?",
   "files.deleted": "File deleted successfully"
