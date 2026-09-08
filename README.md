@@ -11,7 +11,7 @@ Sistema interno da **NEI-ISEP** (Núcleo de Estudantes de Informática do ISEP) 
 | Backend | NestJS 11 · Prisma 6 · PostgreSQL 16 |
 | Frontend | Next.js 16 · React 19 · Tailwind CSS 4 · shadcn/ui |
 | Ficheiros | MinIO (armazenamento interno) |
-| Auth | Access JWT (15 min) + Refresh Token rotativo (7d) · bcrypt · RBAC por permissões |
+| Auth | Access JWT (15 min) + Refresh Token opaco rotativo (30 dias) · bcrypt · RBAC por permissões |
 | Drag & Drop | @dnd-kit |
 | Editor de texto | Tiptap |
 
@@ -82,6 +82,12 @@ docker compose exec api npx prisma db seed
 ---
 
 ## Produção
+
+### Compatibilidade de sessões
+
+Ao publicar o novo formato, os access tokens anteriores sem `token_use` são rejeitados no próximo pedido autenticado, mesmo que ainda não tenham expirado. Os refresh tokens JWT anteriores também são rejeitados: os refresh tokens passam a ser valores opacos num cookie `HttpOnly`, `SameSite=Strict`, cuja fingerprint HMAC-SHA-256 é guardada em `AuthSession`. Os utilizadores com sessões antigas terão de iniciar sessão novamente; não existe uma janela de transição de 15 minutos.
+
+Os access tokens têm uma validade de 15 minutos. Cada refresh token tem validade de 30 dias, roda em cada utilização e não pode ser reutilizado. A reutilização de um token já rodado revoga a respetiva família de sessão. Logout, reposição ou alteração da palavra-passe revogam os refresh tokens aplicáveis. Apenas access tokens já emitidos continuam válidos até à sua expiração.
 
 ### Seed de produção
 
@@ -215,7 +221,9 @@ orbit/
 
 - Apenas a porta `3090` (frontend) está exposta publicamente no Docker.
 - API, base de dados e MinIO comunicam exclusivamente pela rede interna Docker.
-- O access JWT armazena permissões e identidade. O refresh recarrega o perfil/permissões atuais e roda os dois tokens; alterações deixam de exigir um login completo.
+- O access JWT armazena permissões e identidade. O refresh recarrega o perfil/permissões atuais e roda os tokens; alterações deixam de exigir um login completo.
+- Refresh tokens opacos ficam num cookie `HttpOnly`, `SameSite=Strict`; o servidor guarda apenas fingerprints HMAC-SHA-256, roda-os em cada utilização e revoga-os no logout e em alterações de password.
+- Seguimento de segurança: adicionar rate limiting a `/auth/login` e `/auth/refresh`, tendo em conta o proxy Next.js e eventuais réplicas da API. Ainda não existe limitação de pedidos nestes endpoints.
 
 ---
 

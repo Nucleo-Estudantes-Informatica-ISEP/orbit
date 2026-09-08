@@ -11,15 +11,8 @@ import * as crypto from 'crypto';
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 const ACCESS_TOKEN_TTL = '15m';
-const REFRESH_TOKEN_TTL = '7d';
-
-interface RefreshPayload {
-  sub: string;
-  email: string;
-  type: 'refresh';
-  roles?: string[];
-  permissions?: string[];
-}
+const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const ROTATION_RACE_GRACE_MS = 10_000;
 
 @Injectable()
 export class AuthService {
@@ -29,8 +22,13 @@ export class AuthService {
     private mailService: MailService,
   ) {}
 
-  private hashToken(token: string) {
-    return crypto.createHash('sha256').update(token).digest('hex');
+  private fingerprintOpaqueToken(token: string) {
+    const secret =
+      process.env.REFRESH_TOKEN_SECRET || process.env.JWT_SECRET || 'secret';
+    // Tokens are 384-bit random values, not passwords; a fast keyed lookup
+    // fingerprint is intentional so the database can enforce uniqueness.
+    // codeql[js/insufficient-password-hash]
+    return crypto.createHmac('sha256', secret).update(token).digest('hex');
   }
 
   private async buildUserPayload(userId: string) {
@@ -45,8 +43,11 @@ export class AuthService {
       },
     });
 
-    if (!user || user.status !== 'ACTIVE') {
+    if (!user) {
       throw new UnauthorizedException('User not found');
+    }
+    if (user.status !== 'ACTIVE') {
+      throw new UnauthorizedException('Account is inactive');
     }
 
     const permissions = Array.from(
@@ -60,21 +61,56 @@ export class AuthService {
     return { ...rest, roles, permissions };
   }
 
-  private signTokens(payload: {
+  async validateUser(email: string, pass: string) {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) return null;
+    if (user.status !== 'ACTIVE') return null;
+    const match = await bcrypt.compare(pass, user.password);
+    if (match) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { password, ...rest } = user;
+      return rest;
+    }
+    return null;
+  }
+
+  private signAccessToken(payload: {
+    sub: string;
+    email: string;
+    roles: string[];
+    permissions: string[];
+  }) {
+    return this.jwtService.sign(
+      { ...payload, token_use: 'access' },
+      { expiresIn: ACCESS_TOKEN_TTL },
+    );
+  }
+
+  private async createRefreshSession(
+    userId: string,
+    familyId = crypto.randomUUID(),
+  ) {
+    const refreshToken = crypto.randomBytes(48).toString('base64url');
+    await this.prisma.authSession.create({
+      data: {
+        userId,
+        familyId,
+        tokenHash: this.fingerprintOpaqueToken(refreshToken),
+        expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
+      },
+    });
+    return refreshToken;
+  }
+
+  private async signTokens(payload: {
     sub: string;
     email: string;
     roles: string[];
     permissions: string[];
   }) {
     return {
-      access_token: this.jwtService.sign(
-        { ...payload, type: 'access' },
-        { expiresIn: ACCESS_TOKEN_TTL },
-      ),
-      refresh_token: this.jwtService.sign(
-        { ...payload, type: 'refresh' },
-        { expiresIn: REFRESH_TOKEN_TTL },
-      ),
+      access_token: this.signAccessToken(payload),
+      refresh_token: await this.createRefreshSession(payload.sub),
     };
   }
 
@@ -88,7 +124,7 @@ export class AuthService {
     if (!ok) throw new UnauthorizedException();
 
     const profile = await this.buildUserPayload(user.id);
-    const tokens = this.signTokens({
+    const tokens = await this.signTokens({
       sub: user.id,
       email: user.email,
       roles: profile.roles,
@@ -102,27 +138,120 @@ export class AuthService {
   }
 
   async refreshToken(refreshToken: string) {
-    try {
-      const payload = this.jwtService.verify<RefreshPayload>(refreshToken);
-      if (payload.type !== 'refresh') {
-        throw new UnauthorizedException('Invalid refresh token type');
+    if (typeof refreshToken !== 'string' || !refreshToken) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    const now = new Date();
+    const nextToken = crypto.randomBytes(48).toString('base64url');
+    const rotation = await this.prisma.$transaction(async (tx) => {
+      const current = await tx.authSession.findUnique({
+        where: { tokenHash: this.fingerprintOpaqueToken(refreshToken) },
+      });
+
+      if (!current) return null;
+
+      if (current.revokedAt) {
+        // A near-simultaneous duplicate may have read the old browser cookie
+        // before rotation completed. Reject it without invalidating the winner.
+        // Replays outside this narrow race window revoke the token family.
+        if (
+          now.getTime() - current.revokedAt.getTime() >
+          ROTATION_RACE_GRACE_MS
+        ) {
+          await tx.authSession.updateMany({
+            where: { familyId: current.familyId, revokedAt: null },
+            data: { revokedAt: now },
+          });
+        }
+        return null;
       }
 
-      // Reload status, roles, and permissions on every rotation so revoked
-      // access takes effect within one access-token lifetime.
-      const profile = await this.buildUserPayload(payload.sub);
+      if (current.expiresAt <= now) {
+        await tx.authSession.update({
+          where: { id: current.id },
+          data: { revokedAt: now },
+        });
+        return null;
+      }
+
+      const consumed = await tx.authSession.updateMany({
+        where: {
+          id: current.id,
+          revokedAt: null,
+          expiresAt: { gt: now },
+        },
+        data: { revokedAt: now },
+      });
+      if (consumed.count !== 1) {
+        // Lost a concurrent conditional consume. The winning request owns the
+        // successor; do not revoke it as if this duplicate were a late replay.
+        return null;
+      }
+
+      await tx.authSession.create({
+        data: {
+          userId: current.userId,
+          familyId: current.familyId,
+          tokenHash: this.fingerprintOpaqueToken(nextToken),
+          expiresAt: new Date(now.getTime() + REFRESH_TOKEN_TTL_MS),
+        },
+      });
+
       return {
-        user: profile,
-        ...this.signTokens({
-          sub: profile.id,
-          email: profile.email,
-          roles: profile.roles,
-          permissions: profile.permissions,
-        }),
+        userId: current.userId,
+        familyId: current.familyId,
+        refreshToken: nextToken,
       };
-    } catch {
+    });
+
+    if (!rotation) {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
+
+    try {
+      // Rebuild authorization claims so role/permission/status changes apply.
+      const profile = await this.buildUserPayload(rotation.userId);
+      if (profile.status !== 'ACTIVE') {
+        throw new UnauthorizedException('Account is inactive');
+      }
+
+      const access_token = this.signAccessToken({
+        sub: profile.id,
+        email: profile.email,
+        roles: profile.roles,
+        permissions: profile.permissions,
+      });
+
+      return {
+        user: profile,
+        access_token,
+        refresh_token: rotation.refreshToken,
+      };
+    } catch (error) {
+      await this.prisma.authSession.updateMany({
+        where: { familyId: rotation.familyId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      if (error instanceof UnauthorizedException) throw error;
+      throw error;
+    }
+  }
+
+  async logout(refreshToken: string) {
+    if (typeof refreshToken === 'string' && refreshToken) {
+      const session = await this.prisma.authSession.findUnique({
+        where: { tokenHash: this.fingerprintOpaqueToken(refreshToken) },
+        select: { familyId: true },
+      });
+      if (session) {
+        await this.prisma.authSession.updateMany({
+          where: { familyId: session.familyId, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+      }
+    }
+    return { message: 'Sessão terminada.' };
   }
 
   async getProfile(userId: string) {
@@ -148,7 +277,7 @@ export class AuthService {
     }
 
     if (!(await bcrypt.compare(currentPassword, user.password))) {
-      throw new UnauthorizedException('Current password is incorrect');
+      throw new BadRequestException('Current password is incorrect');
     }
 
     const password = await bcrypt.hash(newPassword, 10);
@@ -160,6 +289,9 @@ export class AuthService {
       this.prisma.passwordResetToken.updateMany({
         where: { userId, usedAt: null },
         data: { usedAt: new Date() },
+      }),
+      this.prisma.authSession.deleteMany({
+        where: { userId },
       }),
     ]);
 
@@ -187,7 +319,7 @@ export class AuthService {
     await this.prisma.passwordResetToken.create({
       data: {
         userId: user.id,
-        tokenHash: this.hashToken(rawToken),
+        tokenHash: this.fingerprintOpaqueToken(rawToken),
         expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
       },
     });
@@ -204,7 +336,7 @@ export class AuthService {
 
   async resetPassword(token: string, newPassword: string) {
     const record = await this.prisma.passwordResetToken.findUnique({
-      where: { tokenHash: this.hashToken(token) },
+      where: { tokenHash: this.fingerprintOpaqueToken(token) },
     });
 
     if (!record || record.usedAt || record.expiresAt < new Date()) {
@@ -224,6 +356,9 @@ export class AuthService {
       this.prisma.passwordResetToken.updateMany({
         where: { userId: record.userId, usedAt: null },
         data: { usedAt: new Date() },
+      }),
+      this.prisma.authSession.deleteMany({
+        where: { userId: record.userId },
       }),
     ]);
 

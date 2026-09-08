@@ -16,6 +16,7 @@ import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
 import {
   ApiCreatedResponse,
+  ApiExtraModels,
   ApiOkResponse,
   ApiTags,
   getSchemaPath,
@@ -30,6 +31,7 @@ import { UpdateEventDto } from './dto/update-event.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 
 @ApiTags('events')
+@ApiExtraModels(PaginatedEventResponseDto)
 @ApiProtectedController()
 @Controller('events')
 @UseGuards(JwtAuthGuard, PermissionsGuard)

@@ -16,6 +16,7 @@ import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
 import {
   ApiCreatedResponse,
+  ApiExtraModels,
   ApiOkResponse,
   ApiTags,
   getSchemaPath,
@@ -31,6 +32,7 @@ import { UpdateAnnouncementDto } from './dto/update-announcement.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 
 @ApiTags('announcements')
+@ApiExtraModels(PaginatedAnnouncementResponseDto)
 @ApiProtectedController()
 @Controller('announcements')
 @UseGuards(JwtAuthGuard, PermissionsGuard)

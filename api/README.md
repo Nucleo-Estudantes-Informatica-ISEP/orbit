@@ -16,11 +16,11 @@ Provide the variables documented by the root compose/configuration, including `D
 ## Authentication contract
 
 - Access tokens expire after 15 minutes and contain an access-token type claim.
-- Refresh tokens expire after 7 days, contain a refresh-token type claim, and rotate both tokens.
+- Refresh sessions expire after 30 days. Their opaque tokens rotate on every use, live only in an `HttpOnly`, `SameSite=Strict` cookie, and are stored server-side only as keyed fingerprints.
 - Refresh reloads the member's current profile and permissions from the database.
-- Guards reject token-type confusion.
+- Guards accept only access JWTs as bearer credentials; refresh values are not JWTs.
 - Mutation/audit actor identity is always derived from the authenticated JWT; request DTOs must not accept actor IDs.
-- `/auth/me` permits only the documented self-service profile fields. Password changes verify the current password.
+- `/auth/me` permits only the documented self-service profile fields. Password changes verify the current password and revoke every refresh session for that member.
 
 ## Contract and tests
 

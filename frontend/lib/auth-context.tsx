@@ -1,13 +1,22 @@
-'use client';
+"use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
 import {
   API_BASE,
   AUTH_SESSION_EVENT,
+  ApiError,
   apiFetch,
   clearStoredSession,
+  hasStoredSession,
+  revokeStoredSession,
   storeSession,
-} from '@/lib/api';
+} from "@/lib/api";
 
 export interface User {
   id: string;
@@ -36,28 +45,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Restore token and user from localStorage on mount
   useEffect(() => {
-    const storedToken = localStorage.getItem('auth_token');
-    const storedUser = localStorage.getItem('auth_user');
+    const storedToken = localStorage.getItem("auth_token");
+    const storedUser = localStorage.getItem("auth_user");
 
     const restoreSession = async () => {
-      if (!storedToken) {
+      if (!storedToken && !hasStoredSession()) {
+        clearStoredSession();
         setIsLoading(false);
         return;
       }
 
-      setToken(storedToken);
+      if (storedToken) setToken(storedToken);
 
       try {
-        const freshUser = await apiFetch<User>('/auth/me');
-        localStorage.setItem('auth_user', JSON.stringify(freshUser));
+        const freshUser = await apiFetch<User>("/auth/me");
+        localStorage.setItem("auth_user", JSON.stringify(freshUser));
+        setToken(localStorage.getItem("auth_token"));
         setUser(freshUser);
       } catch (error) {
-        // Fetch rejects with TypeError when no HTTP response was received.
-        // Only that case may use cached identity; server errors and invalid
-        // responses must not restore stale roles or permissions.
+        // Only a transport failure may temporarily retain cached identity.
+        // HTTP errors and invalid JSON must never restore stale permissions.
         if (
           error instanceof TypeError &&
-          localStorage.getItem('auth_token') &&
+          localStorage.getItem("auth_token") &&
           storedUser
         ) {
           try {
@@ -67,6 +77,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setToken(null);
             setUser(null);
           }
+        } else if (error instanceof ApiError && error.status >= 500) {
+          // Server failure is not proof that credentials are invalid. Keep the
+          // session marker/token but fail closed on cached permissions.
+          setToken(localStorage.getItem("auth_token"));
+          setUser(null);
         } else {
           clearStoredSession();
           setToken(null);
@@ -80,33 +95,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void restoreSession();
 
     const syncSession = () => {
-      const currentToken = localStorage.getItem('auth_token');
-      const currentUser = localStorage.getItem('auth_user');
+      const currentToken = localStorage.getItem("auth_token");
+      const currentUser = localStorage.getItem("auth_user");
       setToken(currentToken);
-      setUser(currentUser ? (JSON.parse(currentUser) as User) : null);
+      try {
+        setUser(currentUser ? (JSON.parse(currentUser) as User) : null);
+      } catch {
+        clearStoredSession();
+        setToken(null);
+        setUser(null);
+      }
     };
     window.addEventListener(AUTH_SESSION_EVENT, syncSession);
-    return () => window.removeEventListener(AUTH_SESSION_EVENT, syncSession);
+    window.addEventListener("storage", syncSession);
+    return () => {
+      window.removeEventListener(AUTH_SESSION_EVENT, syncSession);
+      window.removeEventListener("storage", syncSession);
+    };
   }, []);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
       const response = await fetch(`${API_BASE}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ email, password }),
       });
 
       if (!response.ok) {
-        throw new Error('Login failed');
+        throw new Error("Login failed");
       }
 
       const data = await response.json();
-      const { user: userData, access_token, refresh_token } = data;
+      const { user: userData, access_token } = data;
 
-      // Store token and user
-      storeSession({ access_token, refresh_token, user: userData });
+      storeSession({ access_token, user: userData });
 
       setToken(access_token);
       setUser(userData);
@@ -116,19 +141,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
-    clearStoredSession();
+    revokeStoredSession();
     setToken(null);
     setUser(null);
   };
 
   const refreshProfile = async () => {
-    const freshUser = await apiFetch<User>('/auth/me');
-    localStorage.setItem('auth_user', JSON.stringify(freshUser));
+    const freshUser = await apiFetch<User>("/auth/me");
+    localStorage.setItem("auth_user", JSON.stringify(freshUser));
     setUser(freshUser);
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, logout, refreshProfile, isAuthenticated: !!token }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        isLoading,
+        login,
+        logout,
+        refreshProfile,
+        isAuthenticated: !!token,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -137,7 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 }

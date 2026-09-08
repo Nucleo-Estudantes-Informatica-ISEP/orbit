@@ -14,6 +14,7 @@ import {
 } from './request.dto';
 import { CreateAnnouncementDto } from '../announcements/dto/create-announcement.dto';
 import { CreateEventDto } from '../events/dto/create-event.dto';
+import { UpdateUserDto } from '../users/dto/update-user.dto';
 
 describe('request DTO contracts', () => {
   it.each([
@@ -29,6 +30,7 @@ describe('request DTO contracts', () => {
     [CreateIncidentDto, { name: 'Outage', description: 'API unavailable' }],
     [UpdateUserSettingsDto, { darkMode: true, language: 'pt' }],
     [PaginationQueryDto, { page: '2', pageSize: '50' }],
+    [UpdateUserDto, { roles: ['USER'] }],
     [
       CreateAnnouncementDto,
       { title: 'Update', content: 'Message', description: 'Fallback' },

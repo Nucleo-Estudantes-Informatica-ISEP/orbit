@@ -65,11 +65,12 @@ describe('checked-in OpenAPI contract', () => {
     const publicPaths = new Set([
       '/auth/login',
       '/auth/refresh',
+      '/auth/logout',
       '/auth/forgot-password',
       '/auth/reset-password',
       '/health',
     ]);
-    for (const { path, operation } of operations.filter(
+    for (const { operation } of operations.filter(
       ({ path }) => !publicPaths.has(path),
     )) {
       expect(operation.security).toEqual([{ bearer: [] }]);
@@ -88,6 +89,18 @@ describe('checked-in OpenAPI contract', () => {
       expect(
         document.components.schemas[schemaName]?.additionalProperties,
       ).toBe(false);
+    }
+  });
+
+  it('resolves every internal schema reference', () => {
+    const serialized = JSON.stringify(document);
+    const schemaReferences = [
+      ...serialized.matchAll(/#\/components\/schemas\/([^"/]+)/g),
+    ].map((match) => match[1]);
+
+    expect(schemaReferences.length).toBeGreaterThan(0);
+    for (const schemaName of schemaReferences) {
+      expect(document.components.schemas[schemaName]).toBeDefined();
     }
   });
 });

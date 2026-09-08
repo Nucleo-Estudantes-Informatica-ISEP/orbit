@@ -1,16 +1,36 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ResourcesService } from './resources.service';
 import { CreateResourceDto } from './dto/create-resource.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
-import { ApiCreatedResponse, ApiOkResponse, ApiTags, getSchemaPath } from '@nestjs/swagger';
+import {
+  ApiCreatedResponse,
+  ApiExtraModels,
+  ApiOkResponse,
+  ApiTags,
+  getSchemaPath,
+} from '@nestjs/swagger';
 import { IdParamDto, ResourceQueryDto } from '../contracts/request.dto';
-import { PaginatedResourceResponseDto, ResourceResponseDto } from '../contracts/response.dto';
+import {
+  PaginatedResourceResponseDto,
+  ResourceResponseDto,
+} from '../contracts/response.dto';
 import { ApiProtectedController } from '../contracts/openapi.decorators';
 import { UpdateResourceDto } from './dto/update-resource.dto';
 
 @ApiTags('resources')
+@ApiExtraModels(PaginatedResourceResponseDto)
 @ApiProtectedController()
 @Controller('resources')
 @UseGuards(JwtAuthGuard, PermissionsGuard)

@@ -20,7 +20,10 @@ import {
   ProjectMemberParamDto,
   UpdateProjectDto,
 } from '../contracts/request.dto';
-import { ProjectResponseDto } from '../contracts/response.dto';
+import {
+  ProjectMemberResponseDto,
+  ProjectResponseDto,
+} from '../contracts/response.dto';
 import { ApiProtectedController } from '../contracts/openapi.decorators';
 import { CurrentUser } from '../auth/current-user.decorator';
 
@@ -71,14 +74,14 @@ export class ProjectsController {
 
   @Post(':id/members')
   @Permissions('PROJECTS_UPDATE')
-  @ApiCreatedResponse({ type: ProjectResponseDto })
+  @ApiCreatedResponse({ type: ProjectMemberResponseDto })
   addMember(@Param() params: IdParamDto, @Body() body: ProjectMemberDto) {
     return this.svc.addMember(params.id, body.userId);
   }
 
   @Delete(':id/members/:userId')
   @Permissions('PROJECTS_UPDATE')
-  @ApiOkResponse({ type: ProjectResponseDto })
+  @ApiOkResponse({ type: ProjectMemberResponseDto })
   removeMember(@Param() params: ProjectMemberParamDto) {
     return this.svc.removeMember(params.id, params.userId);
   }

@@ -5,6 +5,8 @@ import {
   HttpCode,
   Post,
   Put,
+  Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
@@ -21,7 +23,7 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { LoginDto, RefreshTokenDto } from '../contracts/request.dto';
+import { LoginDto } from '../contracts/request.dto';
 import {
   AuthTokensResponseDto,
   ErrorResponseDto,
@@ -29,6 +31,36 @@ import {
   SessionUserResponseDto,
 } from '../contracts/response.dto';
 import { CurrentUser } from './current-user.decorator';
+import type { Request, Response } from 'express';
+
+const REFRESH_COOKIE = 'orbit_refresh';
+const REFRESH_COOKIE_PATH = '/auth';
+const REFRESH_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
+function readRefreshCookie(request: Request): string {
+  const cookies = request.headers.cookie?.split(';') ?? [];
+  for (const cookie of cookies) {
+    const [name, ...value] = cookie.trim().split('=');
+    if (name === REFRESH_COOKIE) {
+      try {
+        return decodeURIComponent(value.join('='));
+      } catch {
+        return '';
+      }
+    }
+  }
+  return '';
+}
+
+function setRefreshCookie(response: Response, token: string) {
+  response.cookie(REFRESH_COOKIE, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: REFRESH_COOKIE_PATH,
+    maxAge: REFRESH_COOKIE_MAX_AGE_MS,
+  });
+}
 
 @ApiTags('auth')
 @Controller('auth')
@@ -39,16 +71,47 @@ export class AuthController {
   @ApiCreatedResponse({ type: AuthTokensResponseDto })
   @ApiBadRequestResponse({ type: ErrorResponseDto })
   @ApiUnauthorizedResponse({ type: ErrorResponseDto })
-  async login(@Body() body: LoginDto) {
-    return this.authService.authenticate(body.email, body.password);
+  async login(
+    @Body() body: LoginDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const { refresh_token, ...session } = await this.authService.authenticate(
+      body.email,
+      body.password,
+    );
+    setRefreshCookie(response, refresh_token);
+    return session;
   }
 
   @Post('refresh')
   @ApiCreatedResponse({ type: AuthTokensResponseDto })
-  @ApiBadRequestResponse({ type: ErrorResponseDto })
   @ApiUnauthorizedResponse({ type: ErrorResponseDto })
-  async refresh(@Body() body: RefreshTokenDto) {
-    return this.authService.refreshToken(body.refresh_token);
+  async refresh(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const { refresh_token, ...session } = await this.authService.refreshToken(
+      readRefreshCookie(request),
+    );
+    setRefreshCookie(response, refresh_token);
+    return session;
+  }
+
+  @Post('logout')
+  @HttpCode(200)
+  @ApiOkResponse({ type: MessageResponseDto })
+  async logout(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.authService.logout(readRefreshCookie(request));
+    response.clearCookie(REFRESH_COOKIE, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: REFRESH_COOKIE_PATH,
+    });
+    return result;
   }
 
   @Post('forgot-password')

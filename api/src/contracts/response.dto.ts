@@ -219,7 +219,9 @@ export class ProjectResponseDto extends TimestampedResponseDto {
   @ApiPropertyOptional({ nullable: true })
   description?: string | null;
 
-  @ApiProperty({ enum: ['PLANNING', 'ACTIVE', 'ON_HOLD', 'COMPLETED', 'CANCELLED'] })
+  @ApiProperty({
+    enum: ['PLANNING', 'ACTIVE', 'ON_HOLD', 'COMPLETED', 'CANCELLED'],
+  })
   status: string;
 
   @ApiPropertyOptional({ format: 'date-time', nullable: true })
@@ -271,7 +273,9 @@ export class CandidateResponseDto extends TimestampedResponseDto {
   @ApiPropertyOptional({ nullable: true })
   notes?: string | null;
 
-  @ApiProperty({ enum: ['RECEIVED', 'SCREENING', 'INTERVIEW', 'OFFER', 'HIRED', 'REJECTED'] })
+  @ApiProperty({
+    enum: ['RECEIVED', 'SCREENING', 'INTERVIEW', 'OFFER', 'HIRED', 'REJECTED'],
+  })
   stage: string;
 
   @ApiPropertyOptional({ type: [CandidateDepartmentChoiceResponseDto] })
@@ -557,7 +561,9 @@ export class IncidentResponseDto extends TimestampedResponseDto {
   @ApiProperty({ enum: ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] })
   priority: string;
 
-  @ApiProperty({ enum: ['OPEN', 'ANALYZING', 'RESOLVING', 'RESOLVED', 'CLOSED'] })
+  @ApiProperty({
+    enum: ['OPEN', 'ANALYZING', 'RESOLVING', 'RESOLVED', 'CLOSED'],
+  })
   status: string;
 
   @ApiProperty({ type: [String] })
@@ -627,9 +633,6 @@ export class PaginatedFileResponseDto extends PaginatedResponseDto {
 export class AuthTokensResponseDto {
   @ApiProperty()
   access_token: string;
-
-  @ApiProperty()
-  refresh_token: string;
 
   @ApiProperty({ type: SessionUserResponseDto })
   user: SessionUserResponseDto;

@@ -33,7 +33,7 @@ const ROUTE_ENTITY_MAP: Record<string, string> = {
 };
 
 const MUTATING_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
-const SKIP_PATHS = ['/auth/login', '/auth/refresh'];
+const SKIP_PATHS = ['/auth/login', '/auth/refresh', '/auth/logout'];
 
 function extractEntity(path: string): string | null {
   const parts = path.split('/').filter(Boolean);

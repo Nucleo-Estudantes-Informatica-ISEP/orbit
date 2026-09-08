@@ -133,16 +133,12 @@
           "access_token": {
             "type": "string"
           },
-          "refresh_token": {
-            "type": "string"
-          },
           "user": {
             "$ref": "#/components/schemas/SessionUserResponseDto"
           }
         },
         "required": [
           "access_token",
-          "refresh_token",
           "user"
         ],
         "type": "object"
@@ -1517,11 +1513,89 @@
         ],
         "type": "object"
       },
+      "PaginatedAnnouncementResponseDto": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AnnouncementResponseDto"
+            },
+            "type": "array"
+          },
+          "page": {
+            "type": "number"
+          },
+          "pageSize": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "type": "object"
+      },
+      "PaginatedEventResponseDto": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EventResponseDto"
+            },
+            "type": "array"
+          },
+          "page": {
+            "type": "number"
+          },
+          "pageSize": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "type": "object"
+      },
       "PaginatedFileResponseDto": {
         "properties": {
           "items": {
             "items": {
               "$ref": "#/components/schemas/StoredFileResponseDto"
+            },
+            "type": "array"
+          },
+          "page": {
+            "type": "number"
+          },
+          "pageSize": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "type": "object"
+      },
+      "PaginatedResourceResponseDto": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceResponseDto"
             },
             "type": "array"
           },
@@ -1745,18 +1819,6 @@
           "candidateId",
           "content",
           "createdAt"
-        ],
-        "type": "object"
-      },
-      "RefreshTokenDto": {
-        "additionalProperties": false,
-        "properties": {
-          "refresh_token": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "refresh_token"
         ],
         "type": "object"
       },
@@ -2663,7 +2725,6 @@
           },
           "roles": {
             "items": {
-              "format": "uuid",
               "type": "string"
             },
             "type": "array"
@@ -3980,6 +4041,27 @@
         ]
       }
     },
+    "/auth/logout": {
+      "post": {
+        "operationId": "Auth_logout",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/auth/me": {
       "get": {
         "operationId": "Auth_me",
@@ -4074,32 +4156,12 @@
       "post": {
         "operationId": "Auth_refresh",
         "parameters": [],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RefreshTokenDto"
-              }
-            }
-          },
-          "required": true
-        },
         "responses": {
           "201": {
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AuthTokensResponseDto"
-                }
-              }
-            },
-            "description": ""
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
                 }
               }
             },
@@ -9445,7 +9507,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ProjectResponseDto"
+                  "$ref": "#/components/schemas/ProjectMemberResponseDto"
                 }
               }
             },
@@ -9540,7 +9602,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ProjectResponseDto"
+                  "$ref": "#/components/schemas/ProjectMemberResponseDto"
                 }
               }
             },

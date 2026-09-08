@@ -20,27 +20,50 @@ import { Permissions } from '../auth/permissions.decorator';
 import { MinioService } from './minio.service';
 import { randomUUID } from 'crypto';
 import * as path from 'path';
-import { ApiBody, ApiConsumes, ApiCreatedResponse, ApiOkResponse, ApiProduces, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiConsumes,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiProduces,
+  ApiTags,
+} from '@nestjs/swagger';
 import { FileKeyParamDto, PaginationQueryDto } from '../contracts/request.dto';
-import { FileResponseDto, MessageResponseDto, PaginatedFileResponseDto } from '../contracts/response.dto';
+import {
+  FileResponseDto,
+  MessageResponseDto,
+  PaginatedFileResponseDto,
+} from '../contracts/response.dto';
 import { ApiProtectedController } from '../contracts/openapi.decorators';
 
 const INLINE_TYPES = new Set([
-  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
-  'application/pdf', 'text/plain', 'text/html',
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'application/pdf',
+  'text/plain',
 ]);
 
 function mimeFromExt(ext: string): string {
   const map: Record<string, string> = {
-    '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
-    '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml',
-    '.pdf': 'application/pdf', '.txt': 'text/plain',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+    '.svg': 'image/svg+xml',
+    '.pdf': 'application/pdf',
+    '.txt': 'text/plain',
     '.doc': 'application/msword',
-    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    '.docx':
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     '.xls': 'application/vnd.ms-excel',
-    '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    '.xlsx':
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     '.ppt': 'application/vnd.ms-powerpoint',
-    '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    '.pptx':
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     '.zip': 'application/zip',
   };
   return map[ext.toLowerCase()] ?? 'application/octet-stream';
@@ -56,13 +79,15 @@ export class FilesController {
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions('FILES_VIEW')
   @ApiOkResponse({ type: PaginatedFileResponseDto })
-  async list(
-    @Query() query: PaginationQueryDto,
-  ) {
+  async list(@Query() query: PaginationQueryDto) {
     const page = query.page ?? 1;
     const pageSize = Math.min(100, query.pageSize ?? 20);
-    const all = (await this.minioService.listObjects()).filter((f) => f.name && f.lastModified) as { name: string; size: number; lastModified: Date }[];
-    const sorted = all.sort((a, b) => b.lastModified.getTime() - a.lastModified.getTime());
+    const all = (await this.minioService.listObjects()).filter(
+      (f) => f.name && f.lastModified,
+    ) as { name: string; size: number; lastModified: Date }[];
+    const sorted = all.sort(
+      (a, b) => b.lastModified.getTime() - a.lastModified.getTime(),
+    );
     const total = sorted.length;
     const items = sorted.slice((page - 1) * pageSize, page * pageSize);
     return { items, total, page, pageSize };
@@ -130,9 +155,15 @@ export class FilesController {
         (stat.metaData?.['Content-Type'] as string | undefined) ??
         mimeFromExt(ext);
 
-      const disposition = INLINE_TYPES.has(contentType) ? 'inline' : 'attachment';
+      const disposition = INLINE_TYPES.has(contentType)
+        ? 'inline'
+        : 'attachment';
       res.setHeader('Content-Type', contentType);
-      res.setHeader('Content-Disposition', `${disposition}; filename="${path.basename(params.key)}"`);
+      res.setHeader(
+        'Content-Disposition',
+        `${disposition}; filename="${path.basename(params.key)}"`,
+      );
+      res.setHeader('X-Content-Type-Options', 'nosniff');
       res.setHeader('Cache-Control', 'private, max-age=3600');
       if (stat.size) res.setHeader('Content-Length', stat.size);
       stream.pipe(res);

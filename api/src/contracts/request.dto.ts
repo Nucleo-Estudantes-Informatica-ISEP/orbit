@@ -52,7 +52,12 @@ export class CandidateIdParamDto {
   candidateId: string;
 }
 
+function normalizeWildcardKey(value: unknown): unknown {
+  return Array.isArray(value) ? value.join('/') : value;
+}
+
 export class FileKeyParamDto {
+  @Transform(({ value }: { value: unknown }) => normalizeWildcardKey(value))
   @IsString()
   @IsNotEmpty()
   @MaxLength(1024)
@@ -87,12 +92,6 @@ export class LoginDto {
   @IsString()
   @IsNotEmpty()
   password: string;
-}
-
-export class RefreshTokenDto {
-  @IsString()
-  @IsNotEmpty()
-  refresh_token: string;
 }
 
 export class CreateBoardDto {

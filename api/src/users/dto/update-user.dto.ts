@@ -1,4 +1,12 @@
-import { IsEmail, IsOptional, IsString, IsArray, IsEnum, IsUUID, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsOptional,
+  IsString,
+  IsArray,
+  IsEnum,
+  IsUUID,
+  MinLength,
+} from 'class-validator';
 import { UserStatus } from '@prisma/client';
 
 export class UpdateUserDto {
@@ -21,7 +29,7 @@ export class UpdateUserDto {
 
   @IsOptional()
   @IsArray()
-  @IsUUID(undefined, { each: true })
+  @IsString({ each: true })
   roles?: string[];
 
   @IsOptional()
