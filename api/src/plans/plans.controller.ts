@@ -15,7 +15,18 @@ import { Permissions } from '../auth/permissions.decorator';
 import { PlansService } from './plans.service';
 import { CreatePlanDto } from './dto/create-plan.dto';
 import { UpdatePlanDto } from './dto/update-plan.dto';
+import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import {
+  IdParamDto,
+  PlanDecisionDto,
+  PlanQueryDto,
+} from '../contracts/request.dto';
+import { PlanResponseDto } from '../contracts/response.dto';
+import { ApiProtectedController } from '../contracts/openapi.decorators';
+import { CurrentUser } from '../auth/current-user.decorator';
 
+@ApiTags('plans')
+@ApiProtectedController()
 @Controller('plans')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class PlansController {
@@ -23,46 +34,54 @@ export class PlansController {
 
   @Post()
   @Permissions('PLANS_CREATE')
-  create(@Body() dto: CreatePlanDto) {
-    return this.svc.create(dto);
+  @ApiCreatedResponse({ type: PlanResponseDto })
+  create(@CurrentUser('userId') actorId: string, @Body() dto: CreatePlanDto) {
+    return this.svc.create(dto, actorId);
   }
 
   @Get()
   @Permissions('PLANS_READ')
-  findAll(@Query('status') status?: string) {
-    return this.svc.findAll(status);
+  @ApiOkResponse({ type: PlanResponseDto, isArray: true })
+  findAll(@Query() query: PlanQueryDto) {
+    return this.svc.findAll(query.status);
   }
 
   @Get(':id')
   @Permissions('PLANS_READ')
-  findOne(@Param('id') id: string) {
-    return this.svc.findOne(id);
+  @ApiOkResponse({ type: PlanResponseDto })
+  findOne(@Param() params: IdParamDto) {
+    return this.svc.findOne(params.id);
   }
 
   @Put(':id')
   @Permissions('PLANS_UPDATE')
-  update(@Param('id') id: string, @Body() dto: UpdatePlanDto) {
-    return this.svc.update(id, dto);
+  @ApiOkResponse({ type: PlanResponseDto })
+  update(@Param() params: IdParamDto, @Body() dto: UpdatePlanDto) {
+    return this.svc.update(params.id, dto);
   }
 
   @Put(':id/approve')
   @Permissions('PLANS_APPROVE')
-  approve(@Param('id') id: string, @Body() body: { approvedById: string }) {
-    return this.svc.approve(id, body.approvedById);
+  @ApiOkResponse({ type: PlanResponseDto })
+  approve(@CurrentUser('userId') actorId: string, @Param() params: IdParamDto) {
+    return this.svc.approve(params.id, actorId);
   }
 
   @Put(':id/reject')
   @Permissions('PLANS_APPROVE')
+  @ApiOkResponse({ type: PlanResponseDto })
   reject(
-    @Param('id') id: string,
-    @Body() body: { approvedById: string; rejectionNote?: string },
+    @CurrentUser('userId') actorId: string,
+    @Param() params: IdParamDto,
+    @Body() body: PlanDecisionDto,
   ) {
-    return this.svc.reject(id, body.approvedById, body.rejectionNote);
+    return this.svc.reject(params.id, actorId, body.rejectionNote);
   }
 
   @Delete(':id')
   @Permissions('PLANS_DELETE')
-  remove(@Param('id') id: string) {
-    return this.svc.remove(id);
+  @ApiOkResponse({ type: PlanResponseDto })
+  remove(@Param() params: IdParamDto) {
+    return this.svc.remove(params.id);
   }
 }

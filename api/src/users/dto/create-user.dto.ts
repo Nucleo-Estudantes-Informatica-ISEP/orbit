@@ -6,13 +6,9 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MinLength,
 } from 'class-validator';
-
-enum UserStatus {
-  ACTIVE = 'ACTIVE',
-  INACTIVE = 'INACTIVE',
-  SUSPENDED = 'SUSPENDED',
-}
+import { UserStatus } from '@prisma/client';
 
 export class CreateUserDto {
   @IsString()
@@ -23,9 +19,9 @@ export class CreateUserDto {
   email: string;
 
   @IsString()
+  @MinLength(8)
   password: string;
 
-  @IsString()
   @IsUUID()
   departmentId: string;
 

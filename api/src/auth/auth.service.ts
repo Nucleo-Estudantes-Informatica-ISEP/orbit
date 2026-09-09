@@ -46,6 +46,9 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
+    if (user.status !== 'ACTIVE') {
+      throw new UnauthorizedException('Account is inactive');
+    }
 
     const permissions = Array.from(
       new Set(user.userRoles.flatMap(({ role }) => role.permissions ?? [])),
@@ -253,6 +256,48 @@ export class AuthService {
 
   async getProfile(userId: string) {
     return this.buildUserPayload(userId);
+  }
+
+  async updateOwnProfile(userId: string, name: string) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { name: name.trim() },
+    });
+    return this.buildUserPayload(userId);
+  }
+
+  async changeOwnPassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.status !== 'ACTIVE') {
+      throw new UnauthorizedException('User not found');
+    }
+
+    if (!(await bcrypt.compare(currentPassword, user.password))) {
+      throw new BadRequestException('Current password is incorrect');
+    }
+
+    const password = await bcrypt.hash(newPassword, 10);
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: userId },
+        data: { password },
+      }),
+      this.prisma.passwordResetToken.updateMany({
+        where: { userId, usedAt: null },
+        data: { usedAt: new Date() },
+      }),
+      this.prisma.authSession.deleteMany({
+        where: { userId },
+      }),
+    ]);
+
+    this.mailService.sendPasswordChanged(user.email, user.name).catch(() => {});
+
+    return { message: 'Palavra-passe alterada com sucesso.' };
   }
 
   async requestPasswordReset(email: string) {

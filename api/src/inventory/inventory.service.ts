@@ -17,12 +17,12 @@ export class InventoryService {
     department: { select: { id: true, name: true } },
   };
 
-  async create(dto: CreateInventoryItemDto) {
-    const { performedById, value, purchaseDate, warrantyDate, ...rest } = dto;
-    void performedById;
+  async create(dto: CreateInventoryItemDto, actorId: string) {
+    const { value, purchaseDate, warrantyDate, ...rest } = dto;
     return this.prisma.inventoryItem.create({
       data: {
         ...rest,
+        purchasedById: actorId,
         value: new Decimal(value),
         ...(purchaseDate ? { purchaseDate: new Date(purchaseDate) } : {}),
         ...(warrantyDate ? { warrantyDate: new Date(warrantyDate) } : {}),
@@ -48,8 +48,7 @@ export class InventoryService {
   }
 
   async update(id: string, dto: UpdateInventoryItemDto) {
-    const { performedById, value, purchaseDate, warrantyDate, ...rest } = dto;
-    void performedById;
+    const { value, purchaseDate, warrantyDate, ...rest } = dto;
     return this.prisma.inventoryItem.update({
       where: { id },
       data: {

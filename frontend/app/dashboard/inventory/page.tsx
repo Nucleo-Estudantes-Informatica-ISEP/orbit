@@ -16,7 +16,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Pagination, usePagination } from '@/components/ui/data-pagination';
 import { EmptyState } from '@/components/empty-state';
 import { FileUpload } from '@/components/file-upload';
-import { useAuth } from '@/lib/auth-context';
 import { usePermission } from '@/lib/use-permission';
 import { useLocale } from '@/lib/locale-context';
 import { api } from '@/lib/api';
@@ -38,7 +37,6 @@ interface InventoryItem {
 }
 
 interface Department { id: string; name: string }
-interface User { id: string; name: string; email: string }
 
 const emptyForm = {
   name: '',
@@ -49,7 +47,6 @@ const emptyForm = {
   photoKey: '',
   photoName: '',
   quantity: 1,
-  purchasedById: '',
   departmentId: '',
 };
 
@@ -68,7 +65,6 @@ function isWarrantyExpiringSoon(warrantyDate?: string) {
 }
 
 export default function InventoryPage() {
-  const { user } = useAuth();
   const { t } = useLocale();
   const canCreate = usePermission('INVENTORY_CREATE');
   const canUpdate = usePermission('INVENTORY_UPDATE');
@@ -76,7 +72,6 @@ export default function InventoryPage() {
 
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('ALL');
@@ -113,14 +108,12 @@ export default function InventoryPage() {
 
   const load = useCallback(async () => {
     try {
-      const [inv, depts, usrs] = await Promise.all([
+      const [inv, depts] = await Promise.all([
         api.get<InventoryItem[]>('/inventory'),
         api.get<Department[]>('/departments'),
-        api.get<User[]>('/users'),
       ]);
       setItems(inv);
       setDepartments(depts);
-      setUsers(usrs);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Erro ao carregar inventário');
     }
@@ -157,7 +150,6 @@ export default function InventoryPage() {
       photoKey: item.photoKey ?? '',
       photoName: item.photoKey ? 'Foto atual' : '',
       quantity: item.quantity,
-      purchasedById: item.purchasedBy?.id ?? '',
       departmentId: item.department?.id ?? '',
     });
     setError('');
@@ -177,9 +169,7 @@ export default function InventoryPage() {
         warrantyDate: form.warrantyDate || undefined,
         photoKey: form.photoKey || undefined,
         quantity: form.quantity,
-        purchasedById: form.purchasedById || undefined,
         departmentId: form.departmentId || undefined,
-        performedById: user?.id,
       };
       if (editTarget) {
         const updated = await api.put<InventoryItem>(`/inventory/${editTarget.id}`, payload);
@@ -564,33 +554,18 @@ export default function InventoryPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>{t('inventory.departmentLabel')}</Label>
-                <Select
-                  value={form.departmentId || 'NONE'}
-                  onValueChange={(v) => setForm((p) => ({ ...p, departmentId: v === 'NONE' ? '' : v }))}
-                >
-                  <SelectTrigger><SelectValue placeholder={t('common.none')} /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="NONE">{t('common.none')}</SelectItem>
-                    {departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>{t('inventory.buyerLabel')}</Label>
-                <Select
-                  value={form.purchasedById || 'NONE'}
-                  onValueChange={(v) => setForm((p) => ({ ...p, purchasedById: v === 'NONE' ? '' : v }))}
-                >
-                  <SelectTrigger><SelectValue placeholder={t('common.none')} /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="NONE">{t('common.none')}</SelectItem>
-                    {users.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-1.5">
+              <Label>{t('inventory.departmentLabel')}</Label>
+              <Select
+                value={form.departmentId || 'NONE'}
+                onValueChange={(v) => setForm((p) => ({ ...p, departmentId: v === 'NONE' ? '' : v }))}
+              >
+                <SelectTrigger><SelectValue placeholder={t('common.none')} /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="NONE">{t('common.none')}</SelectItem>
+                  {departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-1.5">

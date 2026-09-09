@@ -4,13 +4,10 @@ import {
   IsString,
   IsArray,
   IsEnum,
+  IsUUID,
+  MinLength,
 } from 'class-validator';
-
-enum UserStatus {
-  ACTIVE = 'ACTIVE',
-  INACTIVE = 'INACTIVE',
-  SUSPENDED = 'SUSPENDED',
-}
+import { UserStatus } from '@prisma/client';
 
 export class UpdateUserDto {
   @IsOptional()
@@ -23,10 +20,11 @@ export class UpdateUserDto {
 
   @IsOptional()
   @IsString()
+  @MinLength(8)
   password?: string;
 
   @IsOptional()
-  @IsString()
+  @IsUUID()
   departmentId?: string;
 
   @IsOptional()

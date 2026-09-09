@@ -31,6 +31,8 @@ const userSelect = {
   },
   userRoles: {
     select: {
+      userId: true,
+      roleId: true,
       assignedAt: true,
       role: {
         select: {

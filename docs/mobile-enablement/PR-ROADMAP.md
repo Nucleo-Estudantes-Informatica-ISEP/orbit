@@ -29,7 +29,7 @@ Issue: [#3](https://github.com/Nucleo-Estudantes-Informatica-ISEP/orbit/issues/3
 
 Suggested branch: `auth/session-and-self-service`
 
-- Standardize 15-minute access tokens and 7-day refresh tokens.
+- Standardize 15-minute access tokens and rotating 30-day refresh sessions.
 - Make login/refresh responses consistent.
 - Add safe authenticated endpoints for changing the current Member's name.
 - Require current-password verification before password change.

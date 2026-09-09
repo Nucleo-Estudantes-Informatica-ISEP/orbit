@@ -77,6 +77,9 @@ jobs:
       - name: Production build
         run: npm run build
 
+      - name: OpenAPI drift check
+        run: node dist/src/generate-openapi.js --check
+
       - name: Reject critical production dependency advisories
         run: npm audit --omit=dev --audit-level=critical
 

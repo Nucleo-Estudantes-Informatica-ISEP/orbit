@@ -37,7 +37,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     ) {
       throw new UnauthorizedException('Invalid access token');
     }
-
     return {
       userId: payload.sub,
       email: payload.email,

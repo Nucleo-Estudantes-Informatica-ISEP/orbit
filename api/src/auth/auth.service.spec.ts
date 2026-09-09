@@ -1,4 +1,4 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import { SystemPermission, UserStatus } from '@prisma/client';
@@ -271,6 +271,23 @@ describe('AuthService sessions', () => {
     expect(sessions.every((session) => session.revokedAt)).toBe(true);
     await expect(auth.refreshToken(login.refresh_token)).rejects.toThrow(
       UnauthorizedException,
+    );
+  });
+
+  it('keeps sessions after a wrong current password and revokes them after a valid change', async () => {
+    await auth.authenticate(user.email, 'old-password');
+
+    await expect(
+      auth.changeOwnPassword(user.id, 'wrong-password', 'new-password'),
+    ).rejects.toThrow(BadRequestException);
+    expect(sessions).toHaveLength(1);
+
+    await expect(
+      auth.changeOwnPassword(user.id, 'old-password', 'new-password'),
+    ).resolves.toEqual({ message: 'Palavra-passe alterada com sucesso.' });
+    expect(sessions).toHaveLength(0);
+    await expect(bcrypt.compare('new-password', user.password)).resolves.toBe(
+      true,
     );
   });
 });

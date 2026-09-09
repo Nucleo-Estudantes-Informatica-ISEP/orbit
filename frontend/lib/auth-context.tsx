@@ -1,6 +1,12 @@
-'use client';
+"use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
 import {
   API_BASE,
   AUTH_SESSION_EVENT,
@@ -10,7 +16,7 @@ import {
   hasStoredSession,
   revokeStoredSession,
   storeSession,
-} from '@/lib/api';
+} from "@/lib/api";
 
 export interface User {
   id: string;
@@ -26,6 +32,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  refreshProfile: () => Promise<void>;
   isAuthenticated: boolean;
 }
 
@@ -38,8 +45,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Restore token and user from localStorage on mount
   useEffect(() => {
-    const storedToken = localStorage.getItem('auth_token');
-    const storedUser = localStorage.getItem('auth_user');
+    const storedToken = localStorage.getItem("auth_token");
+    const storedUser = localStorage.getItem("auth_user");
 
     const restoreSession = async () => {
       if (!storedToken && !hasStoredSession()) {
@@ -51,14 +58,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (storedToken) setToken(storedToken);
 
       try {
-        const freshUser = await apiFetch<User>('/auth/me');
-        localStorage.setItem('auth_user', JSON.stringify(freshUser));
-        setToken(localStorage.getItem('auth_token'));
+        const freshUser = await apiFetch<User>("/auth/me");
+        localStorage.setItem("auth_user", JSON.stringify(freshUser));
+        setToken(localStorage.getItem("auth_token"));
         setUser(freshUser);
       } catch (error) {
         // Only a transport failure may temporarily retain cached identity.
         // HTTP errors and invalid JSON must never restore stale permissions.
-        if (error instanceof TypeError && localStorage.getItem('auth_token') && storedUser) {
+        if (
+          error instanceof TypeError &&
+          localStorage.getItem("auth_token") &&
+          storedUser
+        ) {
           try {
             setUser(JSON.parse(storedUser) as User);
           } catch {
@@ -69,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else if (error instanceof ApiError && error.status >= 500) {
           // Server failure is not proof that credentials are invalid. Keep the
           // session marker/token but fail closed on cached permissions.
-          setToken(localStorage.getItem('auth_token'));
+          setToken(localStorage.getItem("auth_token"));
           setUser(null);
         } else {
           clearStoredSession();
@@ -84,8 +95,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void restoreSession();
 
     const syncSession = () => {
-      const currentToken = localStorage.getItem('auth_token');
-      const currentUser = localStorage.getItem('auth_user');
+      const currentToken = localStorage.getItem("auth_token");
+      const currentUser = localStorage.getItem("auth_user");
       setToken(currentToken);
       try {
         setUser(currentUser ? (JSON.parse(currentUser) as User) : null);
@@ -96,10 +107,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
     window.addEventListener(AUTH_SESSION_EVENT, syncSession);
-    window.addEventListener('storage', syncSession);
+    window.addEventListener("storage", syncSession);
     return () => {
       window.removeEventListener(AUTH_SESSION_EVENT, syncSession);
-      window.removeEventListener('storage', syncSession);
+      window.removeEventListener("storage", syncSession);
     };
   }, []);
 
@@ -107,14 +118,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
     try {
       const response = await fetch(`${API_BASE}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ email, password }),
       });
 
       if (!response.ok) {
-        throw new Error('Login failed');
+        throw new Error("Login failed");
       }
 
       const data = await response.json();
@@ -135,6 +146,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
+  const refreshProfile = async () => {
+    const freshUser = await apiFetch<User>("/auth/me");
+    localStorage.setItem("auth_user", JSON.stringify(freshUser));
+    setUser(freshUser);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -143,6 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         login,
         logout,
+        refreshProfile,
         isAuthenticated: !!token,
       }}
     >
@@ -154,7 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 }

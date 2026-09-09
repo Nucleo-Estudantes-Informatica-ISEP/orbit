@@ -1,5 +1,6 @@
 import { PrismaClient, UserStatus, SystemPermission } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import { getProductionAdminSeedConfig } from '../src/config/production-seed';
 
 const prisma = new PrismaClient();
 
@@ -23,9 +24,7 @@ async function main() {
   });
 
   // Admin user
-  const email = process.env.ADMIN_EMAIL || 'admin@orbit.com';
-  const password = process.env.ADMIN_PASSWORD || 'admin123';
-  const name = process.env.ADMIN_NAME || 'Administrator';
+  const { email, password, name } = getProductionAdminSeedConfig(process.env);
 
   const hashed = await bcrypt.hash(password, 10);
 
@@ -50,7 +49,7 @@ async function main() {
   console.log('\nProduction seed complete.');
   console.log(`  Department: ${dept.name}`);
   console.log(`  Role: ${role.name}`);
-  console.log(`  Admin: ${email} / ${password.includes('admin123') ? password : '(env var)'}`);
+  console.log(`  Admin: ${email}`);
 }
 
 main()

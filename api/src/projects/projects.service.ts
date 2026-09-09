@@ -9,7 +9,6 @@ export interface ProjectInput {
   description?: string;
   status?: ProjectStatus;
   deadline?: Date | string;
-  performedById?: string;
 }
 
 @Injectable()
@@ -19,8 +18,8 @@ export class ProjectsService {
     private announcements: AnnouncementsService,
   ) {}
 
-  create(data: ProjectInput) {
-    const { performedById, ...createData } = data;
+  create(data: ProjectInput, actorId: string) {
+    const createData = data;
     if (createData.deadline && typeof createData.deadline === 'string') {
       createData.deadline = new Date(createData.deadline);
     }
@@ -35,7 +34,7 @@ export class ProjectsService {
             [p.departmentId],
             'PROJECT_CREATED',
             `Novo projeto criado: ${p.name}.`,
-            performedById,
+            actorId,
           )
           .catch(() => {});
         // TODO: enviar email quando um projeto for criado para o departamento correspondente.
@@ -68,8 +67,7 @@ export class ProjectsService {
   }
 
   update(id: string, data: Partial<ProjectInput>) {
-    const { performedById, ...updateData } = data;
-    void performedById;
+    const updateData = data;
     if (updateData.deadline && typeof updateData.deadline === 'string') {
       updateData.deadline = new Date(updateData.deadline);
     }
