@@ -9,8 +9,14 @@ type Operation = {
     schema?: { format?: string };
   }>;
   requestBody?: unknown;
-  responses?: Record<string, unknown>;
-  security?: unknown[];
+  responses?: Record<
+    string,
+    {
+      content?: Record<string, { schema?: unknown }>;
+      headers?: Record<string, unknown>;
+    }
+  >;
+  security?: Array<Record<string, unknown>>;
   tags?: string[];
 };
 
@@ -19,7 +25,16 @@ describe('checked-in OpenAPI contract', () => {
     readFileSync(resolve(process.cwd(), 'openapi', 'openapi.json'), 'utf8'),
   ) as {
     paths: Record<string, Record<string, Operation>>;
-    components: { schemas: Record<string, { additionalProperties?: boolean }> };
+    components: {
+      schemas: Record<
+        string,
+        {
+          additionalProperties?: boolean;
+          properties?: Record<string, unknown>;
+        }
+      >;
+      securitySchemes: Record<string, unknown>;
+    };
   };
   const operations = Object.entries(document.paths).flatMap(
     ([path, pathItem]) =>
@@ -90,6 +105,56 @@ describe('checked-in OpenAPI contract', () => {
         document.components.schemas[schemaName]?.additionalProperties,
       ).toBe(false);
     }
+  });
+
+  it('excludes server-owned actor IDs from request schemas', () => {
+    const actorFields = [
+      'createdById',
+      'performedById',
+      'reportedById',
+      'purchasedById',
+    ];
+    const requestSchemaNames = operations.flatMap(({ operation }) => {
+      const serialized = JSON.stringify(operation.requestBody ?? {});
+      return [...serialized.matchAll(/#\/components\/schemas\/([^"/]+)/g)].map(
+        (match) => match[1],
+      );
+    });
+
+    for (const schemaName of requestSchemaNames) {
+      const properties = document.components.schemas[schemaName]?.properties;
+      for (const actorField of actorFields) {
+        expect(properties).not.toHaveProperty(actorField);
+      }
+    }
+  });
+
+  it('documents refresh-cookie transport and rotation', () => {
+    expect(document.components.securitySchemes.orbit_refresh).toEqual({
+      in: 'cookie',
+      name: 'orbit_refresh',
+      type: 'apiKey',
+    });
+    for (const path of ['/auth/refresh', '/auth/logout']) {
+      expect(document.paths[path].post.security).toEqual([
+        { orbit_refresh: [] },
+      ]);
+    }
+    for (const path of ['/auth/login', '/auth/refresh', '/auth/logout']) {
+      const success =
+        document.paths[path].post.responses?.[
+          path === '/auth/logout' ? '200' : '201'
+        ];
+      expect(success?.headers).toHaveProperty('Set-Cookie');
+    }
+  });
+
+  it('documents the health response body', () => {
+    expect(
+      document.paths['/health'].get.responses?.['200']?.content?.[
+        'application/json'
+      ]?.schema,
+    ).toEqual({ $ref: '#/components/schemas/HealthResponseDto' });
   });
 
   it('resolves every internal schema reference', () => {

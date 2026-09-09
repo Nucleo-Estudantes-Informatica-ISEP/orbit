@@ -7,6 +7,11 @@ export function createOpenApiDocument(app: INestApplication) {
     .setDescription('Shared ORBIT web and mobile API contract')
     .setVersion('1.0.0')
     .addBearerAuth()
+    .addCookieAuth(
+      'orbit_refresh',
+      { type: 'apiKey', in: 'cookie', name: 'orbit_refresh' },
+      'orbit_refresh',
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config, {

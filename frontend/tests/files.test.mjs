@@ -107,13 +107,21 @@ test('authenticated files', async (t) => {
     assert.deepEqual(redirects, []);
   });
 
-  await t.test('403 responses do not refresh or clear authentication', async (t) => {
-    reset();
-    const fetch = t.mock.method(globalThis, 'fetch', async () => new Response('forbidden', { status: 403 }));
-    await assert.rejects(apiFetch('/forbidden'), (error) => error.status === 403);
-    assert.equal(fetch.mock.callCount(), 1);
-    assert.equal(storage.size, 3);
-    assert.deepEqual(redirects, []);
+  await t.test('400 business errors and 403 responses preserve authentication', async (t) => {
+    for (const status of [400, 403]) {
+      await t.test(String(status), async (t) => {
+        reset();
+        const fetch = t.mock.method(
+          globalThis,
+          'fetch',
+          async () => new Response('request rejected', { status }),
+        );
+        await assert.rejects(apiFetch('/rejected'), (error) => error.status === status);
+        assert.equal(fetch.mock.callCount(), 1);
+        assert.equal(storage.size, 3);
+        assert.deepEqual(redirects, []);
+      });
+    }
   });
 
   await t.test('refresh network and server failures preserve the recoverable session', async (t) => {

@@ -1294,6 +1294,18 @@
         ],
         "type": "object"
       },
+      "HealthResponseDto": {
+        "properties": {
+          "status": {
+            "example": "ok",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "type": "object"
+      },
       "IncidentCommentResponseDto": {
         "properties": {
           "content": {
@@ -2924,6 +2936,11 @@
         "bearerFormat": "JWT",
         "scheme": "bearer",
         "type": "http"
+      },
+      "orbit_refresh": {
+        "in": "cookie",
+        "name": "orbit_refresh",
+        "type": "apiKey"
       }
     }
   },
@@ -4013,7 +4030,15 @@
                 }
               }
             },
-            "description": ""
+            "description": "",
+            "headers": {
+              "Set-Cookie": {
+                "description": "Rotated 30-day orbit_refresh cookie; HttpOnly; SameSite=Strict; Path=/auth; Secure in production.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -4054,9 +4079,22 @@
                 }
               }
             },
-            "description": ""
+            "description": "",
+            "headers": {
+              "Set-Cookie": {
+                "description": "Rotated 30-day orbit_refresh cookie; HttpOnly; SameSite=Strict; Path=/auth; Secure in production.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           }
         },
+        "security": [
+          {
+            "orbit_refresh": []
+          }
+        ],
         "tags": [
           "auth"
         ]
@@ -4165,7 +4203,15 @@
                 }
               }
             },
-            "description": ""
+            "description": "",
+            "headers": {
+              "Set-Cookie": {
+                "description": "Rotated 30-day orbit_refresh cookie; HttpOnly; SameSite=Strict; Path=/auth; Secure in production.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "401": {
             "content": {
@@ -4178,6 +4224,11 @@
             "description": ""
           }
         },
+        "security": [
+          {
+            "orbit_refresh": []
+          }
+        ],
         "tags": [
           "auth"
         ]
@@ -7374,11 +7425,18 @@
         "parameters": [],
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponseDto"
+                }
+              }
+            },
             "description": ""
           }
         },
         "tags": [
-          "Health"
+          "health"
         ]
       }
     },

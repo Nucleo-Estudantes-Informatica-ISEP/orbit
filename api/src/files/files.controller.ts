@@ -168,7 +168,7 @@ export class FilesController {
       if (stat.size) res.setHeader('Content-Length', stat.size);
       stream.pipe(res);
     } catch {
-      res.status(404).json({ message: 'Ficheiro não encontrado' });
+      throw new NotFoundException('Ficheiro não encontrado');
     }
   }
 }

@@ -21,6 +21,11 @@ export class MessageResponseDto {
   message: string;
 }
 
+export class HealthResponseDto {
+  @ApiProperty({ example: 'ok' })
+  status: 'ok';
+}
+
 export class CountResponseDto {
   @ApiProperty()
   count: number;

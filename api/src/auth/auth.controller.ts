@@ -19,6 +19,7 @@ import {
   ApiBadRequestResponse,
   ApiBearerAuth,
   ApiCreatedResponse,
+  ApiCookieAuth,
   ApiOkResponse,
   ApiTags,
   ApiUnauthorizedResponse,
@@ -36,6 +37,13 @@ import type { Request, Response } from 'express';
 const REFRESH_COOKIE = 'orbit_refresh';
 const REFRESH_COOKIE_PATH = '/auth';
 const REFRESH_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+const REFRESH_COOKIE_RESPONSE_HEADERS = {
+  'Set-Cookie': {
+    description:
+      'Rotated 30-day orbit_refresh cookie; HttpOnly; SameSite=Strict; Path=/auth; Secure in production.',
+    schema: { type: 'string' },
+  },
+};
 
 function readRefreshCookie(request: Request): string {
   const cookies = request.headers.cookie?.split(';') ?? [];
@@ -68,7 +76,10 @@ export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Post('login')
-  @ApiCreatedResponse({ type: AuthTokensResponseDto })
+  @ApiCreatedResponse({
+    type: AuthTokensResponseDto,
+    headers: REFRESH_COOKIE_RESPONSE_HEADERS,
+  })
   @ApiBadRequestResponse({ type: ErrorResponseDto })
   @ApiUnauthorizedResponse({ type: ErrorResponseDto })
   async login(
@@ -84,7 +95,11 @@ export class AuthController {
   }
 
   @Post('refresh')
-  @ApiCreatedResponse({ type: AuthTokensResponseDto })
+  @ApiCookieAuth(REFRESH_COOKIE)
+  @ApiCreatedResponse({
+    type: AuthTokensResponseDto,
+    headers: REFRESH_COOKIE_RESPONSE_HEADERS,
+  })
   @ApiUnauthorizedResponse({ type: ErrorResponseDto })
   async refresh(
     @Req() request: Request,
@@ -99,7 +114,11 @@ export class AuthController {
 
   @Post('logout')
   @HttpCode(200)
-  @ApiOkResponse({ type: MessageResponseDto })
+  @ApiCookieAuth(REFRESH_COOKIE)
+  @ApiOkResponse({
+    type: MessageResponseDto,
+    headers: REFRESH_COOKIE_RESPONSE_HEADERS,
+  })
   async logout(
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,

@@ -11,10 +11,16 @@ import { createValidationPipe } from '../src/validation';
 describe('File downloads (e2e)', () => {
   let app: INestApplication<App>;
   const minio = {
-    getObjectStat: jest.fn(() =>
+    getObjectStat: jest.fn((key: string) =>
       Promise.resolve({
         size: 4,
-        metaData: { 'content-type': 'application/pdf' },
+        metaData: {
+          'content-type': key.endsWith('.svg')
+            ? 'image/svg+xml'
+            : key.endsWith('.html')
+              ? 'text/html'
+              : 'application/pdf',
+        },
       }),
     ),
     getObject: jest.fn(() =>
@@ -45,6 +51,33 @@ describe('File downloads (e2e)', () => {
 
     expect(minio.getObjectStat).toHaveBeenCalledWith('folder/sample.pdf');
     expect(minio.getObject).toHaveBeenCalledWith('folder/sample.pdf');
+  });
+
+  it.each(['vector.svg', 'page.html'])(
+    'forces active %s content to download without sniffing',
+    async (key) => {
+      await request(app.getHttpServer())
+        .get(`/files/${key}`)
+        .expect(200)
+        .expect(
+          'Content-Disposition',
+          new RegExp(`^attachment; filename="${key}"`),
+        )
+        .expect('X-Content-Type-Options', 'nosniff');
+    },
+  );
+
+  it('returns the shared error envelope for missing files', async () => {
+    minio.getObjectStat.mockRejectedValueOnce(new Error('missing'));
+
+    await request(app.getHttpServer())
+      .get('/files/missing.pdf')
+      .expect(404)
+      .expect({
+        statusCode: 404,
+        message: 'Ficheiro não encontrado',
+        error: 'Not Found',
+      });
   });
 
   afterAll(async () => {
