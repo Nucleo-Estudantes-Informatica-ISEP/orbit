@@ -1,4 +1,5 @@
-const CACHE_NAME = "orbit-pwa-v2";
+const CACHE_PREFIX = "orbit-pwa-";
+const CACHE_NAME = `${CACHE_PREFIX}v3`;
 const OFFLINE_URL = "/";
 const PRECACHE_URLS = [
   "/favicon.svg",
@@ -8,22 +9,11 @@ const PRECACHE_URLS = [
 ];
 
 function isPublicAsset(request, url) {
-  if (request.method !== "GET" || url.origin !== self.location.origin) {
-    return false;
-  }
-
-  // Never cache API responses, file transfers, or requests carrying a bearer token.
-  if (
-    url.pathname.startsWith("/api/") ||
-    url.pathname.startsWith("/files/") ||
-    request.headers.has("authorization")
-  ) {
-    return false;
-  }
-
   return (
-    url.pathname.startsWith("/_next/static/") ||
-    ["image", "font", "script", "style"].includes(request.destination)
+    request.method === "GET" &&
+    url.origin === self.location.origin &&
+    !request.headers.has("authorization") &&
+    url.pathname.startsWith("/_next/static/")
   );
 }
 
@@ -52,7 +42,7 @@ self.addEventListener("activate", (event) => {
       const keys = await caches.keys();
       await Promise.all(
         keys
-          .filter((key) => key !== CACHE_NAME)
+          .filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME)
           .map((key) => caches.delete(key)),
       );
       await self.clients.claim();
@@ -66,10 +56,27 @@ self.addEventListener("fetch", (event) => {
 
   if (request.mode === "navigate" && url.pathname === OFFLINE_URL) {
     event.respondWith(
-      fetch(request).catch(async () => {
-        const cached = await caches.match(OFFLINE_URL);
-        return cached ?? Response.error();
-      }),
+      (async () => {
+        try {
+          const response = await fetch(request);
+          if (response.ok) {
+            try {
+              const cache = await caches.open(CACHE_NAME);
+              await cache.put(OFFLINE_URL, response.clone());
+            } catch {
+              // Preserve successful navigation when caching fails.
+            }
+          }
+          return response;
+        } catch {
+          try {
+            const cache = await caches.open(CACHE_NAME);
+            return (await cache.match(OFFLINE_URL)) ?? Response.error();
+          } catch {
+            return Response.error();
+          }
+        }
+      })(),
     );
     return;
   }

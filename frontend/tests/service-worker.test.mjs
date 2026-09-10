@@ -30,11 +30,16 @@ function loadWorker({
   let claimed = false;
   const cache = {
     add: cacheAddImpl ?? (async () => {}),
-    match: cacheMatchImpl ?? (async () => undefined),
+    match:
+      cacheMatchImpl ??
+      (async (assetRequest) =>
+        assetRequest === "/" ? cachedRoot : undefined),
     put:
       cachePutImpl ??
       (async (assetRequest) => {
-        puts.push(assetRequest.url);
+        puts.push(
+          typeof assetRequest === "string" ? assetRequest : assetRequest.url,
+        );
       }),
   };
 
@@ -44,7 +49,12 @@ function loadWorker({
     fetch: fetchImpl ?? (async () => new Response("network")),
     caches: {
       open: cacheOpenImpl ?? (async () => cache),
-      keys: async () => ["orbit-pwa-v1", "orbit-pwa-v2"],
+      keys: async () => [
+        "other-cache",
+        "orbit-pwa-v1",
+        "orbit-pwa-v2",
+        "orbit-pwa-v3",
+      ],
       delete: async (key) => {
         deleted.push(key);
         return true;
@@ -127,6 +137,20 @@ test("service worker", async (t) => {
     );
   });
 
+  await t.test("refreshes the offline start URL after a successful navigation", async () => {
+    const worker = loadWorker({
+      fetchImpl: async () => new Response("fresh home"),
+    });
+
+    const response = await dispatchFetch(
+      worker,
+      request("/", { mode: "navigate", destination: "document" }),
+    );
+
+    assert.equal(await response.text(), "fresh home");
+    assert.deepEqual(worker.puts, ["/"]);
+  });
+
   await t.test("never caches protected assets", () => {
     const worker = loadWorker();
     for (const assetRequest of [
@@ -141,7 +165,7 @@ test("service worker", async (t) => {
     }
   });
 
-  await t.test("caches same-origin public assets", async () => {
+  await t.test("caches only same-origin fingerprinted assets", async () => {
     const worker = loadWorker();
     const assetRequest = request("/_next/static/app.js", {
       destination: "script",
@@ -150,6 +174,13 @@ test("service worker", async (t) => {
     const response = await dispatchFetch(worker, assetRequest);
     assert.equal(await response.text(), "network");
     assert.deepEqual(worker.puts, [assetRequest.url]);
+    assert.equal(
+      dispatchFetch(
+        worker,
+        request("/logo-extended.svg", { destination: "image" }),
+      ),
+      undefined,
+    );
   });
 
   await t.test("uses the network when cache reads or writes fail", async () => {
@@ -188,7 +219,7 @@ test("service worker", async (t) => {
     });
 
     await activation;
-    assert.deepEqual(worker.deleted, ["orbit-pwa-v1"]);
+    assert.deepEqual(worker.deleted, ["orbit-pwa-v1", "orbit-pwa-v2"]);
     assert.equal(worker.claimed, true);
   });
 });
