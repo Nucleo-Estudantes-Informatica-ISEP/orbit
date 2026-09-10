@@ -68,14 +68,17 @@ jobs:
       - name: Unit tests
         run: npm test -- --runInBand
 
-      - name: End-to-end smoke test
-        run: npm run test:e2e -- --runInBand
-
       - name: Apply migrations to an isolated database
         run: npx prisma migrate deploy
 
+      - name: End-to-end tests
+        run: npm run test:e2e -- --runInBand
+
       - name: Production build
         run: npm run build
+
+      - name: OpenAPI drift check
+        run: node dist/src/generate-openapi.js --check
 
       - name: Reject critical production dependency advisories
         run: npm audit --omit=dev --audit-level=critical
@@ -105,6 +108,9 @@ jobs:
 
       - name: Typecheck
         run: npx tsc --noEmit
+
+      - name: File authentication regression tests
+        run: npm test
 
       - name: Production build
         run: npm run build

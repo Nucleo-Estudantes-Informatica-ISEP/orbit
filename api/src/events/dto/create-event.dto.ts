@@ -1,7 +1,18 @@
-import { IsString, IsOptional, IsArray } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsArray,
+  IsDateString,
+  IsEnum,
+  IsUUID,
+  IsNotEmpty,
+  ValidateIf,
+} from 'class-validator';
+import { Visibility } from '@prisma/client';
 
 export class CreateEventDto {
   @IsString()
+  @IsNotEmpty()
   title: string;
 
   @IsOptional()
@@ -12,32 +23,40 @@ export class CreateEventDto {
   @IsString()
   location?: string;
 
-  @IsOptional()
-  @IsString()
+  @ValidateIf(
+    (event: CreateEventDto) =>
+      event.start !== undefined || event.startDate === undefined,
+  )
+  @IsDateString()
   start?: string;
 
-  @IsOptional()
-  @IsString()
+  @ValidateIf(
+    (event: CreateEventDto) =>
+      event.end !== undefined || event.endDate === undefined,
+  )
+  @IsDateString()
   end?: string;
 
   @IsOptional()
   @IsArray()
-  @IsString({ each: true })
+  @IsUUID(undefined, { each: true })
   departmentIds?: string[];
 
-  @IsOptional()
-  @IsString()
-  performedById?: string;
-
-  @IsOptional()
-  @IsString()
+  @ValidateIf(
+    (event: CreateEventDto) =>
+      event.startDate !== undefined || event.start === undefined,
+  )
+  @IsDateString()
   startDate?: string;
 
-  @IsOptional()
-  @IsString()
+  @ValidateIf(
+    (event: CreateEventDto) =>
+      event.endDate !== undefined || event.end === undefined,
+  )
+  @IsDateString()
   endDate?: string;
 
   @IsOptional()
-  @IsString()
-  visibility?: 'PUBLIC' | 'DEPARTMENT' | 'PRIVATE';
+  @IsEnum(Visibility)
+  visibility?: Visibility;
 }

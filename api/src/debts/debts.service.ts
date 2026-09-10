@@ -12,7 +12,6 @@ export type CreateDebtInput = Omit<
   'occurredAt' | 'status' | 'completedAt'
 > & {
   occurredAt?: Date | string;
-  performedById?: string;
 };
 
 export type UpdateDebtInput = Omit<
@@ -22,7 +21,6 @@ export type UpdateDebtInput = Omit<
   occurredAt?: Date | string;
   status?: DebtStatus;
   completedAt?: Date | null;
-  performedById?: string;
 };
 
 @Injectable()
@@ -37,8 +35,7 @@ export class DebtsService {
   };
 
   create(data: CreateDebtInput) {
-    const { performedById, ...rest } = data;
-    void performedById;
+    const rest = data;
     if (
       rest.occurredAt &&
       typeof rest.occurredAt === 'string' &&
@@ -81,8 +78,7 @@ export class DebtsService {
         'Não é possível editar uma dívida concluída',
       );
     }
-    const { performedById, ...rest } = data;
-    void performedById;
+    const rest = data;
     if (
       rest.occurredAt &&
       typeof rest.occurredAt === 'string' &&

@@ -14,7 +14,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Pagination, usePagination } from '@/components/ui/data-pagination';
 import { EmptyState } from '@/components/empty-state';
 import { RichTextEditor } from '@/components/rich-text-editor';
-import { useAuth } from '@/lib/auth-context';
 import { usePermission } from '@/lib/use-permission';
 import { useLocale } from '@/lib/locale-context';
 import { api } from '@/lib/api';
@@ -41,7 +40,6 @@ const visibilityIcon = { PUBLIC: Globe, DEPARTMENT: Building2, PRIVATE: Lock };
 const visibilityLabel = { PUBLIC: 'announcements.global', DEPARTMENT: 'announcements.department', PRIVATE: 'announcements.private' };
 
 export default function AnnouncementsPage() {
-  const { user } = useAuth();
   const { t } = useLocale();
   const canCreate = usePermission('ANNOUNCEMENTS_CREATE');
   const canDelete = usePermission('ANNOUNCEMENTS_DELETE');
@@ -99,10 +97,10 @@ export default function AnnouncementsPage() {
     setSaving(true); setError('');
     try {
       if (editTarget) {
-        const updated = await api.put<Announcement>(`/announcements/${editTarget.id}`, { ...form, performedById: user?.id });
+      const updated = await api.put<Announcement>(`/announcements/${editTarget.id}`, form);
         setAnnouncements((prev) => prev.map((a) => a.id === editTarget.id ? updated : a));
       } else {
-        const result = await api.post<Announcement>('/announcements', { ...form, createdById: user?.id, performedById: user?.id });
+      const result = await api.post<Announcement>('/announcements', form);
         // PRIVATE announcements are per-user inbox items, not feed posts
         if (form.visibility !== 'PRIVATE') {
           setAnnouncements((prev) => [result, ...prev]);

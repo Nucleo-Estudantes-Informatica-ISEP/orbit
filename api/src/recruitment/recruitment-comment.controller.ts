@@ -7,14 +7,22 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import {
-  RecruitmentCommentService,
-  type CreateRecruitmentCommentInput,
-} from './recruitment-comment.service';
+import { RecruitmentCommentService } from './recruitment-comment.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
+import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import {
+  CandidateIdParamDto,
+  CreateRecruitmentCommentDto,
+  IdParamDto,
+} from '../contracts/request.dto';
+import { RecruitmentCommentResponseDto } from '../contracts/response.dto';
+import { ApiProtectedController } from '../contracts/openapi.decorators';
+import { CurrentUser } from '../auth/current-user.decorator';
 
+@ApiTags('recruitment-comments')
+@ApiProtectedController()
 @Controller('recruitment/comments')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class RecruitmentCommentController {
@@ -22,25 +30,32 @@ export class RecruitmentCommentController {
 
   @Post()
   @Permissions('RECRUITMENT_CREATE')
-  create(@Body() body: CreateRecruitmentCommentInput) {
-    return this.svc.create(body);
+  @ApiCreatedResponse({ type: RecruitmentCommentResponseDto })
+  create(
+    @CurrentUser('userId') actorId: string,
+    @Body() body: CreateRecruitmentCommentDto,
+  ) {
+    return this.svc.create({ ...body, createdById: actorId });
   }
 
   @Get('candidate/:candidateId')
   @Permissions('RECRUITMENT_READ')
-  findAllForCandidate(@Param('candidateId') candidateId: string) {
-    return this.svc.findAllForCandidate(candidateId);
+  @ApiOkResponse({ type: RecruitmentCommentResponseDto, isArray: true })
+  findAllForCandidate(@Param() params: CandidateIdParamDto) {
+    return this.svc.findAllForCandidate(params.candidateId);
   }
 
   @Get(':id')
   @Permissions('RECRUITMENT_READ')
-  findOne(@Param('id') id: string) {
-    return this.svc.findOne(id);
+  @ApiOkResponse({ type: RecruitmentCommentResponseDto })
+  findOne(@Param() params: IdParamDto) {
+    return this.svc.findOne(params.id);
   }
 
   @Delete(':id')
   @Permissions('RECRUITMENT_DELETE')
-  remove(@Param('id') id: string) {
-    return this.svc.remove(id);
+  @ApiOkResponse({ type: RecruitmentCommentResponseDto })
+  remove(@Param() params: IdParamDto) {
+    return this.svc.remove(params.id);
   }
 }

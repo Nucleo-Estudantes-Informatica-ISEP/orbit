@@ -11,7 +11,7 @@ Sistema interno da **NEI-ISEP** (Núcleo de Estudantes de Informática do ISEP) 
 | Backend | NestJS 11 · Prisma 6 · PostgreSQL 16 |
 | Frontend | Next.js 16 · React 19 · Tailwind CSS 4 · shadcn/ui |
 | Ficheiros | MinIO (armazenamento interno) |
-| Auth | JWT (8h) + Refresh Token (7d) · bcrypt · RBAC por permissões |
+| Auth | Access JWT (15 min) + Refresh Token opaco rotativo (30 dias) · bcrypt · RBAC por permissões |
 | Drag & Drop | @dnd-kit |
 | Editor de texto | Tiptap |
 
@@ -83,6 +83,12 @@ docker compose exec api npx prisma db seed
 
 ## Produção
 
+### Compatibilidade de sessões
+
+Ao publicar o novo formato, os access tokens anteriores sem `token_use` são rejeitados no próximo pedido autenticado, mesmo que ainda não tenham expirado. Os refresh tokens JWT anteriores também são rejeitados: os refresh tokens passam a ser valores opacos num cookie `HttpOnly`, `SameSite=Strict`, cuja fingerprint HMAC-SHA-256 é guardada em `AuthSession`. Os utilizadores com sessões antigas terão de iniciar sessão novamente; não existe uma janela de transição de 15 minutos.
+
+Os access tokens têm uma validade de 15 minutos. Cada refresh token tem validade de 30 dias, roda em cada utilização e não pode ser reutilizado. A reutilização de um token já rodado revoga a respetiva família de sessão. Logout, reposição ou alteração da palavra-passe revogam os refresh tokens aplicáveis. Apenas access tokens já emitidos continuam válidos até à sua expiração.
+
 ### Seed de produção
 
 Cria apenas 1 departamento (NEI-ISEP), 1 role (ADMIN com todas as permissões) e 1 admin:
@@ -93,15 +99,17 @@ docker compose exec api npx prisma db seed -- --seed=prisma/seed.prod.ts
 
 Configurável via variáveis de ambiente:
 
-| Variável | Default |
-|----------|---------|
-| `ADMIN_EMAIL` | `admin@orbit.com` |
-| `ADMIN_PASSWORD` | `admin123` |
-| `ADMIN_NAME` | `Admin` |
+| Variável | Regra |
+|----------|-------|
+| `ADMIN_EMAIL` | Obrigatória; sem valor predefinido |
+| `ADMIN_PASSWORD` | Obrigatória; mínimo 16 caracteres; nunca é escrita nos logs |
+| `ADMIN_NAME` | Opcional; por omissão `Administrator` |
 
-### Render
+O seed falha antes de escrever na base se as credenciais explícitas estiverem ausentes ou fracas. Guarde `ADMIN_PASSWORD` apenas no gestor de segredos e rode o seed uma única vez quando o bootstrap for realmente necessário.
 
-A API corre como `node dist/main` após build. O Prisma migrate é executado no startup command.
+### Coolify
+
+A produção usa `docker-compose.coolify.yml`. O serviço `migrator` executa `prisma migrate deploy` e tem de terminar com sucesso antes da API arrancar. A API corre separadamente como utilizador não-root e expõe `GET /health`; o frontend só fica pronto depois da API. Configure `SMTP_PASS` como segredo do Coolify — nunca no compose ou no Git.
 
 ---
 
@@ -213,4 +221,14 @@ orbit/
 
 - Apenas a porta `3090` (frontend) está exposta publicamente no Docker.
 - API, base de dados e MinIO comunicam exclusivamente pela rede interna Docker.
-- O JWT armazena as permissões do utilizador — após alteração de permissões, o utilizador precisa renovar o token (refrescar ou re-login).
+- O access JWT armazena permissões e identidade. O refresh recarrega o perfil/permissões atuais e roda os tokens; alterações deixam de exigir um login completo.
+- Refresh tokens opacos ficam num cookie `HttpOnly`, `SameSite=Strict`; o servidor guarda apenas fingerprints HMAC-SHA-256, roda-os em cada utilização e revoga-os no logout e em alterações de password.
+- Seguimento de segurança: adicionar rate limiting a `/auth/login` e `/auth/refresh`, tendo em conta o proxy Next.js e eventuais réplicas da API. Ainda não existe limitação de pedidos nestes endpoints.
+
+---
+
+## Contribuição, testes e CI/CD
+
+Leia [`AGENTS.md`](./AGENTS.md) antes de alterar o repositório. Para correções, prefira TDD: reproduza primeiro o erro num teste focado, implemente a menor correção e refatore com a suite verde.
+
+Cada PR para `main` instala com `npm ci` e tem de passar lint, typecheck, testes unitários/E2E, migrações numa base isolada, build, contrato OpenAPI, auditoria de dependências, imagens Docker não-root, validação do compose Coolify e Gitleaks. O merge não prova deploy: confirme no Coolify o SHA, a migração, `/health` e os fluxos alterados.
