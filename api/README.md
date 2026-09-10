@@ -1,6 +1,7 @@
 # Orbit API
 
-NestJS 11 API for Orbit, backed by PostgreSQL/Prisma and MinIO. Repository-wide workflow and verification rules live in [`../AGENTS.md`](../AGENTS.md).
+[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master
+[circleci-url]: https://circleci.com/gh/nestjs/nest
 
 ## Local setup
 
