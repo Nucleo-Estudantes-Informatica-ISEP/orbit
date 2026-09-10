@@ -1,6 +1,6 @@
 const CACHE_NAME = "orbit-pwa-v2";
+const OFFLINE_URL = "/";
 const PRECACHE_URLS = [
-  "/",
   "/favicon.svg",
   "/icon-192.png",
   "/icon-512.png",
@@ -31,6 +31,7 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     (async () => {
       const cache = await caches.open(CACHE_NAME);
+      await cache.add(OFFLINE_URL);
       await Promise.all(
         PRECACHE_URLS.map(async (url) => {
           try {
@@ -63,10 +64,10 @@ self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  if (request.mode === "navigate" && url.pathname === "/") {
+  if (request.mode === "navigate" && url.pathname === OFFLINE_URL) {
     event.respondWith(
       fetch(request).catch(async () => {
-        const cached = await caches.match("/");
+        const cached = await caches.match(OFFLINE_URL);
         return cached ?? Response.error();
       }),
     );
@@ -77,14 +78,23 @@ self.addEventListener("fetch", (event) => {
 
   event.respondWith(
     (async () => {
-      const cache = await caches.open(CACHE_NAME);
-      const cached = await cache.match(request);
-      if (cached) return cached;
+      let cache;
+      try {
+        cache = await caches.open(CACHE_NAME);
+        const cached = await cache.match(request);
+        if (cached) return cached;
+      } catch {
+        // Cache is best-effort; network must remain available.
+      }
 
       try {
         const response = await fetch(request);
-        if (response.ok) {
-          await cache.put(request, response.clone());
+        if (response.ok && cache) {
+          try {
+            await cache.put(request, response.clone());
+          } catch {
+            // Preserve successful network response when caching fails.
+          }
         }
         return response;
       } catch {

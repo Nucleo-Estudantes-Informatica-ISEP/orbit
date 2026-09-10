@@ -16,15 +16,26 @@ function request(path, options = {}) {
   };
 }
 
-function loadWorker({ fetchImpl, cachedRoot = new Response("offline home") } = {}) {
+function loadWorker({
+  fetchImpl,
+  cachedRoot = new Response("offline home"),
+  cacheAddImpl,
+  cacheOpenImpl,
+  cacheMatchImpl,
+  cachePutImpl,
+} = {}) {
   const handlers = {};
   const deleted = [];
   const puts = [];
   let claimed = false;
   const cache = {
-    add: async () => {},
-    match: async () => undefined,
-    put: async (assetRequest) => puts.push(assetRequest.url),
+    add: cacheAddImpl ?? (async () => {}),
+    match: cacheMatchImpl ?? (async () => undefined),
+    put:
+      cachePutImpl ??
+      (async (assetRequest) => {
+        puts.push(assetRequest.url);
+      }),
   };
 
   vm.runInNewContext(source, {
@@ -32,7 +43,7 @@ function loadWorker({ fetchImpl, cachedRoot = new Response("offline home") } = {
     Response,
     fetch: fetchImpl ?? (async () => new Response("network")),
     caches: {
-      open: async () => cache,
+      open: cacheOpenImpl ?? (async () => cache),
       keys: async () => ["orbit-pwa-v1", "orbit-pwa-v2"],
       delete: async (key) => {
         deleted.push(key);
@@ -76,6 +87,22 @@ function dispatchFetch(worker, assetRequest) {
 }
 
 test("service worker", async (t) => {
+  await t.test("requires the offline start URL during installation", async () => {
+    const worker = loadWorker({
+      cacheAddImpl: async (url) => {
+        if (url === "/") throw new Error("offline shell unavailable");
+      },
+    });
+    let installation;
+    worker.handlers.install({
+      waitUntil: (value) => {
+        installation = value;
+      },
+    });
+
+    await assert.rejects(installation, /offline shell unavailable/);
+  });
+
   await t.test("falls back only for the offline start URL", async () => {
     const worker = loadWorker({
       fetchImpl: async () => {
@@ -123,6 +150,32 @@ test("service worker", async (t) => {
     const response = await dispatchFetch(worker, assetRequest);
     assert.equal(await response.text(), "network");
     assert.deepEqual(worker.puts, [assetRequest.url]);
+  });
+
+  await t.test("uses the network when cache reads or writes fail", async () => {
+    const assetRequest = request("/_next/static/app.js", {
+      destination: "script",
+    });
+    const cacheOpenFailure = loadWorker({
+      cacheOpenImpl: async () => {
+        throw new Error("cache open failed");
+      },
+    });
+    const cacheReadFailure = loadWorker({
+      cacheMatchImpl: async () => {
+        throw new Error("cache read failed");
+      },
+    });
+    const cacheWriteFailure = loadWorker({
+      cachePutImpl: async () => {
+        throw new Error("cache write failed");
+      },
+    });
+
+    for (const worker of [cacheOpenFailure, cacheReadFailure, cacheWriteFailure]) {
+      const response = await dispatchFetch(worker, assetRequest);
+      assert.equal(await response.text(), "network");
+    }
   });
 
   await t.test("removes stale caches before claiming clients", async () => {
