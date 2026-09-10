@@ -13,7 +13,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Pagination, usePagination } from '@/components/ui/data-pagination';
 import { EmptyState } from '@/components/empty-state';
 import { SearchInput } from '@/components/search-input';
-import { useAuth } from '@/lib/auth-context';
 import { usePermission } from '@/lib/use-permission';
 import { useLocale } from '@/lib/locale-context';
 import { api, API_BASE, resolveFileUrl } from '@/lib/api';
@@ -46,7 +45,6 @@ const visibilityLabel = { PUBLIC: 'common.global', DEPARTMENT: 'common.departmen
 const emptyForm = { title: '', url: '', fileKey: '', fileName: '', category: 'Outros', description: '', visibility: 'PUBLIC' as Resource['visibility'], departmentIds: [] as string[] };
 
 export default function DocumentsPage() {
-  const { user } = useAuth();
   const { t } = useLocale();
   const canCreate = usePermission('RESOURCES_CREATE');
   const canUpdate = usePermission('RESOURCES_UPDATE');
@@ -128,7 +126,7 @@ export default function DocumentsPage() {
         const updated = await api.put<Resource>(`/resources/${editTarget.id}`, payload);
         setResources((prev) => prev.map((r) => r.id === editTarget.id ? updated : r));
       } else {
-        const created = await api.post<Resource>('/resources', { ...payload, performedById: user?.id });
+    const created = await api.post<Resource>('/resources', payload);
         setResources((prev) => [created, ...prev]);
       }
       setModalOpen(false);

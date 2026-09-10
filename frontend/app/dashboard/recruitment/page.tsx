@@ -158,7 +158,7 @@ export default function RecruitmentPage() {
     if (!candidate || candidate.stage === newStage) return;
     setCandidates((prev) => prev.map((c) => c.id === candidate.id ? { ...c, stage: newStage } : c));
     try {
-      await api.put(`/candidates/${candidate.id}`, { stage: newStage, performedById: user?.id });
+      await api.put(`/candidates/${candidate.id}`, { stage: newStage });
     } catch {
       setCandidates((prev) => prev.map((c) => c.id === candidate.id ? { ...c, stage: candidate.stage } : c));
     }
@@ -179,7 +179,6 @@ export default function RecruitmentPage() {
         cvUrl: form.cvUrl || undefined,
         notes: form.notes || undefined,
         departmentChoices: deptChoices.length ? deptChoices : undefined,
-        performedById: user?.id,
       };
       const created = await api.post<Candidate>('/candidates', payload);
       setCandidates((prev) => [created, ...prev]);
@@ -210,7 +209,7 @@ export default function RecruitmentPage() {
     if (!commentText.trim() || !detailCandidate || !user) return;
     setCommentSaving(true);
     try {
-      const comment = await api.post<Comment>('/recruitment/comments', { candidateId: detailCandidate.id, createdById: user.id, content: commentText });
+    const comment = await api.post<Comment>('/recruitment/comments', { candidateId: detailCandidate.id, content: commentText });
       setComments((prev) => [...prev, comment]);
       setCommentText('');
     } catch (err: unknown) { toast.error(err instanceof Error ? err.message : 'Ocorreu um erro'); }

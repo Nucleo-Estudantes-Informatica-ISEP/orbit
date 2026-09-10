@@ -4,45 +4,53 @@ import {
   IsArray,
   IsBoolean,
   IsDateString,
+  IsEnum,
+  IsUUID,
+  IsNotEmpty,
+  ValidateIf,
 } from 'class-validator';
+import { Visibility } from '@prisma/client';
 
 export class CreateAnnouncementDto {
   @IsString()
+  @IsNotEmpty()
   title: string;
 
-  @IsOptional()
+  @ValidateIf(
+    (announcement: CreateAnnouncementDto) =>
+      announcement.content !== undefined ||
+      announcement.description === undefined,
+  )
   @IsString()
+  @IsNotEmpty()
   content?: string;
 
-  @IsOptional()
+  @ValidateIf(
+    (announcement: CreateAnnouncementDto) =>
+      announcement.description !== undefined ||
+      announcement.content === undefined,
+  )
   @IsString()
+  @IsNotEmpty()
   description?: string;
 
   @IsOptional()
-  @IsString()
-  createdById?: string;
-
-  @IsOptional()
-  @IsString()
-  performedById?: string;
-
-  @IsOptional()
-  @IsString()
+  @IsUUID()
   targetUserId?: string;
 
   @IsOptional()
   @IsArray()
-  @IsString({ each: true })
+  @IsUUID(undefined, { each: true })
   targetUserIds?: string[];
 
   @IsOptional()
   @IsArray()
-  @IsString({ each: true })
+  @IsUUID(undefined, { each: true })
   departmentIds?: string[];
 
   @IsOptional()
-  @IsString()
-  visibility?: 'PUBLIC' | 'DEPARTMENT' | 'PRIVATE';
+  @IsEnum(Visibility)
+  visibility?: Visibility;
 
   @IsOptional()
   @IsString()
@@ -58,5 +66,5 @@ export class CreateAnnouncementDto {
 
   @IsOptional()
   @IsDateString()
-  date?: Date;
+  date?: string;
 }

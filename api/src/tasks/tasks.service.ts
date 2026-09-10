@@ -58,18 +58,20 @@ export class TasksService {
     };
   }
 
-  async create(data: {
-    title: string;
-    description?: string;
-    deadline?: Date | string;
-    priority?: Priority;
-    status?: TaskStatus;
-    boardId?: string;
-    projectId?: string;
-    assigneeIds?: string[];
-    performedById?: string;
-  }) {
-    const { performedById, assigneeIds, deadline, ...taskData } = data;
+  async create(
+    data: {
+      title: string;
+      description?: string;
+      deadline?: Date | string;
+      priority?: Priority;
+      status?: TaskStatus;
+      boardId?: string;
+      projectId?: string;
+      assigneeIds?: string[];
+    },
+    actorId: string,
+  ) {
+    const { assigneeIds, deadline, ...taskData } = data;
     const relations = await this.assertRelationsExist(
       taskData.boardId,
       taskData.projectId,
@@ -109,7 +111,7 @@ export class TasksService {
               normalizedAssigneeIds,
               'TASK_ASSIGNED',
               `A task "${t.title}" foi atribuida a ti.`,
-              performedById,
+              actorId,
             )
             .catch(() => {});
           this.sendTaskEmails(
@@ -161,10 +163,10 @@ export class TasksService {
       boardId: string;
       projectId: string;
       assigneeIds: string[];
-      performedById: string;
     }>,
+    actorId: string,
   ) {
-    const { performedById, assigneeIds, deadline, ...taskData } = data;
+    const { assigneeIds, deadline, ...taskData } = data;
     const relations = await this.assertRelationsExist(
       taskData.boardId,
       taskData.projectId,
@@ -222,7 +224,7 @@ export class TasksService {
                 newlyAssignedUserIds,
                 'TASK_ASSIGNED',
                 `A task "${t.title}" foi atribuida a ti.`,
-                performedById,
+                actorId,
               )
               .catch(() => {});
             this.sendTaskEmails(

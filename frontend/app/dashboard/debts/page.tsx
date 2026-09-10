@@ -11,7 +11,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Skeleton } from '@/components/ui/skeleton';
 import { Pagination, usePagination } from '@/components/ui/data-pagination';
 import { EmptyState } from '@/components/empty-state';
-import { useAuth } from '@/lib/auth-context';
 import { usePermission } from '@/lib/use-permission';
 import { useLocale } from '@/lib/locale-context';
 import { api, getFileUrl } from '@/lib/api';
@@ -59,7 +58,6 @@ const emptyForm = {
 };
 
 export default function DebtsPage() {
-  const { user } = useAuth();
   const { t, formatDate } = useLocale();
   const canCreate = usePermission('DEBTS_CREATE');
   const canUpdate = usePermission('DEBTS_UPDATE');
@@ -202,7 +200,6 @@ export default function DebtsPage() {
         receivingAccount: form.receivingAccount.trim().slice(0, 64) || undefined,
         depositAccount: form.depositAccount.trim().slice(0, 64) || undefined,
         fileKeys: form.fileKeys,
-        createdById: user?.id,
       };
       if (editTarget) {
         const updated = await api.put<Debt>(`/debts/${editTarget.id}`, payload);
