@@ -63,7 +63,7 @@ self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  if (request.mode === "navigate") {
+  if (request.mode === "navigate" && url.pathname === "/") {
     event.respondWith(
       fetch(request).catch(async () => {
         const cached = await caches.match("/");
