@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/lib/auth-context";
 import { LocaleProvider } from "@/lib/locale-context";
 import { Toaster } from "@/components/ui/sonner";
+import { ServiceWorkerRegister } from "@/components/service-worker-register";
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 
@@ -25,8 +26,12 @@ export const metadata: Metadata = {
   description: "Internal Operating System",
   icons: {
     icon: "/favicon.svg",
-    apple: "/favicon.svg",
+    apple: "/icon-192.png",
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#7cce00",
 };
 
 export default function RootLayout({
@@ -59,6 +64,7 @@ export default function RootLayout({
               <TooltipProvider>
                 {children}
                 <Toaster position="bottom-right" richColors />
+                <ServiceWorkerRegister />
               </TooltipProvider>
             </LocaleProvider>
           </AuthProvider>

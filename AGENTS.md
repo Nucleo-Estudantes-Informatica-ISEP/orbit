@@ -4,9 +4,11 @@ Contributor and automation instructions for the Orbit monorepo. Read this file b
 
 ## Workflow
 
-- Never commit directly to `main`. Branch using `fix/`, `feat/`, `docs/`, `test/`, `build/`, or `chore/` plus a short kebab-case description.
-- Use Conventional Commits, keep commits logically scoped, and include `Closes #N` in the PR body only when the change fully resolves that issue.
-- Open PRs into `main`. Preserve authorship when superseding another PR, link the replacement, and close the duplicate review path once all useful commits are present.
+- `dev` is where task work lands; `main` is the release branch. Never commit directly to either branch.
+- Create task branches from `dev` using `fix/`, `feat/`, `docs/`, `test/`, `build/`, or `chore/` plus a short kebab-case description.
+- Use Conventional Commits, keep commits logically scoped, do not add AI co-author trailers, and include `Closes #N` in the PR body only when the change fully resolves that issue.
+- Push task branches and open PRs into `dev`, never directly into `main`. Preserve authorship when superseding another PR, link the replacement, and close the duplicate review path once all useful commits are present.
+- Update `main` only through a reviewed `dev` → `main` promotion PR.
 - Prefer TDD for regressions, DTO rules, authorization, session behavior, and business logic: write a focused failing test, implement the smallest fix, then refactor with the suite green. If a hosted dependency prevents a deterministic pre-fix test, document that and provide a staging smoke procedure.
 - Never trust actor/member IDs supplied by a client. Mutation attribution comes from the authenticated JWT. Access and refresh tokens are distinct types; access tokens are short-lived and refresh tokens rotate.
 - Keep mobile-enabling backend changes compatible with the existing web client.
