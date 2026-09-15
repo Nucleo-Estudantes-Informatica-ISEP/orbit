@@ -35,12 +35,12 @@ import { CurrentUser } from './current-user.decorator';
 import type { Request, Response } from 'express';
 
 const REFRESH_COOKIE = 'orbit_refresh';
-const REFRESH_COOKIE_PATH = '/auth';
+const REFRESH_COOKIE_PATH = '/';
 const REFRESH_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 const REFRESH_COOKIE_RESPONSE_HEADERS = {
   'Set-Cookie': {
     description:
-      'Rotated 30-day orbit_refresh cookie; HttpOnly; SameSite=Strict; Path=/auth; Secure in production.',
+      'Rotated 30-day orbit_refresh cookie; HttpOnly; SameSite=Strict; Path=/; Secure in production.',
     schema: { type: 'string' },
   },
 };
