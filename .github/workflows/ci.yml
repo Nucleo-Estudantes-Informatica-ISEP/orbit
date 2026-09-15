@@ -126,20 +126,17 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Build API image
-        run: docker build -t orbit-api-check ./api
+        run: docker build -t orbit-api ./api
 
       - name: Build frontend image
         run: docker build -t orbit-frontend-check ./frontend
 
-      - name: Verify MinIO runtime image is pullable
-        run: docker pull quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
-
       - name: Verify non-root runtimes
         run: |
-          test "$(docker inspect --format '{{.Config.User}}' orbit-api-check)" = "node"
+          test "$(docker inspect --format '{{.Config.User}}' orbit-api)" = "node"
           test "$(docker inspect --format '{{.Config.User}}' orbit-frontend-check)" = "node"
 
-      - name: Validate Coolify compose model
+      - name: Validate Coolify compose model and pre-pull
         env:
           SERVICE_USER_POSTGRES: postgres
           SERVICE_PASSWORD_POSTGRES: postgres
@@ -148,5 +145,8 @@ jobs:
           SERVICE_PASSWORD_MINIO: minio-password
           SMTP_PASS: ci-only-smtp-password
         run: |
-          sed '/^[[:space:]]*exclude_from_hc:/d' docker-compose.coolify.yml \
-            | docker compose -f - config --quiet
+          sed '/^[[:space:]]*exclude_from_hc:/d' docker-compose.coolify.yml > docker-compose.ci.yml
+          trap 'rm -f docker-compose.ci.yml' EXIT
+          docker compose -f docker-compose.ci.yml config --quiet
+          docker compose -f docker-compose.ci.yml pull --ignore-buildable
+          docker image inspect orbit-api >/dev/null
