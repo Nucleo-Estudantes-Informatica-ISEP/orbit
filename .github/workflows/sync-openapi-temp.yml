@@ -1,0 +1,42 @@
+name: Sync OpenAPI (temporary)
+
+on:
+  push:
+    branches:
+      - fix/insuficient-perms-dashboard-login
+    paths:
+      - .github/workflows/sync-openapi-temp.yml
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v7
+        with:
+          ref: fix/insuficient-perms-dashboard-login
+          fetch-depth: 0
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+      - name: Generate OpenAPI contract
+        working-directory: api
+        run: |
+          npm ci
+          npx prisma generate
+          npm run build
+          npm run openapi:generate
+      - name: Commit generated contract and remove temporary workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add api/openapi/openapi.json
+          git rm .github/workflows/sync-openapi-temp.yml
+          git commit -m "chore(openapi): sync auth cookie contract"
+          git push origin HEAD:fix/insuficient-perms-dashboard-login
