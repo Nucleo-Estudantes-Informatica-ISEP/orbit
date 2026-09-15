@@ -131,6 +131,9 @@ jobs:
       - name: Build frontend image
         run: docker build -t orbit-frontend-check ./frontend
 
+      - name: Verify MinIO runtime image is pullable
+        run: docker pull quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+
       - name: Verify non-root runtimes
         run: |
           test "$(docker inspect --format '{{.Config.User}}' orbit-api-check)" = "node"
@@ -138,7 +141,6 @@ jobs:
 
       - name: Validate Coolify compose model
         env:
-          SERVICE_URL_FRONTEND_3090: https://ci.invalid
           SERVICE_USER_POSTGRES: postgres
           SERVICE_PASSWORD_POSTGRES: postgres
           SERVICE_BASE64_64_JWT: ci-only-jwt-secret
