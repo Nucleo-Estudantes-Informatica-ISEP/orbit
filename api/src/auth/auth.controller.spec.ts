@@ -47,7 +47,7 @@ describe('AuthController refresh cookie', () => {
       expect.objectContaining({
         httpOnly: true,
         sameSite: 'strict',
-        path: '/auth',
+        path: '/',
         maxAge: 30 * 24 * 60 * 60 * 1000,
       }),
     );
@@ -65,7 +65,11 @@ describe('AuthController refresh cookie', () => {
       access_token: session.access_token,
     });
     expect(refreshToken).toHaveBeenCalledWith('incoming-token');
-    expect(refreshResponse.cookie).toHaveBeenCalled();
+    expect(refreshResponse.cookie).toHaveBeenCalledWith(
+      'orbit_refresh',
+      session.refresh_token,
+      expect.objectContaining({ path: '/' }),
+    );
   });
 
   it('revokes the cookie session and expires the browser cookie on logout', async () => {
@@ -81,7 +85,7 @@ describe('AuthController refresh cookie', () => {
       expect.objectContaining({
         httpOnly: true,
         sameSite: 'strict',
-        path: '/auth',
+        path: '/',
       }),
     );
   });
