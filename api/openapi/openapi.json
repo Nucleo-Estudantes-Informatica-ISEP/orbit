@@ -4033,7 +4033,7 @@
             "description": "",
             "headers": {
               "Set-Cookie": {
-                "description": "Rotated 30-day orbit_refresh cookie; HttpOnly; SameSite=Strict; Path=/auth; Secure in production.",
+                "description": "Rotated 30-day orbit_refresh cookie; HttpOnly; SameSite=Strict; Path=/; Secure in production.",
                 "schema": {
                   "type": "string"
                 }
@@ -4082,7 +4082,7 @@
             "description": "",
             "headers": {
               "Set-Cookie": {
-                "description": "Rotated 30-day orbit_refresh cookie; HttpOnly; SameSite=Strict; Path=/auth; Secure in production.",
+                "description": "Rotated 30-day orbit_refresh cookie; HttpOnly; SameSite=Strict; Path=/; Secure in production.",
                 "schema": {
                   "type": "string"
                 }
@@ -4206,7 +4206,7 @@
             "description": "",
             "headers": {
               "Set-Cookie": {
-                "description": "Rotated 30-day orbit_refresh cookie; HttpOnly; SameSite=Strict; Path=/auth; Secure in production.",
+                "description": "Rotated 30-day orbit_refresh cookie; HttpOnly; SameSite=Strict; Path=/; Secure in production.",
                 "schema": {
                   "type": "string"
                 }
