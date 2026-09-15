@@ -73,6 +73,7 @@ export default function DashboardPage() {
   const canViewTasks = usePermission('TASKS_VIEW');
   const canViewDebts = usePermission('DEBTS_VIEW');
   const canViewAnnouncements = usePermission('ANNOUNCEMENTS_VIEW');
+  const canViewRecruitment = usePermission('RECRUITMENT_VIEW');
 
   const [myTasks, setMyTasks] = useState<Task[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
@@ -91,12 +92,16 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!user) return;
     Promise.all([
-      api.get<Task[]>(`/tasks?assigneeId=${user.id}`).catch(() => []),
-      api.get<Project[]>('/projects').catch(() => []),
-      api.get<Debt[]>('/debts').catch(() => []),
-      api.get<{ items: Event[]; total: number }>(`/events?page=1&pageSize=3&filter=UPCOMING`).catch(() => ({ items: [] as Event[] })),
-      api.get<Candidate[]>('/candidates').catch(() => []),
-      api.get<{ items: Announcement[]; total: number }>(`/announcements?page=1&pageSize=5&visibility=ALL`).catch(() => ({ items: [] as Announcement[] })),
+      canViewTasks ? api.get<Task[]>(`/tasks?assigneeId=${user.id}`).catch(() => []) : Promise.resolve([] as Task[]),
+      canViewProjects ? api.get<Project[]>('/projects').catch(() => []) : Promise.resolve([] as Project[]),
+      canViewDebts ? api.get<Debt[]>('/debts').catch(() => []) : Promise.resolve([] as Debt[]),
+      canViewEvents
+        ? api.get<{ items: Event[]; total: number }>(`/events?page=1&pageSize=3&filter=UPCOMING`).catch(() => ({ items: [] as Event[] }))
+        : Promise.resolve({ items: [] as Event[] }),
+      canViewRecruitment ? api.get<Candidate[]>('/candidates').catch(() => []) : Promise.resolve([] as Candidate[]),
+      canViewAnnouncements
+        ? api.get<{ items: Announcement[]; total: number }>(`/announcements?page=1&pageSize=5&visibility=ALL`).catch(() => ({ items: [] as Announcement[] }))
+        : Promise.resolve({ items: [] as Announcement[] }),
     ]).then(([tasksRaw, p, d, eResp, c, annResp]) => {
       const taskArr: Task[] = Array.isArray(tasksRaw) ? tasksRaw : [];
       setMyTasks(taskArr.filter((task) => task.status !== 'DONE').slice(0, 5));
@@ -110,7 +115,7 @@ export default function DashboardPage() {
       setAnnouncements(annArr.slice(0, 5));
       setLoading(false);
     });
-  }, [user]);
+  }, [user, canViewTasks, canViewProjects, canViewDebts, canViewEvents, canViewRecruitment, canViewAnnouncements]);
 
   const totalIncome = debts.filter((d) => d.type === 'INCOME').reduce((s, d) => s + Number(d.value), 0);
   const totalOutcome = debts.filter((d) => d.type === 'OUTCOME').reduce((s, d) => s + Number(d.value), 0);
@@ -177,7 +182,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
 
         {/* Minhas Tasks */}
-        <Card className="lg:col-span-2 bg-background shadow-sm border-border/40">
+        {canViewTasks && <Card className="lg:col-span-2 bg-background shadow-sm border-border/40">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle>{t('dashboard.myTasks')}</CardTitle>
@@ -213,10 +218,10 @@ export default function DashboardPage() {
               ))
             )}
           </CardContent>
-        </Card>
+        </Card>}
 
         {/* Próximos Eventos */}
-        <Card className="bg-background shadow-sm border-border/40">
+        {canViewEvents && <Card className="bg-background shadow-sm border-border/40">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle>{t('dashboard.upcomingEvents')}</CardTitle>
@@ -259,14 +264,14 @@ export default function DashboardPage() {
               ))
             )}
           </CardContent>
-        </Card>
+        </Card>}
       </div>
 
       {/* Second row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
 
         {/* Recrutamento */}
-        <Card className="bg-background shadow-sm border-border/40">
+        {canViewRecruitment && <Card className="bg-background shadow-sm border-border/40">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle>{t('dashboard.recruitmentPipeline')}</CardTitle>
@@ -301,10 +306,10 @@ export default function DashboardPage() {
               </div>
             )}
           </CardContent>
-        </Card>
+        </Card>}
 
         {/* Anúncios Recentes */}
-        <Card className="bg-background shadow-sm border-border/40">
+        {canViewAnnouncements && <Card className="bg-background shadow-sm border-border/40">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle>{t('dashboard.recentAnnouncements')}</CardTitle>
@@ -339,7 +344,7 @@ export default function DashboardPage() {
               ))
             )}
           </CardContent>
-        </Card>
+        </Card>}
       </div>
 
       {canViewDebts && (
