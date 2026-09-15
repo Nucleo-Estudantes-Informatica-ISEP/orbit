@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,7 +17,7 @@ import { useLocale } from '@/lib/locale-context';
 import { OrbitLogo } from '@/components/orbit-logo';
 
 export default function LoginPage() {
-  const { login, isLoading: authLoading } = useAuth();
+  const { login, isLoading: authLoading, isAuthenticated } = useAuth();
   const { t } = useLocale();
   const router = useRouter();
   const [isResetMode, setIsResetMode] = useState(false);
@@ -27,6 +27,12 @@ export default function LoginPage() {
   const [resetSent, setResetSent] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showSplash, setShowSplash] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading && isAuthenticated && !isResetMode && !showSplash) {
+      router.replace("/dashboard");
+    }
+  }, [authLoading, isAuthenticated, isResetMode, router, showSplash]);
 
   const exitResetMode = () => {
     setIsResetMode(false);

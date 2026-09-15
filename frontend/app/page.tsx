@@ -22,10 +22,21 @@ import {
   Sparkles
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { useAuth } from "@/lib/auth-context";
 import { useLocale, type AppLocale } from '@/lib/locale-context';
 
 export default function Home() {
   const { locale, setLocale, t } = useLocale();
+  const { isAuthenticated, isLoading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      router.replace('/dashboard');
+    }
+  }, [isAuthenticated, isLoading, router]);
 
   const handleLocaleChange = (nextLocale: string) => {
     if (nextLocale === 'pt' || nextLocale === 'en') {
