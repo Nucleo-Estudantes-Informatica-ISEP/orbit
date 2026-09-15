@@ -30,6 +30,9 @@ services:
 
   migrator:
     image: orbit-api
+    # orbit-api is built by the api service during the same deployment. Never
+    # try to resolve it from a registry when Coolify pre-pulls image services.
+    pull_policy: never
     exclude_from_hc: true
     command: ["npx", "prisma", "migrate", "deploy"]
     restart: "no"
