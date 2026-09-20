@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,7 +17,7 @@ import { useLocale } from '@/lib/locale-context';
 import { OrbitLogo } from '@/components/orbit-logo';
 
 export default function LoginPage() {
-  const { login, isLoading: authLoading } = useAuth();
+  const { login, isLoading: authLoading, user } = useAuth();
   const { t } = useLocale();
   const router = useRouter();
   const [isResetMode, setIsResetMode] = useState(false);
@@ -27,6 +27,12 @@ export default function LoginPage() {
   const [resetSent, setResetSent] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showSplash, setShowSplash] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading && user && !isResetMode && !showSplash) {
+      router.replace("/dashboard");
+    }
+  }, [authLoading, user, isResetMode, router, showSplash]);
 
   const exitResetMode = () => {
     setIsResetMode(false);
@@ -78,10 +84,8 @@ export default function LoginPage() {
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center p-4 bg-background text-foreground selection:bg-primary/20 selection:text-primary">
-      {/* BACKGROUND GRID */}
       <div className="fixed inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] -z-10"></div>
 
-      {/* BRANDING / LOGO (No hover animation) */}
       <Link href="/" className="mb-10 flex items-center gap-2">
         <OrbitLogo className="h-10" />
         <Badge variant="secondary" className="ml-2 text-[10px] font-medium tracking-wider uppercase">
@@ -89,7 +93,6 @@ export default function LoginPage() {
         </Badge>
       </Link>
 
-      {/* LOGIN / RESET CARD */}
       <Card className="w-full max-w-[420px] shadow-lg border-border/60 bg-background/60 backdrop-blur-xl overflow-hidden pb-0">
         <CardHeader className="space-y-3 text-center pb-8 pt-8">
           <CardTitle className="text-2xl font-semibold tracking-tight">
