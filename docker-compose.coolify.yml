@@ -16,7 +16,6 @@ services:
       NODE_ENV: production
       PORT: "3090"
       HOSTNAME: "0.0.0.0"
-      SERVICE_URL_FRONTEND_3090: ${SERVICE_URL_FRONTEND_3090}
     depends_on:
       api:
         condition: service_healthy
@@ -31,6 +30,9 @@ services:
 
   migrator:
     image: orbit-api
+    # orbit-api is built by the api service during the same deployment. Never
+    # try to resolve it from a registry when Coolify pre-pulls image services.
+    pull_policy: never
     exclude_from_hc: true
     command: ["npx", "prisma", "migrate", "deploy"]
     restart: "no"
@@ -95,7 +97,9 @@ services:
       retries: 10
 
   minio:
-    image: minio/minio:latest
+    # Docker Hub's minio/minio repository is archived. Keep the runtime on the
+    # official Quay registry and pin the image so deployments are reproducible.
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
