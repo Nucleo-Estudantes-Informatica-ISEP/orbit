@@ -20,8 +20,9 @@ import { useAuth } from '@/lib/auth-context';
 import { usePermission } from '@/lib/use-permission';
 import { useLocale } from '@/lib/locale-context';
 import { api } from '@/lib/api';
+import { getTaskBoardSelection, updateTaskBoardQuery } from '@/lib/task-board-selection';
 import { toast } from 'sonner';
-import { useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 interface Task {
   id: string;
@@ -51,6 +52,8 @@ const emptyForm = { title: '', description: '', priority: 'MEDIUM', status: 'TOD
 
 function TasksPage() {
   const { user } = useAuth();
+  const pathname = usePathname();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const { t } = useLocale();
   const canCreate = usePermission('TASKS_CREATE');
@@ -62,7 +65,6 @@ function TasksPage() {
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedBoard, setSelectedBoard] = useState<string>('ALL');
   const [myTasksOnly, setMyTasksOnly] = useState(false);
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -76,6 +78,7 @@ function TasksPage() {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   const preselectedProject = searchParams.get('projectId') ?? '';
+  const selectedBoard = getTaskBoardSelection(searchParams);
 
   const availableBoards = Array.from(
     new Map(
@@ -91,6 +94,11 @@ function TasksPage() {
   );
 
   const isProjectId = (id: string) => projects.some((p) => p.id === id);
+
+  const handleBoardChange = (selection: string) => {
+    const query = updateTaskBoardQuery(searchParams.toString(), selection, isProjectId(selection));
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
 
   const load = useCallback(async () => {
     const [t, b, u, p] = await Promise.all([
@@ -224,7 +232,7 @@ function TasksPage() {
 
       {/* Board selector + filters */}
       <div className="flex items-center gap-3 flex-wrap">
-        <Select value={selectedBoard === 'ALL' && preselectedProject ? preselectedProject : selectedBoard} onValueChange={setSelectedBoard}>
+        <Select value={selectedBoard} onValueChange={handleBoardChange}>
           <SelectTrigger className="w-48">
             <SelectValue placeholder={t('tasks.allBoards')} />
           </SelectTrigger>
