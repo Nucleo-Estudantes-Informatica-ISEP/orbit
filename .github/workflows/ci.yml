@@ -150,3 +150,20 @@ jobs:
           docker compose -f docker-compose.ci.yml config --quiet
           docker compose -f docker-compose.ci.yml pull --ignore-buildable
           docker image inspect orbit-api >/dev/null
+      - name: Validate shared-data Compose
+        env:
+          DATABASE_URL: postgresql://orbit_runtime:ci-only@shared-postgres:5432/orbit_test?schema=orbit
+          MIGRATION_DATABASE_URL: postgresql://orbit_migrator:ci-only@shared-postgres:5432/orbit_test?schema=orbit
+          SHARED_DATA_NETWORK: shared-data-ci
+          MINIO_ENDPOINT: shared-minio
+          MINIO_ACCESS_KEY: orbit-ci
+          MINIO_SECRET_KEY: ci-only-storage-password
+          MINIO_BUCKET: orbit-ci
+          SERVICE_BASE64_64_JWT: ci-only-jwt-secret
+          SMTP_PASS: ci-only-smtp-password
+          SMTP_HOST: smtp.example.invalid
+          SMTP_USER: ci@example.invalid
+          SMTP_FROM: Orbit CI <ci@example.invalid>
+        run: |
+          sed '/^[[:space:]]*exclude_from_hc:/d' docker-compose.shared.yml \
+            | docker compose -f - config --quiet

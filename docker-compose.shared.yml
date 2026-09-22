@@ -1,0 +1,87 @@
+# Shared PostgreSQL + MinIO deployment. See docs/shared-data.md.
+# slogan: ORBIT internal operating system
+# category: productivity
+# tags: nextjs,nestjs,postgres,minio
+# port: 3090
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: /api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3090"
+      HOSTNAME: "0.0.0.0"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3090').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    expose:
+      - "3090"
+
+  migrator:
+    image: orbit-api
+    # orbit-api is built by the api service during the same deployment. Never
+    # try to resolve it from a registry when Coolify pre-pulls image services.
+    pull_policy: never
+    exclude_from_hc: true
+    command: ["npx", "prisma", "migrate", "deploy"]
+    restart: "no"
+    environment:
+      DATABASE_URL: ${MIGRATION_DATABASE_URL:?Configure the restricted migration DATABASE_URL}
+    networks:
+      - shared-data
+
+  api:
+    image: orbit-api
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      APP_URL: ${APP_URL:-https://orbit.nei-isep.org}
+      DATABASE_URL: ${DATABASE_URL:?Configure the restricted runtime DATABASE_URL}
+      JWT_SECRET: ${SERVICE_BASE64_64_JWT}
+      CORS_ORIGIN: ${APP_URL:-https://orbit.nei-isep.org}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:?Configure shared MinIO hostname}
+      MINIO_PORT: ${MINIO_PORT:-9000}
+      MINIO_USE_SSL: ${MINIO_USE_SSL:-false}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?Configure Orbit bucket access key}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?Configure Orbit bucket secret key}
+      MINIO_BUCKET: ${MINIO_BUCKET:?Configure Orbit bucket}
+      SMTP_HOST: ${SMTP_HOST:?Configure SMTP_HOST in Coolify}
+      SMTP_PORT: "465"
+      SMTP_SECURE: "true"
+      SMTP_USER: ${SMTP_USER:?Configure SMTP_USER in Coolify}
+      SMTP_PASS: ${SMTP_PASS:?Configure SMTP_PASS in Coolify}
+      SMTP_FROM: ${SMTP_FROM:?Configure SMTP_FROM in Coolify}
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+    networks:
+      - default
+      - shared-data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    expose:
+      - "3000"
+
+networks:
+  shared-data:
+    external: true
+    name: ${SHARED_DATA_NETWORK:?Configure shared data Docker network}
