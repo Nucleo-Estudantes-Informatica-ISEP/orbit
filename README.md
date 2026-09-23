@@ -229,6 +229,8 @@ orbit/
 
 ## Contribuição, testes e CI/CD
 
+For shared PostgreSQL and MinIO deployments, use [`docker-compose.shared.yml`](./docker-compose.shared.yml) and follow the [shared-data migration guide](./docs/shared-data.md). Keep the existing Compose location until the data copy and cutover are verified.
+
 Leia [`AGENTS.md`](./AGENTS.md) antes de alterar o repositório. Para correções, prefira TDD: reproduza primeiro o erro num teste focado, implemente a menor correção e refatore com a suite verde.
 
 Cada PR para `main` instala com `npm ci` e tem de passar lint, typecheck, testes unitários/E2E, migrações numa base isolada, build, contrato OpenAPI, auditoria de dependências, imagens Docker não-root, validação do compose Coolify e Gitleaks. O merge não prova deploy: confirme no Coolify o SHA, a migração, `/health` e os fluxos alterados.
