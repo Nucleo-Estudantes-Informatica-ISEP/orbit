@@ -13,6 +13,10 @@ Contributor and automation instructions for the Orbit monorepo. Read this file b
 - Never trust actor/member IDs supplied by a client. Mutation attribution comes from the authenticated JWT. Access and refresh tokens are distinct types; access tokens are short-lived and refresh tokens rotate.
 - Keep mobile-enabling backend changes compatible with the existing web client.
 
+## Documentation-only verification
+
+For documentation-only changes (including `AGENTS.md`, `README.md`, and `docs/`), verify changed content, links, filenames, and `git diff --check`. Local application installs, lint, typecheck, tests, builds, audits, schema/migration checks, Docker builds, and runtime smoke checks are unnecessary. CI still runs its configured checks on the PR.
+
 ## Commands
 
 Run API commands from `api/`:
