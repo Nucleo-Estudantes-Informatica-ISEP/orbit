@@ -49,7 +49,7 @@ Every behavior change needs regression coverage at the lowest useful level. API 
 
 ## CI/CD
 
-`.github/workflows/ci.yml` is the required PR gate. It uses frozen `npm ci` installs and runs API lint/typecheck/unit/E2E/migrations/build/audit, frontend lint/typecheck/tests/build/audit, both production Docker builds with non-root assertions, Coolify compose validation, and Gitleaks.
+`.github/workflows/ci.yml` is the required PR gate. It uses frozen `npm ci` installs and runs API lint/typecheck/unit/E2E/migrations/build/audit, frontend lint/typecheck/tests/build/audit, API/frontend non-root Docker builds, the pinned MinIO source build, Coolify compose validation, and Gitleaks.
 
 Production is Docker Compose on Coolify. The `migrator` service must finish successfully before the API starts; the API health route is `/health`, and the frontend waits for API health. Do not put migrations back into the API startup command and do not add a competing deployment workflow. A green image build is not proof of a deployed release: verify the deployed SHA, migration status, `/health`, the frontend root, and the affected authenticated flow.
 

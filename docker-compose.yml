@@ -62,7 +62,10 @@ services:
       - orbit-internal
 
   minio:
-    image: minio/minio:latest
+    image: orbit-minio
+    build:
+      context: ./minio
+      dockerfile: Dockerfile
     restart: unless-stopped
     # Porta nao exposta publicamente — comunicacao interna apenas
     command: server /data --console-address ":9001"
@@ -74,7 +77,7 @@ services:
     networks:
       - orbit-internal
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9000/minio/health/live"]
       interval: 30s
       timeout: 10s
       retries: 3
