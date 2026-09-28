@@ -149,6 +149,7 @@ jobs:
           trap 'rm -f docker-compose.ci.yml' EXIT
           docker compose -f docker-compose.ci.yml config --quiet
           docker compose -f docker-compose.ci.yml pull --ignore-buildable
+          docker compose -f docker-compose.ci.yml build minio
           docker image inspect orbit-api >/dev/null
       - name: Validate shared-data Compose
         env:
