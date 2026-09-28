@@ -97,9 +97,10 @@ services:
       retries: 10
 
   minio:
-    # Docker Hub's minio/minio repository is archived. Keep the runtime on the
-    # official Quay registry and pin the image so deployments are reproducible.
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    image: orbit-minio
+    build:
+      context: ./minio
+      dockerfile: Dockerfile
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
@@ -108,7 +109,7 @@ services:
     volumes:
       - minio-data:/data
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9000/minio/health/live"]
       interval: 30s
       timeout: 5s
       retries: 5
