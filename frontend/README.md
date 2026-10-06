@@ -21,6 +21,12 @@ npm run build
 npm audit --omit=dev
 ```
 
+The lockfile resolves `proxy-addr` to 2.0.8 to fix
+[GHSA-jqcg-44mw-7w3h](https://github.com/advisories/GHSA-jqcg-44mw-7w3h).
+After dependency updates, run `npm audit --omit=dev --audit-level=critical`
+to reproduce the CI security gate.
+
+
 Prefer TDD for client session handling and behavior regressions. The session tests cover single-flight refresh, persisted rotating tokens, invalid-session clearing, and retry behavior. Add focused behavior tests instead of asserting implementation details.
 
 ## Deployment
