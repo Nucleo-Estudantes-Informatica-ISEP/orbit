@@ -36,6 +36,12 @@ npm run openapi:check
 npm audit --omit=dev
 ```
 
+The lockfile resolves `proxy-addr` to 2.0.8 to fix
+[GHSA-jqcg-44mw-7w3h](https://github.com/advisories/GHSA-jqcg-44mw-7w3h).
+After dependency updates, run `npm audit --omit=dev --audit-level=critical`
+to reproduce the CI security gate.
+
+
 Prefer TDD for DTO validation, permissions, session behavior, and regressions. Contract changes require a focused test and `npm run openapi:generate`; CI rejects drift.
 
 ## Production
