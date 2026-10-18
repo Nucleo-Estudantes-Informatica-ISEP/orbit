@@ -13,6 +13,10 @@ Contributor and automation instructions for the Orbit monorepo. Read this file b
 - Never trust actor/member IDs supplied by a client. Mutation attribution comes from the authenticated JWT. Access and refresh tokens are distinct types; access tokens are short-lived and refresh tokens rotate.
 - Keep mobile-enabling backend changes compatible with the existing web client.
 
+## Documentation-only verification
+
+For documentation-only changes (including `AGENTS.md`, `README.md`, and `docs/`), verify changed content, links, filenames, and `git diff --check`. Local application installs, lint, typecheck, tests, builds, audits, schema/migration checks, Docker builds, and runtime smoke checks are unnecessary. CI still runs its configured checks on the PR.
+
 ## Commands
 
 Run API commands from `api/`:
@@ -45,7 +49,7 @@ Every behavior change needs regression coverage at the lowest useful level. API 
 
 ## CI/CD
 
-`.github/workflows/ci.yml` is the required PR gate. It uses frozen `npm ci` installs and runs API lint/typecheck/unit/E2E/migrations/build/audit, frontend lint/typecheck/tests/build/audit, both production Docker builds with non-root assertions, Coolify compose validation, and Gitleaks.
+`.github/workflows/ci.yml` is the required PR gate. It uses frozen `npm ci` installs and runs API lint/typecheck/unit/E2E/migrations/build/audit, frontend lint/typecheck/tests/build/audit, API/frontend non-root Docker builds, the pinned MinIO source build, Coolify compose validation, and Gitleaks.
 
 Production is Docker Compose on Coolify. The `migrator` service must finish successfully before the API starts; the API health route is `/health`, and the frontend waits for API health. Do not put migrations back into the API startup command and do not add a competing deployment workflow. A green image build is not proof of a deployed release: verify the deployed SHA, migration status, `/health`, the frontend root, and the affected authenticated flow.
 
@@ -56,3 +60,20 @@ Dependabot routine groups are patch/minor only. Major framework, runtime, or too
 Keep `README.md`, `api/README.md`, `frontend/README.md`, `.env` examples, `docs/api-contract.md`, and this file synchronized with scripts, token behavior, deployment, routes, and environment names. Remove starter-template or retired-host instructions instead of preserving them as alternatives.
 
 Never commit or print secrets. Production seeds must fail closed when required administrator credentials are missing and must never log passwords.
+
+## Pull request metadata
+
+- Whenever opening a pull request, add the applicable existing repository
+  labels. Follow the repository's label conventions; do not leave the PR
+  unlabeled.
+- Assign every pull request to its creator (the GitHub PR author). Read the PR
+  author from GitHub and use that account; use `--add-assignee @me` only when
+  the authenticated account is the PR author.
+- Link the issue the PR addresses through GitHub's **Development** relationship
+  and verify that the link exists. A plain `Refs #N` mention is not sufficient.
+  Use a closing keyword when the PR completes the issue, or explicitly link it
+  through Development for partial work. For a non-default target branch,
+  explicitly establish the Development link rather than relying on a closing
+  keyword. Do not link a parent for closure unless its full scope is completed.
+- Verify the labels, creator assignment and Development issue link before
+  reporting the PR as opened.
