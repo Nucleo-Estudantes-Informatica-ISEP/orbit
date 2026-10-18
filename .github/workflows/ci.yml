@@ -131,6 +131,24 @@ jobs:
       - name: Build frontend image
         run: docker build -t orbit-frontend-check ./frontend
 
+      - name: Build MinIO image
+        run: docker build -t orbit-minio-check ./minio
+
+      - name: Check MinIO readiness
+        run: |
+          docker run --detach --name orbit-minio-check \
+            --env MINIO_ROOT_USER=minio --env MINIO_ROOT_PASSWORD=ci-only-minio-password \
+            orbit-minio-check server /data --console-address ":9001"
+          trap 'docker rm --force --volumes orbit-minio-check' EXIT
+          for attempt in {1..30}; do
+            if docker exec orbit-minio-check mc ready local; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs orbit-minio-check
+          exit 1
+
       - name: Verify non-root runtimes
         run: |
           test "$(docker inspect --format '{{.Config.User}}' orbit-api)" = "node"

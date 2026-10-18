@@ -97,9 +97,10 @@ services:
       retries: 10
 
   minio:
-    # Docker Hub's minio/minio repository is archived. Keep the runtime on the
-    # official Quay registry and pin the image so deployments are reproducible.
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    # Build the pinned official release assets; the upstream image is unavailable.
+    build:
+      context: ./minio
+      dockerfile: Dockerfile
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:

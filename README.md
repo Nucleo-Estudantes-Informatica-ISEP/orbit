@@ -231,6 +231,8 @@ orbit/
 
 For shared PostgreSQL and MinIO deployments, use [`docker-compose.shared.yml`](./docker-compose.shared.yml) and follow the [shared-data migration guide](./docs/shared-data.md). Keep the existing Compose location until the data copy and cutover are verified.
 
+The embedded MinIO service builds from [`minio/Dockerfile`](./minio/Dockerfile), using the official GitHub release binaries with pinned SHA-256 digests because the upstream container image is unavailable. It retains server release `RELEASE.2025-09-07T16-13-09Z`, the existing `/data` volume and `mc ready local` healthcheck. Builds support Linux amd64, arm64 and ppc64le and require HTTPS access to the official MinIO GitHub release assets. CI builds this image alongside the API and frontend.
+
 Leia [`AGENTS.md`](./AGENTS.md) antes de alterar o repositório. Para correções, prefira TDD: reproduza primeiro o erro num teste focado, implemente a menor correção e refatore com a suite verde.
 
 Cada PR para `main` instala com `npm ci` e tem de passar lint, typecheck, testes unitários/E2E, migrações numa base isolada, build, contrato OpenAPI, auditoria de dependências, imagens Docker não-root, validação do compose Coolify e Gitleaks. O merge não prova deploy: confirme no Coolify o SHA, a migração, `/health` e os fluxos alterados.
