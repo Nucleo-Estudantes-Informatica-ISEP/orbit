@@ -111,6 +111,8 @@ O seed falha antes de escrever na base se as credenciais explícitas estiverem a
 
 A produção usa `docker-compose.coolify.yml`. O serviço `migrator` executa `prisma migrate deploy` e tem de terminar com sucesso antes da API arrancar. A API corre separadamente como utilizador não-root e expõe `GET /health`; o frontend só fica pronto depois da API. Configure `SMTP_PASS` como segredo do Coolify — nunca no compose ou no Git.
 
+O MinIO é compilado da release `RELEASE.2025-10-15T17-29-55Z` em `minio/Dockerfile`, pois as imagens oficiais deixaram de estar disponíveis nos registos públicos. O volume `minio-data` mantém os dados entre builds.
+
 ---
 
 ## Comandos úteis
