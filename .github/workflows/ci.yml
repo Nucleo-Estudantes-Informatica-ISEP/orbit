@@ -131,6 +131,12 @@ jobs:
       - name: Build frontend image
         run: docker build -t orbit-frontend-check ./frontend
 
+      - name: Build MinIO image and verify storage compatibility
+        run: |
+          docker build -t orbit-minio-check ./minio
+          npm ci --ignore-scripts --prefix api
+          node scripts/check-minio-image.cjs orbit-minio-check
+
       - name: Verify non-root runtimes
         run: |
           test "$(docker inspect --format '{{.Config.User}}' orbit-api)" = "node"
