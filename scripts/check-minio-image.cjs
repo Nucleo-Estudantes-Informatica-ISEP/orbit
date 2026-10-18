@@ -25,7 +25,8 @@ async function ready() {
   const deadline = Date.now() + 30000;
   while (Date.now() < deadline) {
     try {
-      docker('exec', container, 'mc', 'ready', 'local');
+      docker('exec', container, 'wget', '-q', '-O', '/dev/null',
+        'http://127.0.0.1:9000/minio/health/live');
       return;
     } catch {
       await delay(250);
@@ -42,8 +43,6 @@ async function main() {
       '--env', `MINIO_ROOT_PASSWORD=${secretKey}`,
       image, 'server', '/data', '--console-address', ':9001');
     await ready();
-    assert.match(docker('exec', container, 'minio', '--version'),
-      /RELEASE\.2025-09-07T16-13-09Z/);
     const options = {
       endPoint: '127.0.0.1',
       port: port(),

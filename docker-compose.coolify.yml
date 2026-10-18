@@ -97,7 +97,7 @@ services:
       retries: 10
 
   minio:
-    # Community images are unavailable; build the pinned upstream release.
+    image: orbit-minio
     build:
       context: ./minio
       dockerfile: Dockerfile
@@ -109,7 +109,7 @@ services:
     volumes:
       - minio-data:/data
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9000/minio/health/live"]
       interval: 30s
       timeout: 5s
       retries: 5

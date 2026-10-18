@@ -111,7 +111,7 @@ O seed falha antes de escrever na base se as credenciais explícitas estiverem a
 
 A produção usa `docker-compose.coolify.yml`. O serviço `migrator` executa `prisma migrate deploy` e tem de terminar com sucesso antes da API arrancar. A API corre separadamente como utilizador não-root e expõe `GET /health`; o frontend só fica pronto depois da API. Configure `SMTP_PASS` como segredo do Coolify — nunca no compose ou no Git.
 
-O MinIO é compilado pelo `minio/Dockerfile` a partir do commit e checksum fixos da versão `RELEASE.2025-09-07T16-13-09Z`: as imagens comunitárias deixaram de estar disponíveis nos registos oficiais. O volume `minio-data`, as credenciais e o healthcheck `mc ready local` mantêm-se. O CI compila a imagem e verifica autenticação, operações S3 e persistência após reinício com `node scripts/check-minio-image.cjs orbit-minio-check` (requer `npm ci --ignore-scripts --prefix api`). O código e as instruções de compilação do fornecedor estão em [minio/minio](https://github.com/minio/minio).
+O MinIO é compilado da release `RELEASE.2025-10-15T17-29-55Z` em `minio/Dockerfile`, pois as imagens oficiais deixaram de estar disponíveis nos registos públicos. O volume `minio-data` mantém os dados entre builds. O CI verifica autenticação, operações S3 e persistência após reinício com `node scripts/check-minio-image.cjs orbit-minio-check` (requer `npm ci --ignore-scripts --prefix api`).
 
 ---
 
