@@ -74,7 +74,11 @@ export class ConnectorsService {
 
   async execute(operation: AccessOperation): Promise<ConnectorResult> {
     const resource = operation.resourceSnapshot as unknown as Resource;
-    if (!operation.providerUserId || !operation.verificationNote)
+    if (
+      !operation.providerUserId?.trim() ||
+      !operation.verificationNote ||
+      operation.verificationNote.trim().length < 5
+    )
       return {
         status: 'AWAITING_ACCOUNT',
         detail: 'Confirmar conta externa antes de executar',

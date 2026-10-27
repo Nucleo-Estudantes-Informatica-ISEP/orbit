@@ -29,7 +29,10 @@ export function assertOperationIdentity(
   remoteId?: string | null,
   verification?: string | null,
 ) {
-  if (action === 'REVOKE' && (!remoteId?.trim() || !verification?.trim())) {
+  if (
+    action === 'REVOKE' &&
+    (!remoteId?.trim() || !verification || verification.trim().length < 5)
+  ) {
     throw new BadRequestException(
       'Revogação exige ID remoto e evidência de identidade verificada',
     );

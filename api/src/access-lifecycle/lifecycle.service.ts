@@ -272,9 +272,9 @@ export class LifecycleService {
         resourceSnapshot: JSON.parse(
           JSON.stringify(resource),
         ) as Prisma.InputJsonValue,
-        providerUserId: op.providerUserId,
+        providerUserId: op.providerUserId?.trim() || undefined,
         accountEmail: op.accountEmail,
-        verificationNote: op.verificationNote,
+        verificationNote: op.verificationNote?.trim() || undefined,
         exceptionReason: op.exceptionReason,
         automatic: resource.automatic,
       };
@@ -406,7 +406,9 @@ export class LifecycleService {
               ? 'CANCELLED'
               : !op.automatic
                 ? 'AWAITING_MANUAL'
-                : !op.providerUserId || !op.verificationNote
+                : !op.providerUserId ||
+                    !op.verificationNote ||
+                    op.verificationNote.length < 5
                   ? 'AWAITING_ACCOUNT'
                   : 'PENDING',
           },
@@ -479,7 +481,11 @@ export class LifecycleService {
       throw new BadRequestException(
         'Limite de tentativas atingido; criar pedido revisto',
       );
-    if (!op.providerUserId || !op.verificationNote)
+    if (
+      !op.providerUserId ||
+      !op.verificationNote ||
+      op.verificationNote.trim().length < 5
+    )
       throw new BadRequestException(
         'Criar pedido revisto com identidade verificada para nova aprovação',
       );

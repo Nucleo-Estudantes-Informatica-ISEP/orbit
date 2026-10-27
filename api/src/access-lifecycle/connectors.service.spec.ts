@@ -27,6 +27,15 @@ describe('external access connectors', () => {
     const op = { ...operation('GITHUB', {}), providerUserId: null };
     expect((await service.execute(op)).status).toBe('AWAITING_ACCOUNT');
     expect(http.request).not.toHaveBeenCalled();
+    expect(
+      (
+        await service.execute({
+          ...operation('GITHUB', {}),
+          verificationNote: '     ',
+        })
+      ).status,
+    ).toBe('AWAITING_ACCOUNT');
+    expect(http.request).not.toHaveBeenCalled();
   });
 
   it('excludes bots from Discord access management', async () => {
