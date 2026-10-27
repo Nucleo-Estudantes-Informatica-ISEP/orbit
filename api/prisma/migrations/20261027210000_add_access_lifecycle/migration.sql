@@ -178,4 +178,3 @@ ALTER TABLE "OperationEvidence" ADD CONSTRAINT "OperationEvidence_operationId_fk
 
 -- AddForeignKey
 ALTER TABLE "OperationEvidence" ADD CONSTRAINT "OperationEvidence_performedById_fkey" FOREIGN KEY ("performedById") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
