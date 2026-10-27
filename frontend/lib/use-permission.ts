@@ -3,6 +3,7 @@
 import { useAuth } from '@/lib/auth-context';
 
 const READ_BACKED_VIEW_MODULES = new Set([
+  'ACCESS',
   'ANNOUNCEMENTS',
   'DEBTS',
   'EVENTS',

@@ -41,6 +41,8 @@ function pick<T>(arr: T[]): T {
 // ─── permissions ────────────────────────────────────────────────────────────
 
 const ALL_PERMISSIONS: SystemPermission[] = [
+  SystemPermission.ACCESS_READ, SystemPermission.ACCESS_CREATE, SystemPermission.ACCESS_APPROVE,
+  SystemPermission.ACCESS_EXECUTE, SystemPermission.ACCESS_MANAGE, SystemPermission.ACCESS_ALL_DEPARTMENTS,
   SystemPermission.USERS_VIEW, SystemPermission.USERS_CREATE, SystemPermission.USERS_READ,
   SystemPermission.USERS_UPDATE, SystemPermission.USERS_DELETE,
   SystemPermission.ROLES_VIEW, SystemPermission.ROLES_CREATE, SystemPermission.ROLES_READ,
@@ -75,6 +77,7 @@ const ALL_PERMISSIONS: SystemPermission[] = [
 ]
 
 const COORDINATOR_PERMISSIONS: SystemPermission[] = [
+  SystemPermission.ACCESS_READ, SystemPermission.ACCESS_CREATE, SystemPermission.ACCESS_EXECUTE,
   SystemPermission.USERS_VIEW, SystemPermission.USERS_READ, SystemPermission.USERS_UPDATE,
   SystemPermission.ROLES_VIEW, SystemPermission.ROLES_READ,
   SystemPermission.DEPARTMENTS_VIEW, SystemPermission.DEPARTMENTS_READ, SystemPermission.DEPARTMENTS_UPDATE,

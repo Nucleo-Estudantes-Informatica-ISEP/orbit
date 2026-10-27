@@ -51,6 +51,12 @@ enum RecruitmentStage {
 }
 
 enum SystemPermission {
+  ACCESS_READ
+  ACCESS_CREATE
+  ACCESS_APPROVE
+  ACCESS_EXECUTE
+  ACCESS_MANAGE
+  ACCESS_ALL_DEPARTMENTS
   USERS_VIEW
   USERS_CREATE
   USERS_READ
@@ -179,6 +185,9 @@ model Department {
 }
 
 model User {
+  lifecycleRequests       LifecycleProcess[]   @relation("LifecycleRequester")
+  lifecycleDecisions      ProcessApproval[]
+  lifecycleEvidence       OperationEvidence[]
   id                      String               @id @default(uuid())
   name                    String
   email                   String               @unique
@@ -205,6 +214,158 @@ model User {
   authSessions            AuthSession[]
   createdAt               DateTime             @default(now())
   updatedAt               DateTime             @updatedAt
+}
+
+enum AccessProvider {
+  DISCORD
+  GITHUB
+  GOOGLE_DRIVE
+  WHATSAPP
+  FIGMA
+  CODA
+  FREEDCAMP
+  EMAIL
+}
+
+enum LifecycleKind {
+  ONBOARD
+  OFFBOARD
+  CHANGE_ACCESS
+  ALUMNI_TRANSITION
+}
+
+enum LifecycleStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  COMPLETED
+  CANCELLED
+}
+
+enum AccessAction {
+  GRANT
+  REVOKE
+  VERIFY
+}
+
+enum AccessOperationStatus {
+  PENDING
+  RUNNING
+  AWAITING_ACCOUNT
+  AWAITING_MANUAL
+  SUCCEEDED
+  FAILED
+  SKIPPED
+  CANCELLED
+}
+
+model AccessResource {
+  id            String         @id @default(uuid())
+  name          String
+  provider      AccessProvider
+  remoteId      String
+  containerId   String?
+  resourceType  String
+  automatic     Boolean        @default(false)
+  sensitive     Boolean        @default(false)
+  enabled       Boolean        @default(true)
+  departmentIds String[]       @default([])
+  instructions  String         @default("")
+  adminUrl      String?
+  version       Int            @default(1)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model AccessPolicy {
+  id            String   @id @default(uuid())
+  name          String
+  departmentIds String[] @default([])
+  positions     String[] @default([])
+  resourceIds   String[]
+  enabled       Boolean  @default(true)
+  version       Int      @default(1)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model LifecycleProcess {
+  id                  String            @id @default(uuid())
+  kind                LifecycleKind
+  status              LifecycleStatus   @default(DRAFT)
+  targetName          String
+  targetEmail         String
+  targetDepartmentIds String[]
+  targetPositions     String[]
+  source              Json
+  reason              String
+  policySnapshot      Json
+  requestedByUserId   String
+  requestedBy         User              @relation("LifecycleRequester", fields: [requestedByUserId], references: [id], onDelete: Restrict)
+  version             Int               @default(1)
+  submittedAt         DateTime?
+  completedAt         DateTime?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  operations          AccessOperation[]
+  approvals           ProcessApproval[]
+
+  @@index([status, createdAt])
+  @@index([targetEmail])
+  @@index([targetDepartmentIds], type: Gin)
+}
+
+model AccessOperation {
+  id               String                @id @default(uuid())
+  processId        String
+  process          LifecycleProcess      @relation(fields: [processId], references: [id], onDelete: Restrict)
+  action           AccessAction
+  provider         AccessProvider
+  resourceSnapshot Json
+  providerUserId   String?
+  accountEmail     String?
+  verificationNote String?
+  exceptionReason  String?
+  status           AccessOperationStatus @default(PENDING)
+  automatic        Boolean
+  attempts         Int                   @default(0)
+  nextAttemptAt    DateTime              @default(now())
+  leaseToken       String?
+  leaseUntil       DateTime?
+  idempotencyKey   String                @unique @default(uuid())
+  result           Json?
+  lastError        String?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  evidence         OperationEvidence[]
+
+  @@index([status, nextAttemptAt])
+  @@index([processId])
+  @@index([provider, providerUserId])
+}
+
+model ProcessApproval {
+  id          String           @id @default(uuid())
+  processId   String           @unique
+  process     LifecycleProcess @relation(fields: [processId], references: [id], onDelete: Restrict)
+  decidedById String
+  decidedBy   User             @relation(fields: [decidedById], references: [id], onDelete: Restrict)
+  approved    Boolean
+  note        String
+  snapshot    Json
+  createdAt   DateTime         @default(now())
+}
+
+model OperationEvidence {
+  id            String          @id @default(uuid())
+  operationId   String
+  operation     AccessOperation @relation(fields: [operationId], references: [id], onDelete: Restrict)
+  performedById String
+  performedBy   User            @relation(fields: [performedById], references: [id], onDelete: Restrict)
+  outcome       String
+  note          String
+  createdAt     DateTime        @default(now())
 }
 
 model AuthSession {
