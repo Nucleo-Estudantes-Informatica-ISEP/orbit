@@ -77,8 +77,8 @@ export function AccessAdmin({
         type === "resources"
           ? {
               ...resource,
-              containerId: resource.containerId || undefined,
-              adminUrl: resource.adminUrl || undefined,
+              containerId: resource.containerId || (current ? null : undefined),
+              adminUrl: resource.adminUrl || (current ? null : undefined),
             }
           : policy;
       if (current)
