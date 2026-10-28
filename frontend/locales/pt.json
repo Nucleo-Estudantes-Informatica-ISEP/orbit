@@ -819,7 +819,7 @@
   "access.kindHelp.ONBOARD": "Entrada: sugere os acessos a conceder à pessoa.",
   "access.kindHelp.OFFBOARD": "Saída: sugere os acessos a revogar. Confirma os departamentos e cargos que a pessoa deixa.",
   "access.kindHelp.CHANGE_ACCESS": "Mudança de funções ou acessos: escolhe o que conceder, revogar ou apenas consultar.",
-  "access.kindHelp.ALUMNI_TRANSITION": "Transição: sugere remover os acessos anteriores e conceder os acessos Alumni.",
+  "access.kindHelp.ALUMNI_TRANSITION": "Transição: sugere conceder os acessos previstos para Alumni e remover os que deixam de se aplicar.",
   "access.originPositions": "Cargos de origem",
   "access.alumniDestination": "Destino: Alumni. Seleciona pelo menos um cargo de origem; os acessos Alumni serão sugeridos para concessão.",
   "access.contextHelp": "Este contexto orienta as predefinições do pedido e não altera a conta Orbit da pessoa.",

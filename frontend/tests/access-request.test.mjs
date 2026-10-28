@@ -216,6 +216,61 @@ test("Alumni transition grants Alumni access while revoking the previous role re
   );
 });
 
+test("an Alumni transition preserves access from a policy with no position restriction", () => {
+  const policies = [
+    {
+      enabled: true,
+      departmentIds: ["it"],
+      positions: [],
+      resourceIds: ["shared-access"],
+    },
+  ];
+  assert.equal(
+    defaultAccessAction("ALUMNI_TRANSITION", "shared-access", policies, ["it"]),
+    "GRANT",
+  );
+});
+
+test("an unrestricted policy preserves shared access even when a Member-only policy also covers it", () => {
+  const policies = [
+    { enabled: true, positions: ["MEMBER"], resourceIds: ["shared-access"] },
+    { enabled: true, positions: [], resourceIds: ["shared-access"] },
+  ];
+  assert.equal(
+    defaultAccessAction("ALUMNI_TRANSITION", "shared-access", policies, ["it"]),
+    "GRANT",
+  );
+});
+
+test("an unrestricted policy from another department does not preserve access", () => {
+  const policies = [
+    {
+      enabled: true,
+      departmentIds: ["marketing"],
+      positions: [],
+      resourceIds: ["previous-access"],
+    },
+  ];
+  assert.equal(
+    defaultAccessAction("ALUMNI_TRANSITION", "previous-access", policies, [
+      "it",
+    ]),
+    "REVOKE",
+  );
+});
+
+test("a disabled unrestricted policy does not preserve access", () => {
+  const policies = [
+    { enabled: false, positions: [], resourceIds: ["previous-access"] },
+  ];
+  assert.equal(
+    defaultAccessAction("ALUMNI_TRANSITION", "previous-access", policies, [
+      "it",
+    ]),
+    "REVOKE",
+  );
+});
+
 test("an Alumni policy from another department does not turn a revocation into a grant", () => {
   const policies = [
     {

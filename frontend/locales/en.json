@@ -819,7 +819,7 @@
   "access.kindHelp.ONBOARD": "Joining: suggests access to grant to this person.",
   "access.kindHelp.OFFBOARD": "Leaving: suggests access to revoke. Confirm the departments and positions the person is leaving.",
   "access.kindHelp.CHANGE_ACCESS": "Changing responsibilities or access: choose what to grant, revoke or only verify.",
-  "access.kindHelp.ALUMNI_TRANSITION": "Transition: suggests removing previous access and granting Alumni access.",
+  "access.kindHelp.ALUMNI_TRANSITION": "Transition: suggests granting access that applies to Alumni and removing access that no longer applies.",
   "access.originPositions": "Previous positions",
   "access.alumniDestination": "Destination: Alumni. Select at least one origin position; Alumni access will be suggested for granting.",
   "access.contextHelp": "This context determines request defaults and does not change the person’s Orbit account.",

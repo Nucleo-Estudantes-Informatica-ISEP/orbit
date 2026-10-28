@@ -129,7 +129,7 @@ export function defaultAccessAction(
         policy.enabled &&
         (!policy.departmentIds?.length ||
           policy.departmentIds.some((id) => departmentIds.includes(id))) &&
-        policy.positions.includes("ALUMNI") &&
+        (!policy.positions.length || policy.positions.includes("ALUMNI")) &&
         policy.resourceIds.includes(resourceId),
     )
       ? "GRANT"
