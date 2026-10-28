@@ -378,6 +378,25 @@ export class ConnectorsService {
     throw new ProviderError('DRIVE_PAGINATION_LIMIT');
   }
 
+  private driveCanWrite(permission: DrivePermission): boolean {
+    return (
+      permission.type === 'user' &&
+      ['writer', 'fileOrganizer', 'organizer', 'owner'].includes(
+        permission.role,
+      )
+    );
+  }
+
+  private driveExistingGrant(permission: DrivePermission): ConnectorResult {
+    return {
+      status: this.driveCanWrite(permission) ? 'SUCCEEDED' : 'AWAITING_MANUAL',
+      detail: this.driveCanWrite(permission)
+        ? 'Permissão de escrita confirmada para o utilizador aprovado'
+        : 'Permissão existente sem escrita; conceder escrita e confirmar manualmente',
+      remoteId: permission.id,
+    };
+  }
+
   private async drive(
     op: AccessOperation,
     resource: Resource,
@@ -403,6 +422,7 @@ export class ConnectorsService {
         detail: 'Auditar acesso limitado/herança antes de gerir pasta sensível',
       };
     const permissions = await this.drivePermissions(resource.remoteId, token);
+    const accountEmail = op.accountEmail?.trim().toLowerCase();
     const match = permissions.find(
       (value) => value.id === op.providerUserId && value.type === 'user',
     );
@@ -411,16 +431,14 @@ export class ConnectorsService {
       !match &&
       op.accountEmail &&
       permissions.some(
-        (permission) =>
-          permission.emailAddress?.toLowerCase() ===
-          op.accountEmail!.toLowerCase(),
+        (permission) => permission.emailAddress?.toLowerCase() === accountEmail,
       )
     )
       throw new ProviderError('DRIVE_ACCOUNT_MISMATCH');
     if (
       match &&
       op.accountEmail &&
-      match.emailAddress?.toLowerCase() !== op.accountEmail.toLowerCase()
+      match.emailAddress?.toLowerCase() !== accountEmail
     )
       throw new ProviderError('DRIVE_ACCOUNT_MISMATCH');
     if (op.action === 'VERIFY')
@@ -429,31 +447,24 @@ export class ConnectorsService {
         detail: 'Permissão direta consultada; inventário parcial',
       };
     if (op.action === 'GRANT') {
-      if (match)
-        return {
-          status: 'SUCCEEDED',
-          detail: 'Permissão de utilizador confirmada',
-          remoteId: match.id,
-        };
-      if (!op.accountEmail) throw new ProviderError('DRIVE_EMAIL_REQUIRED');
+      if (match) return this.driveExistingGrant(match);
+      if (!accountEmail) throw new ProviderError('DRIVE_EMAIL_REQUIRED');
+      // Without a matching permission ID, the approved principal must be the
+      // same email we send to Google. Never substitute an unrelated email for it.
+      if (op.providerUserId?.trim().toLowerCase() !== accountEmail)
+        throw new ProviderError('DRIVE_ACCOUNT_MISMATCH');
       const emailMatches = permissions.filter(
-        (value) =>
-          value.emailAddress?.toLowerCase() === op.accountEmail!.toLowerCase(),
+        (value) => value.emailAddress?.toLowerCase() === accountEmail,
       );
       if (emailMatches.length === 1 && emailMatches[0].type === 'user')
-        return {
-          status: 'SUCCEEDED',
-          detail:
-            'Permissão existente confirmada para o principal Google aprovado',
-          remoteId: emailMatches[0].id,
-        };
+        return this.driveExistingGrant(emailMatches[0]);
       if (emailMatches.length)
         throw new ProviderError('DRIVE_ACCOUNT_MISMATCH');
       const created = await this.http.request<DrivePermission>(
         `${root}/permissions?supportsAllDrives=true&sendNotificationEmail=true&fields=id,type,emailAddress,role`,
         token,
         'POST',
-        { type: 'user', role: 'writer', emailAddress: op.accountEmail },
+        { type: 'user', role: 'writer', emailAddress: accountEmail },
       );
       if (!created?.id) throw new ProviderError('DRIVE_GRANT_UNVERIFIED', true);
       const after = await this.drivePermissions(resource.remoteId, token);
@@ -461,8 +472,8 @@ export class ConnectorsService {
         !after.some(
           (value) =>
             value.id === created.id &&
-            value.emailAddress?.toLowerCase() ===
-              op.accountEmail!.toLowerCase(),
+            value.emailAddress?.toLowerCase() === accountEmail &&
+            this.driveCanWrite(value),
         )
       )
         throw new ProviderError('DRIVE_GRANT_UNVERIFIED', true);

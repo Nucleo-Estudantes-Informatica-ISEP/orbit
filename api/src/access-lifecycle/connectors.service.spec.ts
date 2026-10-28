@@ -212,6 +212,133 @@ describe('external access connectors', () => {
     expect(http.request).not.toHaveBeenCalled();
   });
 
+  describe('Drive grants', () => {
+    const permission = (role = 'writer') => ({
+      id: '123456789012345678',
+      type: 'user',
+      emailAddress: 'person@example.com',
+      role,
+    });
+    const grant = (providerUserId = 'person@example.com') => ({
+      ...operation('GOOGLE_DRIVE', { remoteId: 'folder' }),
+      providerUserId,
+    });
+    const existingPermissions = (permissions: object[]) => {
+      http.request
+        .mockResolvedValueOnce({
+          mimeType: 'application/vnd.google-apps.folder',
+        })
+        .mockResolvedValueOnce({ permissions });
+    };
+
+    it.each(['other@example.com', '999'])(
+      'rejects an unbound principal %s before creating access',
+      async (principal) => {
+        existingPermissions([]);
+        await expect(service.execute(grant(principal))).rejects.toThrow(
+          'DRIVE_ACCOUNT_MISMATCH',
+        );
+        expect(http.request).toHaveBeenCalledTimes(2);
+      },
+    );
+
+    it('does not substitute an email match for a different approved permission ID', async () => {
+      existingPermissions([permission()]);
+      await expect(service.execute(grant('999'))).rejects.toThrow(
+        'DRIVE_ACCOUNT_MISMATCH',
+      );
+      expect(http.request).toHaveBeenCalledTimes(2);
+    });
+
+    it('rejects a matched permission whose email differs from the approved account', async () => {
+      existingPermissions([
+        { ...permission(), emailAddress: 'other@example.com' },
+      ]);
+      await expect(service.execute(grant(permission().id))).rejects.toThrow(
+        'DRIVE_ACCOUNT_MISMATCH',
+      );
+      expect(http.request).toHaveBeenCalledTimes(2);
+    });
+
+    it('creates and verifies access for the same approved email principal', async () => {
+      existingPermissions([]);
+      http.request
+        .mockResolvedValueOnce(permission())
+        .mockResolvedValueOnce({ permissions: [permission()] });
+      expect(await service.execute(grant('PERSON@example.com'))).toMatchObject({
+        status: 'SUCCEEDED',
+        remoteId: permission().id,
+      });
+      expect(http.request).toHaveBeenCalledWith(
+        expect.stringContaining('/files/folder/permissions?'),
+        'Bearer test',
+        'POST',
+        { type: 'user', role: 'writer', emailAddress: 'person@example.com' },
+      );
+    });
+
+    it.each(['person@example.com', '123456789012345678'])(
+      'requires manual intervention for read-only access matched by %s',
+      async (principal) => {
+        existingPermissions([permission('reader')]);
+        expect(await service.execute(grant(principal))).toMatchObject({
+          status: 'AWAITING_MANUAL',
+          remoteId: permission().id,
+        });
+        expect(http.request).toHaveBeenCalledTimes(2);
+      },
+    );
+
+    it('does not complete onboarding with inherited commenter access', async () => {
+      existingPermissions([
+        {
+          ...permission('commenter'),
+          permissionDetails: [{ inherited: true }],
+        },
+      ]);
+      expect((await service.execute(grant())).status).toBe('AWAITING_MANUAL');
+      expect(http.request).toHaveBeenCalledTimes(2);
+    });
+
+    it.each(['writer', 'fileOrganizer', 'organizer', 'owner'])(
+      'accepts existing %s access without changing it',
+      async (role) => {
+        existingPermissions([permission(role)]);
+        expect(await service.execute(grant(permission().id))).toMatchObject({
+          status: 'SUCCEEDED',
+          remoteId: permission().id,
+        });
+        expect(http.request).toHaveBeenCalledTimes(2);
+      },
+    );
+
+    it('confirms an existing email grant without sending another invitation', async () => {
+      existingPermissions([permission()]);
+      expect((await service.execute(grant())).status).toBe('SUCCEEDED');
+      expect(http.request).toHaveBeenCalledTimes(2);
+    });
+
+    it.each([
+      { role: 'reader' },
+      { type: 'group' },
+      { emailAddress: 'other@example.com' },
+      { id: '999' },
+    ])(
+      'does not complete a new grant with unexpected readback %j',
+      async (change) => {
+        existingPermissions([]);
+        http.request
+          .mockResolvedValueOnce(permission())
+          .mockResolvedValueOnce({
+            permissions: [{ ...permission(), ...change }],
+          });
+        await expect(service.execute(grant())).rejects.toThrow(
+          'DRIVE_GRANT_UNVERIFIED',
+        );
+      },
+    );
+  });
+
   it('detects an incorrect Drive permission ID instead of reporting a false revocation', async () => {
     http.request
       .mockResolvedValueOnce({ mimeType: 'application/vnd.google-apps.folder' })

@@ -722,7 +722,7 @@
   "access.positions": "Cargos",
   "access.reason": "Motivo e contexto da alteração",
   "access.defaults": "Aplicar predefinições",
-  "access.identityHelp": "Dados do Forms são declarados pela pessoa. Confirma a conta na plataforma e regista evidência. GitHub usa ID numérico; Discord usa ID da conta. Para revogar no Drive, usa o ID da permissão Google, nunca apenas email.",
+  "access.identityHelp": "Dados do Forms são declarados pela pessoa. Confirma a conta na plataforma e regista evidência. GitHub usa ID numérico; Discord usa ID da conta. Na primeira concessão Drive, usa o mesmo email Google verificado no ID remoto e no email da conta. Para revogar, usa o ID da permissão Google, nunca apenas email.",
   "access.resources": "Recursos e operações",
   "access.automatic": "Automático",
   "access.manual": "Manual",

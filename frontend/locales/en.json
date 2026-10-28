@@ -722,7 +722,7 @@
   "access.positions": "Positions",
   "access.reason": "Reason and context",
   "access.defaults": "Apply defaults",
-  "access.identityHelp": "Forms data is self reported. Verify the account and record evidence. GitHub uses a numeric ID. Drive revocation requires a permission ID, never email alone.",
+  "access.identityHelp": "Forms data is self reported. Verify the account and record evidence. GitHub uses a numeric ID; Discord uses the account ID. For the first Drive grant, use the same verified Google email for the remote ID and account email. Drive revocation requires a permission ID, never email alone.",
   "access.resources": "Resources and operations",
   "access.automatic": "Automatic",
   "access.manual": "Manual",
