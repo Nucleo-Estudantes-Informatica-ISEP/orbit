@@ -10,6 +10,7 @@
     "prisma:migrate": "prisma migrate deploy",
     "prisma:dev": "prisma migrate dev --name init --skip-seed",
     "seed:prod": "ts-node prisma/seed.prod.ts",
+    "access:seed": "ts-node prisma/seed.access.ts",
     "build": "nest build",
     "openapi:generate": "npm run build && node dist/src/generate-openapi.js",
     "openapi:check": "npm run build && node dist/src/generate-openapi.js --check",

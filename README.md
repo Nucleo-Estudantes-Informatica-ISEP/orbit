@@ -2,6 +2,8 @@
 
 Sistema interno da **NEI-ISEP** (Núcleo de Estudantes de Informática do ISEP) que combina **ERP + HRM + Recrutamento + Gestão de Projetos + Inventário + Planos + Dívidas** numa plataforma web unificada.
 
+[Gestão de acessos externos](docs/access-lifecycle.md): onboarding/offboarding com dados de Google Forms/Sheets, aprovação da Presidência, conectores Discord/GitHub/Drive e execução manual de Figma/WhatsApp/email/Coda/Freedcamp. Configuração e ativação do executor são explícitas; não cria contas Orbit para membros.
+
 ---
 
 ## Stack
