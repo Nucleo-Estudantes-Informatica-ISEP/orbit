@@ -39,6 +39,7 @@ export class IntakeService {
       );
     let columns: Record<string, string>;
     let departments: Record<string, string>;
+    let positions: Record<string, string>;
     try {
       columns = JSON.parse(
         process.env.ACCESS_SHEETS_COLUMNS ||
@@ -47,6 +48,15 @@ export class IntakeService {
       departments = JSON.parse(
         process.env.ACCESS_SHEETS_DEPARTMENTS || '{}',
       ) as Record<string, string>;
+      positions = JSON.parse(
+        process.env.ACCESS_SHEETS_POSITIONS || '{}',
+      ) as Record<string, string>;
+      if (
+        !positions ||
+        typeof positions !== 'object' ||
+        Array.isArray(positions)
+      )
+        throw new Error('Invalid positions mapping');
     } catch {
       throw new ServiceUnavailableException('Mapeamento Sheets inválido');
     }
@@ -82,7 +92,9 @@ export class IntakeService {
         departmentIds: split(get(row, 'departments')).map(
           (value) => departments[value] || value,
         ),
-        positions: split(get(row, 'positions')),
+        positions: split(get(row, 'positions')).map(
+          (value) => positions[value] || value,
+        ),
         accounts: Object.fromEntries(
           ['discordId', 'githubId', 'googleEmail', 'phone', 'figmaEmail'].map(
             (field) => [field, get(row, field)],

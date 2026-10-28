@@ -28,6 +28,8 @@ O mapeamento predefinido é:
 
 Pode ser substituído por `ACCESS_SHEETS_COLUMNS`. Em `ACCESS_SHEETS_DEPARTMENTS`, mapear rótulos reais para UUIDs: `{"Informática":"<uuid>","Marketing":"<uuid>"}`. A folha deve incluir cabeçalhos e um intervalo limitado, por exemplo `'Respostas ao formulário 1'!A1:Z5000`. Aumentar a última linha antes de a fonte ultrapassar o intervalo; a aplicação não solicita linhas fora dele. A pesquisa exige pelo menos três caracteres e devolve até 25 resultados, filtrados pelo âmbito departamental do operador. O índice `offset` permite continuar a pesquisa pela API.
 
+O Sheets existente pode manter os seus cabeçalhos. Por exemplo, `{"name":"Nome e Apelido","email":"E-Mail Pessoal","phone":"Nº Telemóvel","departments":"Departamento","positions":"Cargo","discordId":"ID Discord"}` permite usar a folha `Membros!A1:L5000`. Campos opcionais sem coluna ficam vazios: não se presume que o email pessoal seja a conta Google ou Figma. Data de nascimento, ano, email institucional e LinkedIn não são copiados para os pedidos. `ACCESS_SHEETS_POSITIONS` traduz cargos declarados, por exemplo `{"Coordenador":"COORDINATOR","Direção":"BOARD","Presidência":"PRESIDENCY"}`; isto preenche o contexto do pedido e não atribui permissões de operador.
+
 As contas declaradas no Forms são pistas de preenchimento. Um operador deve confirmar a identidade na plataforma e registar como a verificou. Um email isolado não permite revogação. No Drive, usar o ID de permissão remoto confirmado para revogar; para a primeira concessão pode ser usado o principal Google verificado, acompanhado de `accountEmail`. O conector guarda o ID de permissão devolvido para futuras operações. GitHub resolve o ID numérico para o login atual e compara o ID antes de atuar.
 
 Pedidos sobre acessos antigos, respostas indisponíveis ou processos anteriores também podem ser criados com introdução manual, desde que seja indicada a origem. Reutilizar histórico mantém os IDs como sugestões e limpa a evidência de verificação; é necessário confirmar novamente antes de revogar.
@@ -61,6 +63,16 @@ npm run access:seed
 ```
 
 Na imagem de produção: `node dist/prisma/seed.access.js`. O seed não cria utilizadores, preserva recursos/políticas existentes, usa IDs determinísticos e acrescenta permissões de acessos ao role `ADMIN` existente. Recursos novos ficam **desativados**, com `CONFIGURE_ME`; é necessário preencher os IDs reais e ativá-los na área de configuração. As políticas são versionadas; alterações não modificam processos existentes. Para departamentos com nomes diferentes de Informática, Marketing e Relações Externas, ajustar as políticas na interface.
+
+Instalações com configuração já recolhida podem definir `ACCESS_BOOTSTRAP_RESOURCES` e `ACCESS_BOOTSTRAP_ROLE_PERMISSIONS` antes de executar o seed. Exemplo sem credenciais nem convites privados:
+
+```json
+{"figma":{"remoteId":"TEAM_ID","enabled":true,"automatic":false},"drive-general":{"remoteId":"FOLDER_ID","enabled":true,"automatic":false}}
+```
+
+Chaves estáveis disponíveis incluem `discord-members`, `discord-board`, `discord-presidency`, `discord-coordinator`, `discord-co-coordinator`, `discord-alumni`, `discord-server-manager`, `discord:department:<uuid>`, `drive-general`, `drive-board`, `drive-presidency`, `github`, `figma`, `whatsapp-general` e os restantes identificadores definidos no seed. Cada patch aceita apenas `remoteId`, `containerId`, `adminUrl` HTTPS, `enabled` e `automatic`. Recursos/papéis são validados antes da aplicação transacional. Repetir um patch igual não incrementa a versão. Recursos sem patch continuam desativados; o executor mantém a configuração independente `ACCESS_EXECUTOR_ENABLED=false`.
+
+Uma configuração explícita de roles, como `{"COORDENADOR":["ACCESS_READ","ACCESS_CREATE","ACCESS_EXECUTE"]}`, substitui apenas permissões `ACCESS_*` desses roles e preserva todas as outras. Nesse modo não é aplicada a concessão predefinida de todas as permissões ao `ADMIN`. Selecionar os roles de aprovação segundo a Presidência confirmada, sem inferir pertença a partir de `SYS-ADMIN` ou de um cargo Discord. Não são criados roles, contas ou novos vínculos de utilizador. O nome departamental `Infraestruturas Informáticas` é reconhecido para as predefinições de Informática.
 
 Inclui Discord Members/departamento/cargos, Drive Geral/Direção/Presidência, GitHub para Informática ou Coordenação, Figma para Informática/Marketing, Coda para Relações Externas, Freedcamp para Marketing e grupos WhatsApp. `server-manager` e email institucional são exceções manuais sensíveis, sem predefinição. Bots Discord, `INSIDE NEI`, anos letivos, `new-members` e tesouraria não têm atribuições automáticas implícitas.
 

@@ -1,5 +1,9 @@
 import { createHash } from 'node:crypto';
 import { AccessProvider, PrismaClient, SystemPermission } from '@prisma/client';
+import {
+  applyAccessBootstrap,
+  readAccessBootstrap,
+} from '../src/access-lifecycle/bootstrap.config';
 
 const prisma = new PrismaClient();
 const idFor = (key: string) => {
@@ -8,6 +12,7 @@ const idFor = (key: string) => {
 };
 
 async function main() {
+  const bootstrap = readAccessBootstrap(process.env);
   const departments = await prisma.department.findMany();
   const normalized = (name: string) =>
     name
@@ -256,7 +261,8 @@ async function main() {
       active,
     );
   }
-  const it = department('Informática');
+  const it =
+    department('Informática') || department('Infraestruturas Informáticas');
   const marketing = department('Marketing');
   const external = department('Relações Externas');
   if (it)
@@ -283,7 +289,9 @@ async function main() {
       [external],
       active,
     );
-  const admin = await prisma.role.findUnique({ where: { name: 'ADMIN' } });
+  const admin = !bootstrap.rolePermissions
+    ? await prisma.role.findUnique({ where: { name: 'ADMIN' } })
+    : null;
   if (admin)
     await prisma.role.update({
       where: { id: admin.id },
@@ -298,8 +306,9 @@ async function main() {
         ],
       },
     });
+  await applyAccessBootstrap(prisma, resources, bootstrap);
   console.log(
-    'Access policies initialized. Resources remain disabled until configured. No member or user accounts created.',
+    'Access policies initialized and explicit bootstrap applied. Unconfigured resources remain disabled. No member or user accounts created.',
   );
 }
 
