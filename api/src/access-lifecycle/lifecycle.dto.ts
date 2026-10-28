@@ -69,7 +69,11 @@ export class CreateLifecycleDto {
   @ArrayUnique()
   @IsUUID('all', { each: true })
   targetDepartmentIds: string[];
-  @ApiProperty({ type: [String] })
+  @ApiProperty({
+    type: [String],
+    description:
+      'ALUMNI_TRANSITION requires at least one non-Alumni origin position.',
+  })
   @IsArray()
   @ArrayMaxSize(20)
   @ArrayUnique()
@@ -310,6 +314,8 @@ export class AccessConfigurationResponseDto {
   @ApiProperty({ type: [String] }) permissions: string[];
   @ApiPropertyOptional() formUrl?: string;
   @ApiProperty() intakeConfigured: boolean;
+  @ApiProperty() executorEnabled: boolean;
+  @ApiProperty() dryRun: boolean;
 }
 
 export class AccessResourceResponseDto extends AccessResourceDto {
