@@ -131,23 +131,11 @@ jobs:
       - name: Build frontend image
         run: docker build -t orbit-frontend-check ./frontend
 
-      - name: Build MinIO image
-        run: docker build -t orbit-minio-check ./minio
-
-      - name: Check MinIO readiness
+      - name: Build MinIO image and verify storage compatibility
         run: |
-          docker run --detach --name orbit-minio-check \
-            --env MINIO_ROOT_USER=minio --env MINIO_ROOT_PASSWORD=ci-only-minio-password \
-            orbit-minio-check server /data --console-address ":9001"
-          trap 'docker rm --force --volumes orbit-minio-check' EXIT
-          for attempt in {1..30}; do
-            if docker exec orbit-minio-check mc ready local; then
-              exit 0
-            fi
-            sleep 2
-          done
-          docker logs orbit-minio-check
-          exit 1
+          docker build -t orbit-minio-check ./minio
+          npm ci --ignore-scripts --prefix api
+          node scripts/check-minio-image.cjs orbit-minio-check
 
       - name: Verify non-root runtimes
         run: |
@@ -167,6 +155,7 @@ jobs:
           trap 'rm -f docker-compose.ci.yml' EXIT
           docker compose -f docker-compose.ci.yml config --quiet
           docker compose -f docker-compose.ci.yml pull --ignore-buildable
+          docker compose -f docker-compose.ci.yml build minio
           docker image inspect orbit-api >/dev/null
       - name: Validate shared-data Compose
         env:

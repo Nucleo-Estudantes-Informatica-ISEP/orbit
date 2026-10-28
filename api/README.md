@@ -2,6 +2,8 @@
 
 NestJS 11 API for Orbit, backed by PostgreSQL/Prisma and MinIO. Repository-wide workflow and verification rules live in [`../AGENTS.md`](../AGENTS.md).
 
+External access lifecycle routes live under `/access-lifecycle`. See [configuration and operations](../docs/access-lifecycle.md) for Forms/Sheets intake, scoped permissions, immutable approvals, provider credentials, dry-run execution and manual evidence. Initialize disabled resource defaults with `npm run access:seed` after migrations; the production image supports `node dist/prisma/seed.access.js`. The executor is disabled unless `ACCESS_EXECUTOR_ENABLED=true`, and remains read-only until `ACCESS_EXECUTOR_DRY_RUN=false`.
+
 ## Local setup
 
 ```bash
@@ -35,6 +37,12 @@ npm run build
 npm run openapi:check
 npm audit --omit=dev
 ```
+
+The lockfile resolves `proxy-addr` to 2.0.8 to fix
+[GHSA-jqcg-44mw-7w3h](https://github.com/advisories/GHSA-jqcg-44mw-7w3h).
+After dependency updates, run `npm audit --omit=dev --audit-level=critical`
+to reproduce the CI security gate.
+
 
 Prefer TDD for DTO validation, permissions, session behavior, and regressions. Contract changes require a focused test and `npm run openapi:generate`; CI rejects drift.
 

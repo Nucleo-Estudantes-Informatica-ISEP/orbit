@@ -2,6 +2,8 @@
 
 Next.js 16 frontend for Orbit. It runs on port 3090 and proxies `/api/*` to the internal Orbit API in Docker. Read [`../AGENTS.md`](../AGENTS.md) and [`AGENTS.md`](./AGENTS.md) before changing it.
 
+`/dashboard/access` provides external access requests, Forms/Sheets response lookup, resource selection, Presidency approval, execution evidence and versioned resource/policy administration. Visibility requires `ACCESS_READ`; the API enforces current permissions and department scope independently. Provider credentials stay on the API server. See the [access lifecycle guide](../docs/access-lifecycle.md).
+
 ## Local setup
 
 ```bash
@@ -20,6 +22,12 @@ npm test
 npm run build
 npm audit --omit=dev
 ```
+
+The lockfile resolves `proxy-addr` to 2.0.8 to fix
+[GHSA-jqcg-44mw-7w3h](https://github.com/advisories/GHSA-jqcg-44mw-7w3h).
+After dependency updates, run `npm audit --omit=dev --audit-level=critical`
+to reproduce the CI security gate.
+
 
 Prefer TDD for client session handling and behavior regressions. The session tests cover single-flight refresh, persisted rotating tokens, invalid-session clearing, and retry behavior. Add focused behavior tests instead of asserting implementation details.
 

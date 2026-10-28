@@ -2,6 +2,8 @@
 
 Sistema interno da **NEI-ISEP** (Núcleo de Estudantes de Informática do ISEP) que combina **ERP + HRM + Recrutamento + Gestão de Projetos + Inventário + Planos + Dívidas** numa plataforma web unificada.
 
+[Gestão de acessos externos](docs/access-lifecycle.md): onboarding/offboarding com dados de Google Forms/Sheets, aprovação da Presidência, conectores Discord/GitHub/Drive e execução manual de Figma/WhatsApp/email/Coda/Freedcamp. Configuração e ativação do executor são explícitas; não cria contas Orbit para membros.
+
 ---
 
 ## Stack
@@ -110,6 +112,8 @@ O seed falha antes de escrever na base se as credenciais explícitas estiverem a
 ### Coolify
 
 A produção usa `docker-compose.coolify.yml`. O serviço `migrator` executa `prisma migrate deploy` e tem de terminar com sucesso antes da API arrancar. A API corre separadamente como utilizador não-root e expõe `GET /health`; o frontend só fica pronto depois da API. Configure `SMTP_PASS` como segredo do Coolify — nunca no compose ou no Git.
+
+O MinIO é compilado da release `RELEASE.2025-10-15T17-29-55Z` em `minio/Dockerfile`, pois as imagens oficiais deixaram de estar disponíveis nos registos públicos. O volume `minio-data` mantém os dados entre builds. O CI verifica autenticação, operações S3 e persistência após reinício com `node scripts/check-minio-image.cjs orbit-minio-check` (requer `npm ci --ignore-scripts --prefix api`).
 
 ---
 
@@ -231,7 +235,7 @@ orbit/
 
 For shared PostgreSQL and MinIO deployments, use [`docker-compose.shared.yml`](./docker-compose.shared.yml) and follow the [shared-data migration guide](./docs/shared-data.md). Keep the existing Compose location until the data copy and cutover are verified.
 
-The embedded MinIO service builds from [`minio/Dockerfile`](./minio/Dockerfile), using the official GitHub release binaries with pinned SHA-256 digests because the upstream container image is unavailable. It retains server release `RELEASE.2025-09-07T16-13-09Z`, the existing `/data` volume and `mc ready local` healthcheck. Builds support Linux amd64, arm64 and ppc64le and require HTTPS access to the official MinIO GitHub release assets. CI builds this image alongside the API and frontend.
+The embedded MinIO service builds the pinned server source `RELEASE.2025-10-15T17-29-55Z` through [`minio/Dockerfile`](./minio/Dockerfile), keeps the existing `/data` volume and checks `/minio/health/live`. CI builds this image alongside the API and frontend and verifies authentication, bucket/object operations and persistence after restart with [`scripts/check-minio-image.cjs`](./scripts/check-minio-image.cjs). The shared-data deployment uses the separately managed MinIO service.
 
 Leia [`AGENTS.md`](./AGENTS.md) antes de alterar o repositório. Para correções, prefira TDD: reproduza primeiro o erro num teste focado, implemente a menor correção e refatore com a suite verde.
 

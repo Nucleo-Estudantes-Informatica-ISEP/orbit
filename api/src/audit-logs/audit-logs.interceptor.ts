@@ -16,6 +16,7 @@ type AuditRequest = Omit<Request, 'route'> & {
 };
 
 const ROUTE_ENTITY_MAP: Record<string, string> = {
+  'access-lifecycle': 'LifecycleProcess',
   users: 'User',
   roles: 'Role',
   departments: 'Department',

@@ -21,9 +21,11 @@ import { IncidentsModule } from './incidents/incidents.module';
 import { PrismaService } from './prisma.service';
 import { AuditLogInterceptor } from './audit-logs/audit-logs.interceptor';
 import { HealthController } from './health/health.controller';
+import { LifecycleModule } from './access-lifecycle/lifecycle.module';
 
 @Module({
   imports: [
+    LifecycleModule,
     UsersModule,
     DepartmentsModule,
     BoardsModule,
