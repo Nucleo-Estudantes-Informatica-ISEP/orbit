@@ -1,10 +1,66 @@
 import type {
   AccessPolicy,
+  AccessOperation,
+  AccessResource,
   Provider,
   SelectedOperation,
 } from "./access-lifecycle";
 
 const permissionId = (value?: string) => /^\d+$/.test(value || "");
+
+export function reuseAccessOperations(
+  previous: AccessOperation[],
+  resources: AccessResource[],
+): SelectedOperation[] {
+  return previous.flatMap((op) => {
+    const resource = resources.find(
+      (resource) => resource.id === op.resourceSnapshot.id && resource.enabled,
+    );
+    if (!resource) return [];
+    return [
+      changeAccessAction(
+        {
+          resourceId: resource.id,
+          action: "VERIFY",
+          providerUserId: op.result?.remoteId || op.providerUserId,
+          accountEmail: op.accountEmail,
+        },
+        resource.provider,
+        "VERIFY",
+      ),
+    ];
+  });
+}
+
+export function restoreAccessDefaults(
+  current: SelectedOperation[],
+  defaults: SelectedOperation[],
+  resources: AccessResource[],
+): SelectedOperation[] {
+  const recommendedIds = new Set(defaults.map((op) => op.resourceId));
+  return [
+    ...defaults.map((defaultOperation) => {
+      const existing = current.find(
+        (op) => op.resourceId === defaultOperation.resourceId,
+      );
+      const resource = resources.find(
+        (resource) => resource.id === defaultOperation.resourceId,
+      );
+      return existing && resource
+        ? changeAccessAction(
+            { ...defaultOperation, ...existing },
+            resource.provider,
+            defaultOperation.action,
+          )
+        : defaultOperation;
+    }),
+    ...current.filter((op) => !recommendedIds.has(op.resourceId)),
+  ];
+}
+
+export function hasOriginPosition(positions: string[]): boolean {
+  return positions.some((position) => position !== "ALUMNI");
+}
 
 export function changeRemoteIdentity(
   operation: SelectedOperation,
@@ -67,7 +123,6 @@ export function defaultAccessAction(
   departmentIds: string[] = [],
 ): SelectedOperation["action"] {
   if (kind === "OFFBOARD") return "REVOKE";
-  if (kind === "CHANGE_ACCESS") return "VERIFY";
   if (kind === "ALUMNI_TRANSITION")
     return policies.some(
       (policy) =>

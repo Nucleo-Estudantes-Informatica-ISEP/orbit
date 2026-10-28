@@ -192,6 +192,29 @@ describe('LifecycleService', () => {
     ).rejects.toThrow('ID remoto');
   });
 
+  it.each([{ positions: [] }, { positions: ['ALUMNI'] }])(
+    'rejects an Alumni transition without an origin position: $positions',
+    async ({ positions }) => {
+      await expect(
+        service.create('actor', {
+          ...createDto(),
+          kind: 'ALUMNI_TRANSITION',
+          targetPositions: positions,
+        }),
+      ).rejects.toThrow('cargo de origem');
+      expect(prisma.lifecycleProcess.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it('accepts an Alumni transition with an explicit origin position', async () => {
+    const result = await service.create('actor', {
+      ...createDto(),
+      kind: 'ALUMNI_TRANSITION',
+      targetPositions: ['MEMBER', 'ALUMNI'],
+    });
+    expect(result.targetPositions).toEqual(['MEMBER', 'ALUMNI']);
+  });
+
   it('stores a process snapshot without creating a member or Orbit account', async () => {
     const result = await service.create('actor', createDto());
     expect(result.requestedByUserId).toBe('actor');

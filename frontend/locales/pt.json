@@ -821,7 +821,7 @@
   "access.kindHelp.CHANGE_ACCESS": "Mudança de funções ou acessos: escolhe o que conceder, revogar ou apenas consultar.",
   "access.kindHelp.ALUMNI_TRANSITION": "Transição: sugere remover os acessos anteriores e conceder os acessos Alumni.",
   "access.originPositions": "Cargos de origem",
-  "access.alumniDestination": "Destino: Alumni. Os acessos Alumni serão sugeridos para concessão.",
+  "access.alumniDestination": "Destino: Alumni. Seleciona pelo menos um cargo de origem; os acessos Alumni serão sugeridos para concessão.",
   "access.contextHelp": "Este contexto orienta as predefinições do pedido e não altera a conta Orbit da pessoa.",
   "access.reasonPlaceholder": "Ex.: entrada de um novo membro em Informática ou fim de funções na Direção.",
   "access.selectedResources": "acessos selecionados",
@@ -861,5 +861,6 @@
   "access.pendingIdentityHelp": "Sem identificação e verificação, a operação automática fica pendente. Completar a identidade depois da aprovação exige um novo pedido.",
   "access.sensitiveReason": "Porque é necessário este acesso sensível?",
   "access.exceptionReason": "Porque é necessário este acesso fora das predefinições?",
-  "access.draftHelp": "Guardar cria um rascunho. Depois de rever, submete-o para aprovação de outra pessoa."
+  "access.draftHelp": "Guardar cria um rascunho. Depois de rever, submete-o para aprovação de outra pessoa.",
+  "access.chooseOriginPosition": "Seleciona pelo menos um cargo de origem para a transição para Alumni."
 }

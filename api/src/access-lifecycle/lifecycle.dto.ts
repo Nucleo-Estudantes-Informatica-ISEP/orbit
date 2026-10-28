@@ -69,7 +69,11 @@ export class CreateLifecycleDto {
   @ArrayUnique()
   @IsUUID('all', { each: true })
   targetDepartmentIds: string[];
-  @ApiProperty({ type: [String] })
+  @ApiProperty({
+    type: [String],
+    description:
+      'ALUMNI_TRANSITION requires at least one non-Alumni origin position.',
+  })
   @IsArray()
   @ArrayMaxSize(20)
   @ArrayUnique()

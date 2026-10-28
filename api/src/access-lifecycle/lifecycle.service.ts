@@ -196,6 +196,13 @@ export class LifecycleService {
   async create(actorId: string, dto: CreateLifecycleDto) {
     const actor = await this.actor(actorId, 'ACCESS_CREATE');
     assertScope(actor.departmentId, actor.global, dto.targetDepartmentIds);
+    if (
+      dto.kind === 'ALUMNI_TRANSITION' &&
+      !dto.targetPositions.some((position) => position !== 'ALUMNI')
+    )
+      throw new BadRequestException(
+        'Transição para Alumni exige pelo menos um cargo de origem',
+      );
     const departmentCount = await this.prisma.department.count({
       where: { id: { in: dto.targetDepartmentIds } },
     });

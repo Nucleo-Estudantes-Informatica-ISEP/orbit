@@ -33,6 +33,9 @@ import {
   changeAccessAction,
   defaultAccessAction,
   requestPositions,
+  reuseAccessOperations,
+  restoreAccessDefaults,
+  hasOriginPosition,
 } from "@/lib/access-request";
 
 const root = "/access-lifecycle";
@@ -111,20 +114,8 @@ export function AccessRequestForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [recommendedIds, setRecommendedIds] = useState<string[]>([]);
-  const [operations, setOperations] = useState<SelectedOperation[]>(
-    previous?.operations
-      .filter((op) =>
-        config.resources.some(
-          (resource) =>
-            resource.id === op.resourceSnapshot.id && resource.enabled,
-        ),
-      )
-      .map((op) => ({
-        resourceId: op.resourceSnapshot.id,
-        action: "VERIFY",
-        providerUserId: op.result?.remoteId || op.providerUserId,
-        accountEmail: op.accountEmail,
-      })) || [],
+  const [operations, setOperations] = useState<SelectedOperation[]>(() =>
+    reuseAccessOperations(previous?.operations || [], config.resources),
   );
   const [additionalOpen, setAdditionalOpen] = useState(false);
   const toggle = (values: string[], value: string) =>
@@ -214,6 +205,13 @@ export function AccessRequestForm({
       if (step === 1) {
         if (!departments.length) {
           setError(t("access.chooseDepartment"));
+          return;
+        }
+        if (
+          kind === "ALUMNI_TRANSITION" &&
+          !hasOriginPosition(targetPositions)
+        ) {
+          setError(t("access.chooseOriginPosition"));
           return;
         }
         const preview = await api.post<{ resources: AccessResource[] }>(
@@ -877,7 +875,15 @@ export function AccessRequestForm({
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setOperations(suggested.map(defaultOperation))}
+                onClick={() =>
+                  setOperations((current) =>
+                    restoreAccessDefaults(
+                      current,
+                      suggested.map(defaultOperation),
+                      resources,
+                    ),
+                  )
+                }
               >
                 {t("access.restoreDefaults")}
               </Button>
@@ -955,7 +961,10 @@ export function AccessRequestForm({
             (step === 0 &&
               source === "forms" &&
               (!intake || searchState === "loading")) ||
-            (step === 1 && !departments.length) ||
+            (step === 1 &&
+              (!departments.length ||
+                (kind === "ALUMNI_TRANSITION" &&
+                  !hasOriginPosition(targetPositions)))) ||
             (step === 2 && !operations.length)
           }
         >

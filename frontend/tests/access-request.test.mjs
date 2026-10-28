@@ -6,7 +6,99 @@ import {
   changeAccessAction,
   defaultAccessAction,
   requestPositions,
+  reuseAccessOperations,
+  restoreAccessDefaults,
+  hasOriginPosition,
 } from "../lib/access-request.ts";
+
+test("an Alumni destination alone is not an origin position", () => {
+  assert.equal(hasOriginPosition([]), false);
+  assert.equal(hasOriginPosition(["ALUMNI"]), false);
+  assert.equal(hasOriginPosition(["MEMBER", "ALUMNI"]), true);
+});
+
+test("reusing a first Drive grant clears the email from the numeric permission ID field", () => {
+  const resource = { id: "drive", provider: "GOOGLE_DRIVE", enabled: true };
+  const [operation] = reuseAccessOperations(
+    [
+      {
+        resourceSnapshot: resource,
+        providerUserId: "person@example.com",
+        accountEmail: "person@example.com",
+        verificationNote: "Previously verified",
+      },
+    ],
+    [resource],
+  );
+  assert.equal(operation.action, "VERIFY");
+  assert.equal(operation.providerUserId, undefined);
+  assert.equal(operation.accountEmail, "person@example.com");
+  assert.equal(operation.verificationNote, undefined);
+});
+
+test("reuse prefers a returned Drive permission ID and excludes disabled resources", () => {
+  const resource = { id: "drive", provider: "GOOGLE_DRIVE", enabled: true };
+  const previous = [
+    {
+      resourceSnapshot: resource,
+      providerUserId: "person@example.com",
+      result: { remoteId: "123456" },
+    },
+  ];
+  assert.equal(
+    reuseAccessOperations(previous, [resource])[0].providerUserId,
+    "123456",
+  );
+  assert.deepEqual(
+    reuseAccessOperations(previous, [{ ...resource, enabled: false }]),
+    [],
+  );
+});
+
+test("restoring defaults preserves additional access and its identity and justification", () => {
+  const extra = {
+    resourceId: "alumni",
+    action: "GRANT",
+    providerUserId: "123456",
+    verificationNote: "Confirmed profile",
+    exceptionReason: "Explicit access request",
+  };
+  const restored = restoreAccessDefaults(
+    [extra],
+    [{ resourceId: "members", action: "GRANT" }],
+    [{ id: "members", provider: "DISCORD", enabled: true }],
+  );
+  assert.deepEqual(restored, [
+    { resourceId: "members", action: "GRANT" },
+    extra,
+  ]);
+});
+
+test("restoring a recommendation retains entered identity and evidence while resetting its action", () => {
+  const current = {
+    resourceId: "drive",
+    action: "REVOKE",
+    providerUserId: "123456",
+    accountEmail: "person@example.com",
+    verificationNote: "Verified account",
+    exceptionReason: "Sensitive access approved",
+  };
+  const resources = [{ id: "drive", provider: "GOOGLE_DRIVE", enabled: true }];
+  const defaults = [
+    {
+      resourceId: "drive",
+      action: "GRANT",
+      providerUserId: "person@example.com",
+      accountEmail: "person@example.com",
+    },
+  ];
+  const restored = restoreAccessDefaults([current], defaults, resources);
+  assert.deepEqual(restored, [{ ...current, action: "GRANT" }]);
+  assert.deepEqual(
+    restoreAccessDefaults(restored, defaults, resources),
+    restored,
+  );
+});
 
 test("a first Drive grant binds the displayed email to the verified principal", () => {
   const next = changeAccountEmail(
@@ -120,7 +212,7 @@ test("Alumni transition grants Alumni access while revoking the previous role re
   assert.equal(defaultAccessAction("OFFBOARD", "alumni", policies), "REVOKE");
   assert.equal(
     defaultAccessAction("CHANGE_ACCESS", "members", policies),
-    "VERIFY",
+    "GRANT",
   );
 });
 

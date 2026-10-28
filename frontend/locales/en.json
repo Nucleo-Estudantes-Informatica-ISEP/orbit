@@ -821,7 +821,7 @@
   "access.kindHelp.CHANGE_ACCESS": "Changing responsibilities or access: choose what to grant, revoke or only verify.",
   "access.kindHelp.ALUMNI_TRANSITION": "Transition: suggests removing previous access and granting Alumni access.",
   "access.originPositions": "Previous positions",
-  "access.alumniDestination": "Destination: Alumni. Alumni access will be suggested for granting.",
+  "access.alumniDestination": "Destination: Alumni. Select at least one origin position; Alumni access will be suggested for granting.",
   "access.contextHelp": "This context determines request defaults and does not change the person’s Orbit account.",
   "access.reasonPlaceholder": "E.g. a new member joining IT or the end of a board position.",
   "access.selectedResources": "access resources selected",
@@ -861,5 +861,6 @@
   "access.pendingIdentityHelp": "Without identification and verification, the automatic operation stays pending. Completing its identity after approval requires a new request.",
   "access.sensitiveReason": "Why is this sensitive access needed?",
   "access.exceptionReason": "Why is this access outside the defaults needed?",
-  "access.draftHelp": "Saving creates a draft. After reviewing it, submit it for another person’s approval."
+  "access.draftHelp": "Saving creates a draft. After reviewing it, submit it for another person’s approval.",
+  "access.chooseOriginPosition": "Select at least one origin position for the Alumni transition."
 }
