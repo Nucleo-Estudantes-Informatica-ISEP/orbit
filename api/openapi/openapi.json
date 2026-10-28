@@ -10,6 +10,12 @@
             },
             "type": "array"
           },
+          "dryRun": {
+            "type": "boolean"
+          },
+          "executorEnabled": {
+            "type": "boolean"
+          },
           "formUrl": {
             "type": "string"
           },
@@ -42,7 +48,9 @@
           "policies",
           "departments",
           "permissions",
-          "intakeConfigured"
+          "intakeConfigured",
+          "executorEnabled",
+          "dryRun"
         ],
         "type": "object"
       },
@@ -1165,6 +1173,7 @@
             "type": "string"
           },
           "targetPositions": {
+            "description": "ALUMNI_TRANSITION requires at least one non-Alumni origin position.",
             "items": {
               "enum": [
                 "MEMBER",

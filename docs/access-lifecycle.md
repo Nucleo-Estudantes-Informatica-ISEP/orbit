@@ -36,6 +36,14 @@ Pedidos sobre acessos antigos, respostas indisponíveis ou processos anteriores 
 
 ## Aprovação e permissões
 
+Na transição para Alumni, políticas sem restrição de cargos continuam a aplicar-se, tal como as políticas explícitas de Alumni. Um recurso é sugerido para concessão/manutenção quando pelo menos uma dessas políticas está ativa e corresponde aos departamentos do pedido; só é sugerido para revogação quando nenhuma política aplicável o mantém. A sobreposição com uma política restrita a membros não cancela esse acesso.
+
+Em “Alterar acessos”, as predefinições de pedidos novos mantêm a ação **Conceder**. Operações reutilizadas começam em **Consultar**, com nova verificação de identidade obrigatória antes de execução automática. Reutilizar Drive conserva um ID de permissão devolvido pelo conector; um email não é copiado para o campo numérico de consulta/revogação. “Repor predefinições” repõe as ações sugeridas e preserva contas, evidências, justificações e seleções adicionais; a evidência é limpa se a normalização mudar a identidade. Uma transição para Alumni exige pelo menos um cargo de origem diferente de Alumni, validado na interface e na API.
+
+O formulário de novo pedido separa **Pessoa → Contexto → Acessos**. Na primeira etapa, pesquisar e selecionar uma resposta do Forms/Sheets ou optar explicitamente por introdução manual com referência da origem. A pesquisa indica carregamento e ausência de resultados. Na segunda, confirmar tipo, departamentos, cargos e motivo; isto define o contexto do pedido, sem alterar a conta Orbit. Na terceira, os acessos das políticas são pré-selecionados e os restantes ficam em “Outros acessos”, com justificação obrigatória. Recursos sensíveis exigem igualmente justificação. A transição para Alumni acrescenta o contexto Alumni e sugere concessão dos seus recursos, com revogação dos anteriores.
+
+Cada plataforma mostra a identificação relevante: ID Discord/GitHub, telefone WhatsApp e email para teams manuais/email institucional. Na primeira concessão Drive, o único email preenche principal e conta; um ID de permissão existente é opcional. Revogar/consultar Drive pede ID da permissão. Alterar a identidade limpa a evidência anterior. Pedidos de concessão incompletos continuam permitidos, mas a execução automática aguarda identificação verificada e a sua correção exige novo pedido. A configuração devolve `executorEnabled` e `dryRun` para mostrar o modo efetivo de execução; a capacidade de automação de cada recurso é indicada separadamente.
+
 Todas as rotas têm autenticação JWT e verificam no servidor o estado atual do operador e as suas permissões na base de dados. O departamento do JWT/cliente não é usado como prova de autorização.
 
 | Permissão | Uso |

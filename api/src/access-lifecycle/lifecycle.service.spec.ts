@@ -8,11 +8,12 @@ import { LifecycleService } from './lifecycle.service';
 import { PrismaService } from '../prisma.service';
 import { IntakeService } from './intake.service';
 import { ConnectorsService } from './connectors.service';
+import { env } from 'node:process';
 
 describe('LifecycleService', () => {
   const prisma = {
     user: { findUnique: jest.fn() },
-    department: { count: jest.fn() },
+    department: { count: jest.fn(), findMany: jest.fn() },
     accessPolicy: { findMany: jest.fn() },
     accessResource: { findMany: jest.fn() },
     lifecycleProcess: {
@@ -115,6 +116,31 @@ describe('LifecycleService', () => {
     );
   });
 
+  it('reports the effective executor mode without exposing environment credentials', async () => {
+    const enabled = env.ACCESS_EXECUTOR_ENABLED;
+    const dryRun = env.ACCESS_EXECUTOR_DRY_RUN;
+    try {
+      prisma.department.findMany.mockResolvedValue([]);
+      delete env.ACCESS_EXECUTOR_ENABLED;
+      delete env.ACCESS_EXECUTOR_DRY_RUN;
+      expect(await service.configuration('actor')).toMatchObject({
+        executorEnabled: false,
+        dryRun: true,
+      });
+      env.ACCESS_EXECUTOR_ENABLED = 'true';
+      env.ACCESS_EXECUTOR_DRY_RUN = 'false';
+      expect(await service.configuration('actor')).toMatchObject({
+        executorEnabled: true,
+        dryRun: false,
+      });
+    } finally {
+      if (enabled === undefined) delete env.ACCESS_EXECUTOR_ENABLED;
+      else env.ACCESS_EXECUTOR_ENABLED = enabled;
+      if (dryRun === undefined) delete env.ACCESS_EXECUTOR_DRY_RUN;
+      else env.ACCESS_EXECUTOR_DRY_RUN = dryRun;
+    }
+  });
+
   it('uses live permissions and rejects suspended operators', async () => {
     prisma.user.findUnique.mockResolvedValue({
       ...actor(),
@@ -164,6 +190,29 @@ describe('LifecycleService', () => {
         selectedOperations: [{ resourceId: 'resource', action: 'REVOKE' }],
       }),
     ).rejects.toThrow('ID remoto');
+  });
+
+  it.each([{ positions: [] }, { positions: ['ALUMNI'] }])(
+    'rejects an Alumni transition without an origin position: $positions',
+    async ({ positions }) => {
+      await expect(
+        service.create('actor', {
+          ...createDto(),
+          kind: 'ALUMNI_TRANSITION',
+          targetPositions: positions,
+        }),
+      ).rejects.toThrow('cargo de origem');
+      expect(prisma.lifecycleProcess.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it('accepts an Alumni transition with an explicit origin position', async () => {
+    const result = await service.create('actor', {
+      ...createDto(),
+      kind: 'ALUMNI_TRANSITION',
+      targetPositions: ['MEMBER', 'ALUMNI'],
+    });
+    expect(result.targetPositions).toEqual(['MEMBER', 'ALUMNI']);
   });
 
   it('stores a process snapshot without creating a member or Orbit account', async () => {

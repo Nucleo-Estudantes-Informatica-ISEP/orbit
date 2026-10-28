@@ -66,6 +66,8 @@ export interface AccessConfiguration {
   permissions: string[];
   formUrl?: string;
   intakeConfigured: boolean;
+  executorEnabled?: boolean;
+  dryRun?: boolean;
 }
 export interface IntakeResponse {
   key: string;
