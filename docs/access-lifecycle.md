@@ -36,6 +36,10 @@ Pedidos sobre acessos antigos, respostas indisponíveis ou processos anteriores 
 
 ## Aprovação e permissões
 
+O formulário de novo pedido separa **Pessoa → Contexto → Acessos**. Na primeira etapa, pesquisar e selecionar uma resposta do Forms/Sheets ou optar explicitamente por introdução manual com referência da origem. A pesquisa indica carregamento e ausência de resultados. Na segunda, confirmar tipo, departamentos, cargos e motivo; isto define o contexto do pedido, sem alterar a conta Orbit. Na terceira, os acessos das políticas são pré-selecionados e os restantes ficam em “Outros acessos”, com justificação obrigatória. Recursos sensíveis exigem igualmente justificação. A transição para Alumni acrescenta o contexto Alumni e sugere concessão dos seus recursos, com revogação dos anteriores.
+
+Cada plataforma mostra a identificação relevante: ID Discord/GitHub, telefone WhatsApp e email para teams manuais/email institucional. Na primeira concessão Drive, o único email preenche principal e conta; um ID de permissão existente é opcional. Revogar/consultar Drive pede ID da permissão. Alterar a identidade limpa a evidência anterior. Pedidos de concessão incompletos continuam permitidos, mas a execução automática aguarda identificação verificada e a sua correção exige novo pedido. A configuração devolve `executorEnabled` e `dryRun` para mostrar o modo efetivo de execução; a capacidade de automação de cada recurso é indicada separadamente.
+
 Todas as rotas têm autenticação JWT e verificam no servidor o estado atual do operador e as suas permissões na base de dados. O departamento do JWT/cliente não é usado como prova de autorização.
 
 | Permissão | Uso |

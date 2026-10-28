@@ -8,11 +8,12 @@ import { LifecycleService } from './lifecycle.service';
 import { PrismaService } from '../prisma.service';
 import { IntakeService } from './intake.service';
 import { ConnectorsService } from './connectors.service';
+import { env } from 'node:process';
 
 describe('LifecycleService', () => {
   const prisma = {
     user: { findUnique: jest.fn() },
-    department: { count: jest.fn() },
+    department: { count: jest.fn(), findMany: jest.fn() },
     accessPolicy: { findMany: jest.fn() },
     accessResource: { findMany: jest.fn() },
     lifecycleProcess: {
@@ -113,6 +114,31 @@ describe('LifecycleService', () => {
     prisma.$transaction.mockImplementation(
       (callback: (tx: typeof prisma) => unknown) => callback(prisma),
     );
+  });
+
+  it('reports the effective executor mode without exposing environment credentials', async () => {
+    const enabled = env.ACCESS_EXECUTOR_ENABLED;
+    const dryRun = env.ACCESS_EXECUTOR_DRY_RUN;
+    try {
+      prisma.department.findMany.mockResolvedValue([]);
+      delete env.ACCESS_EXECUTOR_ENABLED;
+      delete env.ACCESS_EXECUTOR_DRY_RUN;
+      expect(await service.configuration('actor')).toMatchObject({
+        executorEnabled: false,
+        dryRun: true,
+      });
+      env.ACCESS_EXECUTOR_ENABLED = 'true';
+      env.ACCESS_EXECUTOR_DRY_RUN = 'false';
+      expect(await service.configuration('actor')).toMatchObject({
+        executorEnabled: true,
+        dryRun: false,
+      });
+    } finally {
+      if (enabled === undefined) delete env.ACCESS_EXECUTOR_ENABLED;
+      else env.ACCESS_EXECUTOR_ENABLED = enabled;
+      if (dryRun === undefined) delete env.ACCESS_EXECUTOR_DRY_RUN;
+      else env.ACCESS_EXECUTOR_DRY_RUN = dryRun;
+    }
   });
 
   it('uses live permissions and rejects suspended operators', async () => {

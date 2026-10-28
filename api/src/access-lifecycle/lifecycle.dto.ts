@@ -310,6 +310,8 @@ export class AccessConfigurationResponseDto {
   @ApiProperty({ type: [String] }) permissions: string[];
   @ApiPropertyOptional() formUrl?: string;
   @ApiProperty() intakeConfigured: boolean;
+  @ApiProperty() executorEnabled: boolean;
+  @ApiProperty() dryRun: boolean;
 }
 
 export class AccessResourceResponseDto extends AccessResourceDto {

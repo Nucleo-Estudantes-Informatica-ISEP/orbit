@@ -137,6 +137,8 @@ export class LifecycleService {
           ? formUrl
           : undefined,
       intakeConfigured: this.intake.configured,
+      executorEnabled: process.env.ACCESS_EXECUTOR_ENABLED === 'true',
+      dryRun: process.env.ACCESS_EXECUTOR_DRY_RUN !== 'false',
     };
   }
 

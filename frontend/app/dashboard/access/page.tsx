@@ -6,7 +6,6 @@ import {
   Plus,
   RefreshCw,
   ExternalLink,
-  Search,
   Settings,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,15 +23,14 @@ import { useAuth } from "@/lib/auth-context";
 import { useLocale } from "@/lib/locale-context";
 import { AccessAdmin } from "@/components/access-admin";
 import {
+  AccessRequestForm,
+  AccessExecutionNotice,
+} from "@/components/access-request-form";
+import {
   AccessConfiguration,
   AccessOperation,
-  IntakeResponse,
   LifecycleProcess,
-  SelectedOperation,
   canConfirmManually,
-  cleanOperation,
-  intakeAccount,
-  positions,
 } from "@/lib/access-lifecycle";
 import { toast } from "sonner";
 
@@ -66,17 +64,7 @@ export default function AccessPage() {
   const [busy, setBusy] = useState(false);
   const [creating, setCreating] = useState(false);
   const [admin, setAdmin] = useState(false);
-  const [kind, setKind] = useState("ONBOARD");
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [departments, setDepartments] = useState<string[]>([]);
-  const [targetPositions, setTargetPositions] = useState<string[]>(["MEMBER"]);
-  const [reason, setReason] = useState("");
-  const [sourceNote, setSourceNote] = useState("");
-  const [intakeQuery, setIntakeQuery] = useState("");
-  const [responses, setResponses] = useState<IntakeResponse[]>([]);
-  const [intake, setIntake] = useState<IntakeResponse>();
-  const [operations, setOperations] = useState<SelectedOperation[]>([]);
+  const [previousRequest, setPreviousRequest] = useState<LifecycleProcess>();
   const [decisionNote, setDecisionNote] = useState("");
   const [confirmation, setConfirmation] = useState<AccessOperation | null>(
     null,
@@ -132,73 +120,8 @@ export default function AccessPage() {
   };
 
   function start(previous?: LifecycleProcess) {
-    setKind(previous ? "CHANGE_ACCESS" : "ONBOARD");
-    setName(previous?.targetName || "");
-    setEmail(previous?.targetEmail || "");
-    setDepartments(previous?.targetDepartmentIds || []);
-    setTargetPositions(previous?.targetPositions || ["MEMBER"]);
-    setReason("");
-    setIntake(undefined);
-    setResponses([]);
-    setIntakeQuery("");
-    setOperations(
-      previous?.operations
-        .filter((op) =>
-          config?.resources.some(
-            (resource) =>
-              resource.id === op.resourceSnapshot.id && resource.enabled,
-          ),
-        )
-        .map((op) => ({
-          resourceId: op.resourceSnapshot.id,
-          action: "VERIFY" as const,
-          providerUserId: op.result?.remoteId || op.providerUserId,
-          accountEmail: op.accountEmail,
-        })) || [],
-    );
-    setSourceNote(previous ? `${t("access.reused")} ${previous.id}` : "");
+    setPreviousRequest(previous);
     setCreating(true);
-  }
-
-  function chooseResponse(response: IntakeResponse) {
-    setIntake(response);
-    setName(response.name);
-    setEmail(response.email);
-    setDepartments(response.departmentIds);
-    setTargetPositions(
-      response.positions.filter((position) => positions.includes(position)),
-    );
-    setOperations([]);
-    setResponses([]);
-  }
-
-  const toggle = (values: string[], value: string) =>
-    values.includes(value)
-      ? values.filter((item) => item !== value)
-      : [...values, value];
-  const changeOperation = (
-    resourceId: string,
-    value: Partial<SelectedOperation>,
-  ) =>
-    setOperations((items) =>
-      items.map((op) =>
-        op.resourceId === resourceId ? { ...op, ...value } : op,
-      ),
-    );
-
-  async function create() {
-    const result = await api.post<LifecycleProcess>(`${root}/processes`, {
-      kind,
-      targetName: name,
-      targetEmail: email,
-      targetDepartmentIds: departments,
-      targetPositions,
-      reason,
-      ...(intake ? { intakeKey: intake.key } : { sourceNote }),
-      selectedOperations: operations.map(cleanOperation),
-    });
-    setCreating(false);
-    setSelected(result);
   }
 
   if (!user?.permissions?.includes("ACCESS_READ"))
@@ -247,6 +170,7 @@ export default function AccessPage() {
           {error}
         </p>
       )}
+      {config && <AccessExecutionNotice config={config} />}
       {admin && config && <AccessAdmin config={config} reload={load} />}
       <div className="rounded-lg border bg-muted/20 p-4 text-sm text-muted-foreground">
         {t("access.partialInventory")}
@@ -352,378 +276,25 @@ export default function AccessPage() {
       </div>
 
       <Dialog open={creating} onOpenChange={setCreating}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+        <DialogContent className="max-h-[90dvh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>{t("access.new")}</DialogTitle>
           </DialogHeader>
-          <form
-            className="space-y-5"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void run(create);
-            }}
-          >
-            {config?.formUrl && (
-              <a
-                href={config.formUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-2 text-sm underline"
-              >
-                {t("access.openForm")}
-                <ExternalLink className="h-4 w-4" />
-              </a>
-            )}
-            {config?.intakeConfigured && (
-              <div className="space-y-2 rounded-lg border p-3">
-                <label className="text-sm font-medium" htmlFor="intake-search">
-                  {t("access.intake")}
-                </label>
-                <div className="flex gap-2">
-                  <Input
-                    id="intake-search"
-                    value={intakeQuery}
-                    onChange={(event) => setIntakeQuery(event.target.value)}
-                    placeholder={t("access.search")}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={busy || intakeQuery.trim().length < 3}
-                    onClick={() =>
-                      void run(async () => {
-                        setResponses(
-                          await api.get<IntakeResponse[]>(
-                            `${root}/intake?query=${encodeURIComponent(intakeQuery)}`,
-                          ),
-                        );
-                      })
-                    }
-                  >
-                    <Search className="h-4 w-4" />
-                    <span className="sr-only">{t("access.search")}</span>
-                  </Button>
-                </div>
-                {responses.map((row) => (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    key={row.key}
-                    onClick={() => chooseResponse(row)}
-                  >
-                    {row.name} · {row.email}
-                  </Button>
-                ))}
-                {intake && (
-                  <p className="text-sm">
-                    {t("access.intakeSelected")} {intake.name}
-                    <Button
-                      type="button"
-                      variant="link"
-                      onClick={() => setIntake(undefined)}
-                    >
-                      {t("access.clear")}
-                    </Button>
-                  </p>
-                )}
-              </div>
-            )}
-            <label className="grid gap-2 text-sm">
-              {t("access.kind")}
-              <select
-                className={selectClass}
-                value={kind}
-                onChange={(event) => {
-                  setKind(event.target.value);
-                  setOperations([]);
-                }}
-              >
-                {[
-                  "ONBOARD",
-                  "OFFBOARD",
-                  "CHANGE_ACCESS",
-                  "ALUMNI_TRANSITION",
-                ].map((value) => (
-                  <option key={value} value={value}>
-                    {t(`access.kinds.${value}`)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="grid gap-2 text-sm">
-                {t("access.name")}
-                <Input
-                  required
-                  maxLength={200}
-                  value={name}
-                  readOnly={Boolean(intake)}
-                  onChange={(event) => setName(event.target.value)}
-                />
-              </label>
-              <label className="grid gap-2 text-sm">
-                {t("access.email")}
-                <Input
-                  required
-                  type="email"
-                  value={email}
-                  readOnly={Boolean(intake)}
-                  onChange={(event) => setEmail(event.target.value)}
-                />
-              </label>
-            </div>
-            {!intake && (
-              <label className="grid gap-2 text-sm">
-                {t("access.source")}
-                <Textarea
-                  required
-                  minLength={5}
-                  value={sourceNote}
-                  onChange={(event) => setSourceNote(event.target.value)}
-                />
-              </label>
-            )}
-            <fieldset className="space-y-2">
-              <legend className="text-sm font-medium">
-                {t("access.departments")}
-              </legend>
-              <div className="flex flex-wrap gap-4">
-                {config?.departments.map((department) => (
-                  <label
-                    className="flex items-center gap-2 text-sm"
-                    key={department.id}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={departments.includes(department.id)}
-                      onChange={() => {
-                        setDepartments(toggle(departments, department.id));
-                        setOperations([]);
-                      }}
-                    />
-                    {department.name}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-            <fieldset className="space-y-2">
-              <legend className="text-sm font-medium">
-                {t("access.positions")}
-              </legend>
-              <div className="flex flex-wrap gap-4">
-                {positions.map((position) => (
-                  <label
-                    className="flex items-center gap-2 text-sm"
-                    key={position}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={targetPositions.includes(position)}
-                      onChange={() => {
-                        setTargetPositions(toggle(targetPositions, position));
-                        setOperations([]);
-                      }}
-                    />
-                    {t(`access.positionsLabels.${position}`)}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-            <label className="grid gap-2 text-sm">
-              {t("access.reason")}
-              <Textarea
-                required
-                minLength={5}
-                maxLength={2000}
-                value={reason}
-                onChange={(event) => setReason(event.target.value)}
-              />
-            </label>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={busy || !departments.length}
-              onClick={() =>
-                void run(async () => {
-                  const preview = await api.post<{
-                    resources: AccessConfiguration["resources"];
-                  }>(`${root}/preview`, {
-                    departmentIds: departments,
-                    positions: targetPositions,
-                  });
-                  setOperations(
-                    preview.resources.map((resource) => ({
-                      resourceId: resource.id,
-                      action:
-                        kind === "OFFBOARD" || kind === "ALUMNI_TRANSITION"
-                          ? "REVOKE"
-                          : "GRANT",
-                      ...intakeAccount(resource, intake),
-                    })),
-                  );
-                })
-              }
-            >
-              {t("access.defaults")}
-            </Button>
-            <p className="text-sm text-muted-foreground">
-              {t("access.identityHelp")}
-            </p>
-            <fieldset className="space-y-3">
-              <legend className="mb-3 font-medium">
-                {t("access.resources")}
-              </legend>
-              {config?.resources
-                .filter(
-                  (resource) =>
-                    resource.enabled &&
-                    (!resource.departmentIds.length ||
-                      resource.departmentIds.some((id) =>
-                        departments.includes(id),
-                      )),
-                )
-                .map((resource) => {
-                  const op = operations.find(
-                    (value) => value.resourceId === resource.id,
-                  );
-                  return (
-                    <div className="rounded-lg border p-3" key={resource.id}>
-                      <label className="flex items-center gap-2 text-sm font-medium">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(op)}
-                          onChange={() =>
-                            setOperations((items) =>
-                              op
-                                ? items.filter(
-                                    (value) => value.resourceId !== resource.id,
-                                  )
-                                : [
-                                    ...items,
-                                    {
-                                      resourceId: resource.id,
-                                      action:
-                                        kind === "OFFBOARD"
-                                          ? "REVOKE"
-                                          : "GRANT",
-                                      ...intakeAccount(resource, intake),
-                                    },
-                                  ],
-                            )
-                          }
-                        />
-                        {resource.name}
-                        <Badge variant="outline">
-                          {resource.automatic
-                            ? t("access.automatic")
-                            : t("access.manual")}
-                        </Badge>
-                        {resource.sensitive && (
-                          <Badge variant="destructive">
-                            {t("access.sensitive")}
-                          </Badge>
-                        )}
-                      </label>
-                      {op && (
-                        <div className="mt-3 space-y-3">
-                          <p className="text-sm text-muted-foreground">
-                            {resource.instructions}
-                          </p>
-                          <label className="grid gap-1 text-sm">
-                            {t("access.action")}
-                            <select
-                              className={selectClass}
-                              value={op.action}
-                              onChange={(event) =>
-                                changeOperation(resource.id, {
-                                  action: event.target
-                                    .value as SelectedOperation["action"],
-                                })
-                              }
-                            >
-                              {(kind === "OFFBOARD"
-                                ? ["REVOKE", "VERIFY"]
-                                : kind === "ONBOARD"
-                                  ? ["GRANT", "VERIFY"]
-                                  : ["GRANT", "REVOKE", "VERIFY"]
-                              ).map((value) => (
-                                <option key={value} value={value}>
-                                  {t(`access.actions.${value}`)}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                          <div className="grid gap-3 sm:grid-cols-2">
-                            <label className="grid gap-1 text-sm">
-                              {t("access.remoteId")}
-                              <Input
-                                required={op.action === "REVOKE"}
-                                maxLength={200}
-                                value={op.providerUserId || ""}
-                                onChange={(event) =>
-                                  changeOperation(resource.id, {
-                                    providerUserId: event.target.value,
-                                  })
-                                }
-                              />
-                            </label>
-                            <label className="grid gap-1 text-sm">
-                              {t("access.accountEmail")}
-                              <Input
-                                type="email"
-                                value={op.accountEmail || ""}
-                                onChange={(event) =>
-                                  changeOperation(resource.id, {
-                                    accountEmail: event.target.value,
-                                  })
-                                }
-                              />
-                            </label>
-                          </div>
-                          <label className="grid gap-1 text-sm">
-                            {t("access.verification")}
-                            <Textarea
-                              minLength={5}
-                              required={op.action === "REVOKE"}
-                              value={op.verificationNote || ""}
-                              onChange={(event) =>
-                                changeOperation(resource.id, {
-                                  verificationNote: event.target.value,
-                                })
-                              }
-                            />
-                          </label>
-                          <label className="grid gap-1 text-sm">
-                            {t("access.exception")}
-                            <Textarea
-                              minLength={5}
-                              required={resource.sensitive}
-                              value={op.exceptionReason || ""}
-                              onChange={(event) =>
-                                changeOperation(resource.id, {
-                                  exceptionReason: event.target.value,
-                                })
-                              }
-                            />
-                          </label>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-            </fieldset>
-            {!config?.resources.length && (
-              <p className="text-sm text-muted-foreground">
-                {t("access.noResources")}
-              </p>
-            )}
-            <Button
-              disabled={busy || !operations.length || !departments.length}
-              type="submit"
-            >
-              {t("access.saveDraft")}
-            </Button>
-          </form>
+          {creating && config && (
+            <AccessRequestForm
+              config={config}
+              previous={previousRequest}
+              onCreate={async (payload) => {
+                const result = await api.post<LifecycleProcess>(
+                  `${root}/processes`,
+                  payload,
+                );
+                setCreating(false);
+                setSelected(result);
+                await load();
+              }}
+            />
+          )}
         </DialogContent>
       </Dialog>
 
