@@ -115,19 +115,19 @@ async function main() {
   );
   await add(
     'coda',
-    'Coda · Relações Externas (por confirmar)',
+    'Coda · Team Relações Externas',
     'CODA',
     'MANUAL',
     false,
-    'Estrutura, plano e permissões por confirmar. Manter desativado até definição explícita; execução manual com evidência.',
+    'Convidar conta verificada para a team Coda. Convite enviado: aguarda aceitação. Só concluir depois de confirmar pertença. Offboarding: remover da team e confirmar. Configurar o ID/nome da team e o link administrativo antes de ativar.',
   );
   await add(
     'freedcamp',
-    'Freedcamp · Marketing (por confirmar)',
+    'Freedcamp · Team Marketing',
     'FREEDCAMP',
     'MANUAL',
     false,
-    'Estrutura, plano e permissões por confirmar. Manter desativado até definição explícita; execução manual com evidência.',
+    'Convidar conta verificada para a team Freedcamp. Convite enviado: aguarda aceitação. Só concluir depois de confirmar pertença. Offboarding: remover da team e confirmar. Configurar o ID/nome da team e o link administrativo antes de ativar.',
   );
   await add(
     'whatsapp-community',

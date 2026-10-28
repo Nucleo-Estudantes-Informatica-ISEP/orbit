@@ -747,7 +747,7 @@
   "access.evidenceHelp": "An invitation is not accepted access. Figma requires a team invitation and acceptance confirmation. Record a verifiable result without secrets.",
   "access.evidence": "Evidence and context",
   "access.saveEvidence": "Save evidence",
-  "access.settingsHelp": "Resources and policies are versioned. Requests retain their approved version. Figma uses a team invitation. Coda/Freedcamp rules remain unconfirmed. Credentials are configured on the server.",
+  "access.settingsHelp": "Resources and policies are versioned. Requests retain their approved version. Figma, Coda and Freedcamp use team invitations with manual acceptance confirmation. Credentials are configured on the server.",
   "access.addResource": "Add / edit resource",
   "access.addPolicy": "Add / edit policy",
   "access.enabled": "Enabled",

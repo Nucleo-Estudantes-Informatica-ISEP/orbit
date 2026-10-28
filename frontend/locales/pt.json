@@ -747,7 +747,7 @@
   "access.evidenceHelp": "Convite enviado não significa acesso aceite. Figma exige convite para a team e confirmação de aceitação. Regista resultado verificável, sem passwords ou segredos.",
   "access.evidence": "Evidência e contexto",
   "access.saveEvidence": "Guardar evidência",
-  "access.settingsHelp": "Recursos e políticas têm versões. Pedidos existentes mantêm a versão aprovada. Figma é uma team com convite; Coda/Freedcamp mantêm regras por confirmar. Credenciais são configuradas no servidor.",
+  "access.settingsHelp": "Recursos e políticas têm versões. Pedidos existentes mantêm a versão aprovada. Figma, Coda e Freedcamp usam convites para teams, com confirmação manual de aceitação. Credenciais são configuradas no servidor.",
   "access.addResource": "Adicionar / editar recurso",
   "access.addPolicy": "Adicionar / editar política",
   "access.enabled": "Ativo",
