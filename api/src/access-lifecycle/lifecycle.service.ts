@@ -343,16 +343,22 @@ export class LifecycleService {
         const declared = declaredField
           ? declaredAccounts![declaredField].trim()
           : undefined;
+        const declaredPrincipal =
+          declared && declaredField?.endsWith('Username')
+            ? `@${declared.replace(/^@/, '')}`
+            : declared;
         const normalizeAccount = (value: string) =>
           value.trim().replace(/^@/, '').toLowerCase();
         if (
-          declared &&
+          declaredPrincipal &&
           principal &&
-          normalizeAccount(
+          (normalizeAccount(
             resource.provider === 'GOOGLE_DRIVE'
               ? op.accountEmail || principal
               : principal,
-          ) !== normalizeAccount(declared)
+          ) !== normalizeAccount(declaredPrincipal) ||
+            (['DISCORD', 'GITHUB'].includes(resource.provider) &&
+              /^\d+$/.test(principal) !== /^\d+$/.test(declaredPrincipal)))
         ) {
           let sameAccount = false;
           if (
@@ -360,13 +366,8 @@ export class LifecycleService {
             resource.automatic &&
             resource.remoteId !== 'CONFIGURE_ME'
           ) {
-            const expected = (
-              await resolveIdentity(
-                declaredField!.endsWith('Username')
-                  ? `@${declared.replace(/^@/, '')}`
-                  : declared,
-              )
-            ).providerUserId;
+            const expected = (await resolveIdentity(declaredPrincipal))
+              .providerUserId;
             sameAccount = Boolean(
               expected && /^\d+$/.test(expected) && expected === providerUserId,
             );

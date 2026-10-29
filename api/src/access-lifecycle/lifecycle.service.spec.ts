@@ -437,6 +437,47 @@ describe('LifecycleService', () => {
   });
 
   it.each([
+    [{ githubId: '123' }, { accountUsername: '123' }],
+    [{ githubUsername: '123' }, { providerUserId: '123' }],
+  ])(
+    'distinguishes numeric usernames from legacy IDs when binding to Sheets %j',
+    async (accounts, identity) => {
+      prisma.accessResource.findMany.mockResolvedValue([
+        {
+          id: 'resource',
+          provider: 'GITHUB',
+          remoteId: 'org',
+          automatic: true,
+          sensitive: false,
+          departmentIds: [],
+        },
+      ]);
+      intake.find.mockResolvedValue({
+        name: 'External person',
+        email: 'external@example.com',
+        departmentIds: ['it'],
+        accounts,
+      });
+      connectors.resolveIdentity.mockImplementation(
+        ({ providerUserId }: { providerUserId: string }) =>
+          Promise.resolve({
+            providerUserId: providerUserId === '@123' ? '999' : '123',
+          }),
+      );
+      await expect(
+        service.create('actor', {
+          ...createDto(),
+          intakeKey: 'a'.repeat(64),
+          selectedOperations: [
+            { resourceId: 'resource', action: 'GRANT', ...identity },
+          ],
+        }),
+      ).rejects.toThrow('Sheets');
+      expect(prisma.lifecycleProcess.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
     ['DISCORD_PROTECTED_ROLE', BadRequestException],
     ['DISCORD_NOT_CONFIGURED', ServiceUnavailableException],
   ] as const)(
