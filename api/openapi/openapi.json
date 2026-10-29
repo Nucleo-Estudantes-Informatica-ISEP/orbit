@@ -3954,6 +3954,7 @@
             "required": false,
             "schema": {
               "maxLength": 254,
+              "minLength": 3,
               "type": "string"
             }
           },
@@ -4369,6 +4370,7 @@
             "required": false,
             "schema": {
               "maxLength": 254,
+              "minLength": 3,
               "type": "string"
             }
           },
@@ -4526,6 +4528,16 @@
             "description": ""
           },
           "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "503": {
             "content": {
               "application/json": {
                 "schema": {
@@ -5367,6 +5379,16 @@
               }
             },
             "description": ""
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
           }
         },
         "security": [
@@ -5455,6 +5477,16 @@
             "description": ""
           },
           "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "503": {
             "content": {
               "application/json": {
                 "schema": {

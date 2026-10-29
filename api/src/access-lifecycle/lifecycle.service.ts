@@ -9,6 +9,7 @@ import { Prisma, SystemPermission } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { IntakeService, normalizeIntakeText } from './intake.service';
 import { ConnectorsService } from './connectors.service';
+import { throwProviderFailure } from './provider-failure';
 import {
   AccessPolicyDto,
   AccessPreviewDto,
@@ -226,8 +227,10 @@ export class LifecycleService {
     if (resources.length !== ids.length)
       throw new BadRequestException('Recurso desativado ou desconhecido');
     let source: Prisma.InputJsonValue;
+    let declaredAccounts: Record<string, string> | undefined;
     if (dto.intakeKey) {
       const row = await this.intake.find(dto.intakeKey);
+      declaredAccounts = row.accounts;
       assertScope(actor.departmentId, actor.global, row.departmentIds);
       if (
         row.name !== dto.targetName ||
@@ -298,28 +301,80 @@ export class LifecycleService {
             : op.providerUserId;
         assertOperationIdentity(op.action, principal);
         let providerUserId = principal?.trim();
+        const resolveIdentity = (identity: string) => {
+          const key = `${resource.provider}:${resource.containerId || ''}:${identity}`;
+          if (!identities.has(key))
+            identities.set(
+              key,
+              this.connectors
+                .resolveIdentity({
+                  provider: resource.provider,
+                  providerUserId: identity,
+                  accountEmail: op.accountEmail || null,
+                  verificationNote: null,
+                  resourceSnapshot: JSON.parse(
+                    JSON.stringify(resource),
+                  ) as Prisma.JsonValue,
+                })
+                .catch(throwProviderFailure),
+            );
+          return identities.get(key)!;
+        };
         if (
           providerUserId &&
           resource.automatic &&
           ['DISCORD', 'GITHUB'].includes(resource.provider) &&
           resource.remoteId !== 'CONFIGURE_ME'
         ) {
-          const key = `${resource.provider}:${resource.containerId || ''}:${providerUserId}`;
-          if (!identities.has(key))
-            identities.set(
-              key,
-              this.connectors.resolveIdentity({
-                provider: resource.provider,
-                providerUserId,
-                accountEmail: op.accountEmail || null,
-                verificationNote: null,
-                resourceSnapshot: JSON.parse(
-                  JSON.stringify(resource),
-                ) as Prisma.JsonValue,
-              }),
-            );
           providerUserId =
-            (await identities.get(key)!).providerUserId || undefined;
+            (await resolveIdentity(providerUserId)).providerUserId || undefined;
+        }
+        const fields =
+          resource.provider === 'DISCORD'
+            ? ['discordUsername', 'discordId']
+            : resource.provider === 'GITHUB'
+              ? ['githubUsername', 'githubId']
+              : resource.provider === 'GOOGLE_DRIVE'
+                ? ['googleEmail']
+                : [];
+        const declaredField = fields.find((field) =>
+          declaredAccounts?.[field]?.trim(),
+        );
+        const declared = declaredField
+          ? declaredAccounts![declaredField].trim()
+          : undefined;
+        const normalizeAccount = (value: string) =>
+          value.trim().replace(/^@/, '').toLowerCase();
+        if (
+          declared &&
+          principal &&
+          normalizeAccount(
+            resource.provider === 'GOOGLE_DRIVE'
+              ? op.accountEmail || principal
+              : principal,
+          ) !== normalizeAccount(declared)
+        ) {
+          let sameAccount = false;
+          if (
+            ['DISCORD', 'GITHUB'].includes(resource.provider) &&
+            resource.automatic &&
+            resource.remoteId !== 'CONFIGURE_ME'
+          ) {
+            const expected = (
+              await resolveIdentity(
+                declaredField!.endsWith('Username')
+                  ? `@${declared.replace(/^@/, '')}`
+                  : declared,
+              )
+            ).providerUserId;
+            sameAccount = Boolean(
+              expected && /^\d+$/.test(expected) && expected === providerUserId,
+            );
+          }
+          if (!sameAccount)
+            throw new BadRequestException(
+              'Conta externa difere da resposta Sheets da pessoa; atualizar a origem ou corrigir a conta',
+            );
         }
         const accountName =
           op.accountUsername?.trim() ||
@@ -341,7 +396,16 @@ export class LifecycleService {
           verificationNote: op.verificationNote?.trim() || undefined,
           exceptionReason: op.exceptionReason,
           automatic: resource.automatic && resource.remoteId !== 'CONFIGURE_ME',
-          ...(accountName ? { result: { accountName } } : {}),
+          ...(principal
+            ? {
+                result: {
+                  ...(accountName ? { accountName } : {}),
+                  ...(fields.length
+                    ? { identitySource: declared ? 'SHEETS' : 'OPERATOR' }
+                    : {}),
+                },
+              }
+            : {}),
         };
       }),
     );
@@ -368,6 +432,13 @@ export class LifecycleService {
 
   async list(actorId: string, query: LifecycleQueryDto) {
     const actor = await this.actor(actorId, 'ACCESS_READ');
+    if (
+      query.providerUserId !== undefined &&
+      query.providerUserId.trim().length < 3
+    )
+      throw new BadRequestException(
+        'Pesquisar pelo menos três caracteres na conta externa',
+      );
     const results = await this.prisma.lifecycleProcess.findMany({
       where: {
         ...(!actor.global
@@ -683,7 +754,7 @@ export class LifecycleService {
     return result;
   }
 
-  private validateResource(dto: AccessResourceDto) {
+  private async validateResource(dto: AccessResourceDto) {
     const types: Record<string, string[]> = {
       DISCORD: ['DISCORD_ROLE'],
       GITHUB: ['GITHUB_ORG', 'GITHUB_TEAM'],
@@ -716,6 +787,11 @@ export class LifecycleService {
       !dto.containerId
     )
       throw new BadRequestException('Servidor/organização obrigatórios');
+    try {
+      await this.connectors.validateDiscordResource(dto);
+    } catch (error) {
+      throwProviderFailure(error);
+    }
   }
 
   async saveResource(
@@ -732,7 +808,7 @@ export class LifecycleService {
     )
       throw new BadRequestException('Departamento inexistente no recurso');
     if (!id) {
-      this.validateResource(dto as AccessResourceDto);
+      await this.validateResource(dto as AccessResourceDto);
       return this.prisma.accessResource.create({
         data: dto as AccessResourceDto,
       });
@@ -741,7 +817,7 @@ export class LifecycleService {
       where: { id },
     });
     if (!existing) throw new NotFoundException('Recurso não encontrado');
-    this.validateResource({ ...existing, ...dto } as AccessResourceDto);
+    await this.validateResource({ ...existing, ...dto } as AccessResourceDto);
     const { version, ...data } = dto as UpdateAccessResourceDto;
     const result = await this.prisma.accessResource.updateMany({
       where: { id, version },

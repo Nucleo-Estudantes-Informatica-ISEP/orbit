@@ -862,5 +862,9 @@
   "access.chooseOriginPosition": "Select at least one origin position for the Alumni transition.",
   "access.automaticIdentityHelp": "Orbit resolves technical identifiers and verifies the account and remote result. No technical IDs or manual identity confirmation are required.",
   "access.configurationRequired": "This resource needs its destination configured. The request retains this step and its manual instructions; it cannot run automatically until configured.",
-  "access.intakeScope": "Search only shows people assigned to your department in the Membros sheet. People in other departments are visible to operators with global scope."
+  "access.intakeScope": "Search only shows people assigned to your department in the Membros sheet. People in other departments are visible to operators with global scope.",
+  "access.remoteSearchMinimum": "Enter at least three characters to search an external account.",
+  "access.resolvedAccountId": "Identifier resolved by Orbit",
+  "access.identitySource.SHEETS": "Account matches the selected Sheets response.",
+  "access.identitySource.OPERATOR": "Account entered by the operator; no declared match in Sheets. Review the link to the person before approving."
 }

@@ -1,4 +1,7 @@
 -- One-time correction of stock resources; policies, custom resources and approval snapshots are preserved.
+-- Intentionally override manual flags on these five configured stock IDs, including versions > 1:
+-- the requested operational change enables approved privileged Discord/Drive automation.
+-- Subsequent edits remain authoritative; the seed does not reapply this migration.
 UPDATE "AccessResource"
 SET "automatic" = true, "version" = "version" + 1, "updatedAt" = CURRENT_TIMESTAMP
 WHERE "enabled" = true AND "automatic" = false AND "remoteId" <> 'CONFIGURE_ME'

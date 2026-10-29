@@ -107,14 +107,28 @@ export class IntakeService {
       await this.http.google('sheets'),
     );
     const [headers, ...rows] = result?.values || [];
-    const indices = (field: string) =>
-      (headers || []).flatMap((header, index) =>
-        [columns[field], ...(aliases[field] || [])]
-          .filter(Boolean)
-          .some((name) => labelKey(name) === labelKey(header))
-          ? [index]
-          : [],
-      );
+    const normalizedHeaders = (headers || []).map(labelKey);
+    const fieldIndices = new Map(
+      [...new Set([...Object.keys(aliases), ...Object.keys(columns)])].map(
+        (field) => {
+          const accepted = new Set(
+            [columns[field], ...(aliases[field] || [])]
+              .filter(Boolean)
+              .map(labelKey),
+          );
+          return [
+            field,
+            normalizedHeaders.flatMap((header, index) =>
+              accepted.has(header) ? [index] : [],
+            ),
+          ] as const;
+        },
+      ),
+    );
+    const indices = (field: string) => fieldIndices.get(field) || [];
+    const hasExplicitDiscordUsername = Boolean(
+      columns.discordUsername || normalizedHeaders.includes('usernamediscord'),
+    );
     if (
       !headers ||
       ['name', 'email', 'departments'].some((field) => !indices(field).length)
@@ -170,8 +184,7 @@ export class IntakeService {
             field,
             field === 'discordUsername' &&
             /^\d{15,22}$/.test(get(row, field)) &&
-            !columns.discordUsername &&
-            !headers.some((header) => labelKey(header) === 'usernamediscord')
+            !hasExplicitDiscordUsername
               ? ''
               : get(row, field),
           ]),

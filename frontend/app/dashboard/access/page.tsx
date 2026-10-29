@@ -76,10 +76,15 @@ export default function AccessPage() {
 
   const load = useCallback(async () => {
     if (!user?.permissions?.includes("ACCESS_READ")) return;
+    if (remoteQuery && remoteQuery.trim().length < 3) {
+      setProcesses([]);
+      setError(t("access.remoteSearchMinimum"));
+      return;
+    }
     const params = new URLSearchParams({ offset: String(offset) });
     if (query) params.set("query", query);
     if (status) params.set("status", status);
-    if (remoteQuery) params.set("providerUserId", remoteQuery);
+    if (remoteQuery) params.set("providerUserId", remoteQuery.trim());
     try {
       const [configuration, items] = await Promise.all([
         api.get<AccessConfiguration>(`${root}/configuration`),
@@ -496,8 +501,25 @@ export default function AccessPage() {
                       op.accountEmail ||
                       op.providerUserId ||
                       "—"}{" "}
-                    · {op.accountEmail}
+                    {op.accountEmail &&
+                    op.result?.accountName &&
+                    op.accountEmail !== op.result.accountName
+                      ? ` · ${op.accountEmail}`
+                      : ""}
                   </p>
+                  {["DISCORD", "GITHUB"].includes(op.provider) &&
+                    op.providerUserId &&
+                    /^\d+$/.test(op.providerUserId) &&
+                    op.result?.accountName && (
+                      <p className="break-all text-sm text-muted-foreground">
+                        {t("access.resolvedAccountId")}: {op.providerUserId}
+                      </p>
+                    )}
+                  {op.result?.identitySource && (
+                    <p className="text-sm text-muted-foreground">
+                      {t(`access.identitySource.${op.result.identitySource}`)}
+                    </p>
+                  )}
                   {op.verificationNote && (
                     <p className="text-sm">
                       {t("access.verification")}: {op.verificationNote}

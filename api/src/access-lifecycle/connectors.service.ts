@@ -2,11 +2,15 @@ import { Injectable } from '@nestjs/common';
 import type { AccessOperation, AccessResource, Prisma } from '@prisma/client';
 import { ProviderError, ProviderHttp } from './provider-http';
 
+const privilegedDiscordPermissions = 8n | (1n << 5n) | (1n << 28n);
+type DiscordRole = { id: string; managed?: boolean; permissions: string };
+
 export type ConnectorResult = {
   status: 'SUCCEEDED' | 'AWAITING_ACCOUNT' | 'AWAITING_MANUAL';
   detail: string;
   remoteId?: string;
   accountName?: string;
+  identitySource?: 'SHEETS' | 'OPERATOR';
 };
 type Resource = Pick<
   AccessResource,
@@ -27,6 +31,56 @@ interface DrivePermission {
 @Injectable()
 export class ConnectorsService {
   constructor(private readonly http: ProviderHttp) {}
+
+  private assertDiscordRole(
+    resource: { remoteId: string; sensitive: boolean },
+    role: DiscordRole | undefined,
+    guild: string,
+  ) {
+    if (
+      !role ||
+      role.managed ||
+      role.id === guild ||
+      ((BigInt(role.permissions) & privilegedDiscordPermissions) !== 0n &&
+        !resource.sensitive)
+    )
+      throw new ProviderError('DISCORD_PROTECTED_ROLE');
+  }
+
+  async validateDiscordResource(resource: {
+    provider: string;
+    enabled: boolean;
+    automatic: boolean;
+    remoteId: string;
+    containerId?: string | null;
+    sensitive: boolean;
+  }) {
+    if (
+      resource.provider !== 'DISCORD' ||
+      !resource.enabled ||
+      !resource.automatic ||
+      resource.remoteId === 'CONFIGURE_ME'
+    )
+      return;
+    const token = process.env.ACCESS_DISCORD_BOT_TOKEN;
+    if (!token || !resource.containerId)
+      throw new ProviderError('DISCORD_NOT_CONFIGURED');
+    if (
+      ![resource.remoteId, resource.containerId].every((value) =>
+        /^\d{15,22}$/.test(value),
+      )
+    )
+      throw new ProviderError('DISCORD_INVALID_ID');
+    const roles = await this.http.request<DiscordRole[]>(
+      `https://discord.com/api/v10/guilds/${resource.containerId}/roles`,
+      `Bot ${token}`,
+    );
+    this.assertDiscordRole(
+      resource,
+      roles?.find((role) => role.id === resource.remoteId),
+      resource.containerId,
+    );
+  }
 
   async resolveIdentity<
     T extends Pick<
@@ -146,7 +200,7 @@ export class ConnectorsService {
             remoteId: role.id,
             name: role.name,
             administrative:
-              (BigInt(role.permissions) & ((1n << 28n) | 8n)) !== 0n,
+              (BigInt(role.permissions) & privilegedDiscordPermissions) !== 0n,
           });
       }
     }
@@ -231,6 +285,7 @@ export class ConnectorsService {
       { id: string; position: number; managed: boolean; permissions: string }[]
     >(`${base}/roles`, auth);
     const role = roles?.find((value) => value.id === resource.remoteId);
+    this.assertDiscordRole(resource, role, guild);
     const bot = await this.http.request<{ id: string }>(
       'https://discord.com/api/v10/users/@me',
       auth,
@@ -239,8 +294,6 @@ export class ConnectorsService {
       `${base}/members/${bot?.id}`,
       auth,
     );
-    if (!role || role.managed || role.id === guild)
-      throw new ProviderError('DISCORD_PROTECTED_ROLE');
     const botRoles =
       roles?.filter((value) => self?.roles.includes(value.id)) || [];
     if (
@@ -249,7 +302,7 @@ export class ConnectorsService {
           (BigInt(value.permissions) & (1n << 28n)) !== 0n ||
           (BigInt(value.permissions) & 8n) !== 0n,
       ) ||
-      Math.max(...botRoles.map((value) => value.position)) <= role.position
+      Math.max(...botRoles.map((value) => value.position)) <= role!.position
     )
       throw new ProviderError('DISCORD_ROLE_HIERARCHY');
     const present = member.roles.includes(resource.remoteId);
@@ -563,6 +616,20 @@ export class ConnectorsService {
     if (meta?.mimeType !== 'application/vnd.google-apps.folder')
       throw new ProviderError('DRIVE_NOT_A_FOLDER');
     const permissions = await this.drivePermissions(resource.remoteId, token);
+    if (
+      resource.sensitive &&
+      op.action === 'GRANT' &&
+      permissions.some(
+        (permission) =>
+          ['group', 'domain', 'anyone'].includes(permission.type) ||
+          permission.permissionDetails?.some((detail) => detail.inherited),
+      )
+    )
+      return {
+        status: 'AWAITING_MANUAL',
+        detail:
+          'Pasta sensível com acesso indireto por herança, grupo, domínio ou link; o responsável deve auditar essa origem antes de conceder acesso. Nenhuma alteração executada.',
+      };
     const emailPrincipal = op.providerUserId?.includes('@')
       ? op.providerUserId.trim().toLowerCase()
       : undefined;

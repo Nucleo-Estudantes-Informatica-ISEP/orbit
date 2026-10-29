@@ -149,6 +149,7 @@ export class LifecycleQueryDto {
   })
   @IsOptional()
   @IsString()
+  @MinLength(3)
   @MaxLength(254)
   providerUserId?: string;
   @ApiPropertyOptional({ default: 0 })

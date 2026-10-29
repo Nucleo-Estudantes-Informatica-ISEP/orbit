@@ -99,7 +99,12 @@ export interface AccessOperation {
   automatic: boolean;
   attempts: number;
   lastError?: string;
-  result?: { detail?: string; remoteId?: string; accountName?: string };
+  result?: {
+    detail?: string;
+    remoteId?: string;
+    accountName?: string;
+    identitySource?: "SHEETS" | "OPERATOR";
+  };
   evidence: {
     id: string;
     performedById: string;

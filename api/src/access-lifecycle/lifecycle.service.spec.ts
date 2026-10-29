@@ -3,19 +3,26 @@ import {
   ConflictException,
   ForbiddenException,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { LifecycleService } from './lifecycle.service';
 import { PrismaService } from '../prisma.service';
 import { IntakeService } from './intake.service';
 import { ConnectorsService } from './connectors.service';
 import { env } from 'node:process';
+import { ProviderError } from './provider-http';
 
 describe('LifecycleService', () => {
   const prisma = {
     user: { findUnique: jest.fn() },
     department: { count: jest.fn(), findMany: jest.fn() },
     accessPolicy: { findMany: jest.fn() },
-    accessResource: { findMany: jest.fn() },
+    accessResource: {
+      findMany: jest.fn(),
+      create: jest.fn(),
+      updateMany: jest.fn(),
+      findUnique: jest.fn(),
+    },
     lifecycleProcess: {
       findFirst: jest.fn(),
       findMany: jest.fn(),
@@ -33,7 +40,10 @@ describe('LifecycleService', () => {
     $queryRaw: jest.fn(),
   };
   const intake = { responses: jest.fn(), find: jest.fn() };
-  const connectors = { resolveIdentity: jest.fn() };
+  const connectors = {
+    resolveIdentity: jest.fn(),
+    validateDiscordResource: jest.fn(),
+  };
   const service = new LifecycleService(
     prisma as unknown as PrismaService,
     intake as unknown as IntakeService,
@@ -262,7 +272,7 @@ describe('LifecycleService', () => {
         {
           providerUserId: '123',
           automatic: true,
-          result: { accountName: 'person' },
+          result: { accountName: 'person', identitySource: 'OPERATOR' },
         },
       ],
     });
@@ -283,6 +293,189 @@ describe('LifecycleService', () => {
       data: { status: 'PENDING' },
     });
   });
+
+  it.each([
+    ['DISCORD_INVALID_USERNAME', false, BadRequestException],
+    ['DISCORD_AMBIGUOUS_USERNAME', false, BadRequestException],
+    ['GITHUB_INVALID_USERNAME', false, BadRequestException],
+    ['GITHUB_ACCOUNT_MISMATCH', false, BadRequestException],
+    ['DISCORD_NOT_CONFIGURED', false, ServiceUnavailableException],
+    ['PROVIDER_HTTP_429', true, ServiceUnavailableException],
+  ] as const)(
+    'maps identity lookup %s to a controlled HTTP failure',
+    async (code, retryable, exception) => {
+      prisma.accessResource.findMany.mockResolvedValue([
+        {
+          id: 'resource',
+          provider: 'GITHUB',
+          remoteId: 'org',
+          automatic: true,
+          sensitive: false,
+          departmentIds: [],
+        },
+      ]);
+      connectors.resolveIdentity.mockRejectedValue(
+        new ProviderError(code, retryable),
+      );
+      await expect(
+        service.create('actor', {
+          ...createDto(),
+          selectedOperations: [
+            {
+              resourceId: 'resource',
+              action: 'GRANT',
+              accountUsername: 'person',
+            },
+          ],
+        }),
+      ).rejects.toThrow(exception);
+      expect(prisma.lifecycleProcess.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it('rejects revoking an account that differs from the selected person in Sheets', async () => {
+    prisma.accessResource.findMany.mockResolvedValue([
+      {
+        id: 'resource',
+        provider: 'GITHUB',
+        remoteId: 'org',
+        automatic: true,
+        sensitive: false,
+        departmentIds: [],
+      },
+    ]);
+    intake.find.mockResolvedValue({
+      name: 'External person',
+      email: 'external@example.com',
+      departmentIds: ['it'],
+      accounts: { githubUsername: 'person' },
+    });
+    connectors.resolveIdentity.mockImplementation(
+      ({ providerUserId }: { providerUserId: string }) =>
+        Promise.resolve({
+          providerUserId: providerUserId === '@person' ? '123' : '999',
+        }),
+    );
+    await expect(
+      service.create('actor', {
+        ...createDto(),
+        kind: 'OFFBOARD',
+        intakeKey: 'a'.repeat(64),
+        selectedOperations: [
+          {
+            resourceId: 'resource',
+            action: 'REVOKE',
+            accountUsername: 'different-person',
+          },
+        ],
+      }),
+    ).rejects.toThrow('Sheets');
+    expect(prisma.lifecycleProcess.create).not.toHaveBeenCalled();
+  });
+
+  it('accepts a username matching the legacy account ID declared in Sheets', async () => {
+    prisma.accessResource.findMany.mockResolvedValue([
+      {
+        id: 'resource',
+        provider: 'GITHUB',
+        remoteId: 'org',
+        automatic: true,
+        sensitive: false,
+        departmentIds: [],
+      },
+    ]);
+    intake.find.mockResolvedValue({
+      name: 'External person',
+      email: 'external@example.com',
+      departmentIds: ['it'],
+      accounts: { githubId: '123' },
+    });
+    connectors.resolveIdentity.mockResolvedValue({ providerUserId: '123' });
+    const result = await service.create('actor', {
+      ...createDto(),
+      intakeKey: 'a'.repeat(64),
+      selectedOperations: [
+        { resourceId: 'resource', action: 'GRANT', accountUsername: 'person' },
+      ],
+    });
+    expect(result.operations).toMatchObject({
+      create: [{ providerUserId: '123', result: { identitySource: 'SHEETS' } }],
+    });
+  });
+
+  it('rejects a Google email different from the selected Sheets account', async () => {
+    prisma.accessResource.findMany.mockResolvedValue([
+      {
+        id: 'resource',
+        provider: 'GOOGLE_DRIVE',
+        remoteId: 'folder',
+        automatic: true,
+        sensitive: false,
+        departmentIds: [],
+      },
+    ]);
+    intake.find.mockResolvedValue({
+      name: 'External person',
+      email: 'external@example.com',
+      departmentIds: ['it'],
+      accounts: { googleEmail: 'person@example.com' },
+    });
+    await expect(
+      service.create('actor', {
+        ...createDto(),
+        intakeKey: 'a'.repeat(64),
+        selectedOperations: [
+          {
+            resourceId: 'resource',
+            action: 'GRANT',
+            accountEmail: 'different@example.com',
+          },
+        ],
+      }),
+    ).rejects.toThrow('Sheets');
+    expect(prisma.lifecycleProcess.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['DISCORD_PROTECTED_ROLE', BadRequestException],
+    ['DISCORD_NOT_CONFIGURED', ServiceUnavailableException],
+  ] as const)(
+    'rejects invalid resource configuration with a controlled %s response',
+    async (code, exception) => {
+      prisma.user.findUnique.mockResolvedValue(
+        actor(['ACCESS_READ', 'ACCESS_MANAGE', 'ACCESS_ALL_DEPARTMENTS']),
+      );
+      prisma.department.count.mockResolvedValue(0);
+      connectors.validateDiscordResource.mockRejectedValue(
+        new ProviderError(code),
+      );
+      await expect(
+        service.saveResource('actor', {
+          provider: 'DISCORD',
+          name: 'Privileged',
+          remoteId: 'role',
+          containerId: 'guild',
+          resourceType: 'DISCORD_ROLE',
+          automatic: true,
+          sensitive: false,
+          enabled: true,
+          departmentIds: [],
+          instructions: '',
+        }),
+      ).rejects.toThrow(exception);
+      expect(prisma.accessResource.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['a', 'ab', '   '])(
+    'rejects a broad remote-account filter %j before the SQL scan',
+    async (providerUserId) => {
+      await expect(
+        service.list('actor', { providerUserId, offset: 0 }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.lifecycleProcess.findMany).not.toHaveBeenCalled();
+    },
+  );
 
   it('distinguishes an explicit numeric username from a legacy account ID before approval', async () => {
     prisma.accessResource.findMany.mockResolvedValue([

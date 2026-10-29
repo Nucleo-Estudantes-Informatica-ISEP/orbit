@@ -862,5 +862,9 @@
   "access.chooseOriginPosition": "Seleciona pelo menos um cargo de origem para a transição para Alumni.",
   "access.automaticIdentityHelp": "O Orbit resolve os identificadores e verifica a conta e o resultado na plataforma. Não precisas de IDs técnicos nem de preencher uma confirmação manual.",
   "access.configurationRequired": "Falta configurar o destino deste recurso. O passo continua no pedido com estas instruções para execução manual; não será executado automaticamente enquanto faltar a configuração.",
-  "access.intakeScope": "A pesquisa mostra apenas pessoas do teu departamento na folha Membros. Um registo associado a outro departamento só aparece a operadores com âmbito global."
+  "access.intakeScope": "A pesquisa mostra apenas pessoas do teu departamento na folha Membros. Um registo associado a outro departamento só aparece a operadores com âmbito global.",
+  "access.remoteSearchMinimum": "Escreve pelo menos três caracteres para pesquisar uma conta externa.",
+  "access.resolvedAccountId": "Identificador resolvido pelo Orbit",
+  "access.identitySource.SHEETS": "Conta corresponde à declarada na resposta Sheets selecionada.",
+  "access.identitySource.OPERATOR": "Conta indicada pelo operador; sem correspondência declarada no Sheets. Revê a associação à pessoa antes de aprovar."
 }

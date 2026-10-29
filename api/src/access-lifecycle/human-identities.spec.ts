@@ -131,7 +131,15 @@ describe('person-facing external identities', () => {
       },
     );
     expect(
-      (await service.execute(op('DISCORD', member.user.id))).status,
+      (
+        await service.execute({
+          ...op('DISCORD', member.user.id),
+          resourceSnapshot: {
+            ...(op('DISCORD', member.user.id).resourceSnapshot as object),
+            sensitive: true,
+          },
+        })
+      ).status,
     ).toBe('SUCCEEDED');
     expect(http.request.mock.calls.some((c: unknown[]) => c[2] === 'PUT')).toBe(
       true,
@@ -178,33 +186,140 @@ describe('person-facing external identities', () => {
     ).toBe(true);
   });
 
-  it('upgrades a direct reader permission to writer and verifies the resulting role', async () => {
-    let role = 'reader';
-    http.request.mockImplementation(
-      (url: string, _token: string, method = 'GET') => {
-        if (method === 'PATCH') {
-          role = 'writer';
-          return { id: '456', role };
-        }
-        if (url.includes('/permissions?'))
-          return {
-            permissions: [
-              {
-                id: '456',
-                type: 'user',
-                role,
-                emailAddress: 'person@example.com',
-              },
-            ],
-          };
-        return { mimeType: 'application/vnd.google-apps.folder' };
+  it.each(['8', '32', String(1n << 28n)])(
+    'blocks an administrative Discord permission %s without a sensitive resource',
+    async (permissions) => {
+      const member = { user: { id: '123456789012345678' }, roles: [] };
+      http.request.mockImplementation((url: string) => {
+        if (url.endsWith('/roles'))
+          return [
+            {
+              id: '223456789012345678',
+              position: 4,
+              managed: false,
+              permissions,
+            },
+            {
+              id: '523456789012345678',
+              position: 10,
+              managed: false,
+              permissions: '8',
+            },
+          ];
+        if (url.endsWith('/users/@me')) return { id: '423456789012345678' };
+        if (url.endsWith('/members/423456789012345678'))
+          return { roles: ['523456789012345678'] };
+        if (url.endsWith('/members/' + member.user.id)) return member;
+        return { id: '323456789012345678' };
+      });
+      await expect(
+        service.execute(op('DISCORD', member.user.id)),
+      ).rejects.toThrow('DISCORD_PROTECTED_ROLE');
+      expect(
+        http.request.mock.calls.some((call: unknown[]) => call[2] === 'PUT'),
+      ).toBe(false);
+    },
+  );
+
+  it('checks permission bits when saving a configured automatic Discord resource', async () => {
+    http.request.mockResolvedValue([
+      {
+        id: '223456789012345678',
+        position: 4,
+        managed: false,
+        permissions: '8',
       },
+    ]);
+    const resource = {
+      ...(op('DISCORD', 'person').resourceSnapshot as object),
+      provider: 'DISCORD',
+      enabled: true,
+      automatic: true,
+      sensitive: false,
+    } as Parameters<ConnectorsService['validateDiscordResource']>[0];
+    await expect(service.validateDiscordResource(resource)).rejects.toThrow(
+      'DISCORD_PROTECTED_ROLE',
     );
-    expect(
-      (await service.execute(op('GOOGLE_DRIVE', 'person@example.com'))).status,
-    ).toBe('SUCCEEDED');
-    expect(
-      http.request.mock.calls.some((c: unknown[]) => c[2] === 'PATCH'),
-    ).toBe(true);
+    await expect(
+      service.validateDiscordResource({ ...resource, sensitive: true }),
+    ).resolves.toBeUndefined();
   });
+
+  it.each([
+    { id: 'group', type: 'group', role: 'reader' },
+    { id: 'domain', type: 'domain', role: 'reader' },
+    { id: 'link', type: 'anyone', role: 'reader' },
+    {
+      id: 'inherited',
+      type: 'user',
+      role: 'reader',
+      permissionDetails: [{ inherited: true }],
+    },
+  ])(
+    'audits indirect access $id before granting a sensitive Drive folder',
+    async (permission) => {
+      http.request
+        .mockResolvedValueOnce({
+          mimeType: 'application/vnd.google-apps.folder',
+          inheritedPermissionsDisabled: false,
+        })
+        .mockResolvedValueOnce({ permissions: [permission] });
+      const operation = op('GOOGLE_DRIVE', 'person@example.com');
+      operation.resourceSnapshot = {
+        ...(operation.resourceSnapshot as object),
+        sensitive: true,
+      };
+      expect((await service.execute(operation)).status).toBe('AWAITING_MANUAL');
+      expect(
+        http.request.mock.calls.some((call: unknown[]) =>
+          ['POST', 'PATCH', 'DELETE'].includes(String(call[2])),
+        ),
+      ).toBe(false);
+    },
+  );
+
+  it.each([false, true])(
+    'upgrades direct read access automatically, including a sensitive=%s folder with no indirect access',
+    async (sensitive) => {
+      let role = 'reader';
+      http.request.mockImplementation(
+        (url: string, _token: string, method = 'GET') => {
+          if (method === 'PATCH') {
+            role = 'writer';
+            return { id: '456', role };
+          }
+          if (url.includes('/permissions?'))
+            return {
+              permissions: [
+                {
+                  id: '456',
+                  type: 'user',
+                  role,
+                  emailAddress: 'person@example.com',
+                },
+              ],
+            };
+          return {
+            mimeType: 'application/vnd.google-apps.folder',
+            inheritedPermissionsDisabled: false,
+          };
+        },
+      );
+      expect(
+        (
+          await service.execute({
+            ...op('GOOGLE_DRIVE', 'person@example.com'),
+            resourceSnapshot: {
+              ...(op('GOOGLE_DRIVE', 'person@example.com')
+                .resourceSnapshot as object),
+              sensitive,
+            },
+          })
+        ).status,
+      ).toBe('SUCCEEDED');
+      expect(
+        http.request.mock.calls.some((c: unknown[]) => c[2] === 'PATCH'),
+      ).toBe(true);
+    },
+  );
 });

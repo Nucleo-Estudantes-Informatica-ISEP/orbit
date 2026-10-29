@@ -8,10 +8,16 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiTags,
+  ApiServiceUnavailableResponse,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { ApiProtectedController } from '../contracts/openapi.decorators';
+import { ErrorResponseDto } from '../contracts/response.dto';
 import { IdParamDto } from '../contracts/request.dto';
 import { LifecycleService } from './lifecycle.service';
 import {
@@ -62,6 +68,7 @@ export class LifecycleController {
   }
 
   @Post('resources')
+  @ApiServiceUnavailableResponse({ type: ErrorResponseDto })
   @ApiCreatedResponse({ type: AccessResourceResponseDto })
   resource(
     @CurrentUser('userId') actor: string,
@@ -71,6 +78,7 @@ export class LifecycleController {
   }
 
   @Put('resources/:id')
+  @ApiServiceUnavailableResponse({ type: ErrorResponseDto })
   @ApiOkResponse({ type: AccessResourceResponseDto })
   updateResource(
     @CurrentUser('userId') actor: string,
@@ -97,6 +105,7 @@ export class LifecycleController {
   }
 
   @Post('processes')
+  @ApiServiceUnavailableResponse({ type: ErrorResponseDto })
   @ApiCreatedResponse({ type: LifecycleResponseDto })
   create(
     @CurrentUser('userId') actor: string,
