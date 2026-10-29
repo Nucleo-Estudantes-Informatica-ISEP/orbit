@@ -43,7 +43,7 @@ describe('independent Forms and Sheets origins', () => {
     process.env.ACCESS_SHEETS_DEPARTMENTS = '{"Informática":"department-it"}';
     http.google.mockResolvedValue('Bearer test');
     http.request.mockImplementation((url: string) => {
-      if (url.includes('sheets.googleapis.com'))
+      if (new URL(url).hostname === 'sheets.googleapis.com')
         return {
           values: [
             ['Nome', 'Email', 'Departamento'],
@@ -84,7 +84,8 @@ describe('independent Forms and Sheets origins', () => {
     expect(http.google).toHaveBeenCalledWith('forms');
     expect(
       http.request.mock.calls.every(
-        (call: unknown[]) => !String(call[0]).includes('sheets.googleapis.com'),
+        (call: unknown[]) =>
+          new URL(String(call[0])).hostname !== 'sheets.googleapis.com',
       ),
     ).toBe(true);
   });
@@ -167,14 +168,15 @@ describe('independent Forms and Sheets origins', () => {
     );
     expect(
       http.request.mock.calls.every(
-        (call: unknown[]) => !String(call[0]).includes('sheets.googleapis.com'),
+        (call: unknown[]) =>
+          new URL(String(call[0])).hostname !== 'sheets.googleapis.com',
       ),
     ).toBe(true);
   });
   it('continues to resolve old Sheets keys even if the new Forms origin is unavailable', async () => {
     const [row] = await intake.responses('SHEETS');
     http.request.mockImplementation((url: string) => {
-      if (url.includes('forms.googleapis.com'))
+      if (new URL(url).hostname === 'forms.googleapis.com')
         throw new ProviderError('PROVIDER_HTTP_403');
       return {
         values: [
