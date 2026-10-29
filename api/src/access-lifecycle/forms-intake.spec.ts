@@ -147,6 +147,32 @@ describe('independent Forms and Sheets origins', () => {
     const [row] = await intake.responses('FORMS');
     expect(row.email).toBe('collected@example.com');
   });
+  it('preserves a numeric username pinned by question ID without also treating it as a legacy ID', async () => {
+    process.env.ACCESS_FORMS_FIELDS = JSON.stringify({
+      discordUsername: 'discord',
+    });
+    const username = '123456789012345678';
+    http.request.mockImplementation((url: string) =>
+      url.includes('/responses?')
+        ? {
+            responses: [
+              {
+                ...response(),
+                answers: {
+                  ...response().answers,
+                  discord: { textAnswers: { answers: [{ value: username }] } },
+                },
+              },
+            ],
+          }
+        : { items },
+    );
+    const [row] = await intake.responses('FORMS');
+    expect(row.accounts).toMatchObject({
+      discordUsername: username,
+      discordId: '',
+    });
+  });
   it('refuses an edited form response and a key supplied against the wrong origin', async () => {
     const [row] = await intake.responses('FORMS');
     await expect(intake.find(row.key, 'SHEETS')).rejects.toThrow('ausente');

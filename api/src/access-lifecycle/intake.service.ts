@@ -22,7 +22,7 @@ const aliases: Record<string, string[]> = {
   departments: ['Departamento', 'Departamentos'],
   positions: ['Cargo', 'Cargos'],
   discordId: ['ID Discord', 'Discord ID'],
-  discordUsername: ['Username Discord', 'ID Discord', 'Discord ID'],
+  discordUsername: ['Username Discord'],
   githubId: ['GitHub ID'],
   githubUsername: ['Username GitHub', 'Utilizador GitHub', 'GitHub'],
   googleEmail: ['Email Google', 'E-mail Google'],
@@ -249,28 +249,50 @@ export class IntakeService {
     const fieldIndices = new Map(
       [...new Set([...Object.keys(aliases), ...Object.keys(columns)])].map(
         (field) => {
-          const accepted = new Set(
-            (questionIds.has(columns[field])
+          const accepted = (
+            questionIds.has(columns[field])
               ? [columns[field]]
               : [columns[field], ...(aliases[field] || [])]
-            )
-              .filter(Boolean)
-              .map(labelKey),
-          );
+          )
+            .filter(Boolean)
+            .map(labelKey);
           return [
             field,
-            normalizedHeaders.flatMap((header, index) =>
-              header.some((label) => accepted.has(label)) ? [index] : [],
-            ),
+            [
+              ...new Set(
+                accepted.flatMap((label) =>
+                  normalizedHeaders.flatMap((header, index) =>
+                    header.includes(label) ? [index] : [],
+                  ),
+                ),
+              ),
+            ],
           ] as const;
         },
       ),
     );
-    const indices = (field: string) => fieldIndices.get(field) || [];
-    const hasExplicitDiscordUsername = Boolean(
-      columns.discordUsername ||
-      normalizedHeaders.some((labels) => labels.includes('usernamediscord')),
+    const usernameMapping = columns.discordUsername?.trim();
+    const usernameLabel = labelKey(usernameMapping || 'Username Discord');
+    const explicitUsernameIndices = normalizedHeaders.flatMap(
+      (labels, index) => (labels.includes(usernameLabel) ? [index] : []),
     );
+    const hasExplicitDiscordUsername = Boolean(
+      usernameMapping || explicitUsernameIndices.length,
+    );
+    const legacyDiscordIndices = fieldIndices.get('discordId') || [];
+    if (hasExplicitDiscordUsername) {
+      // A blank username stays blank; borrowing the legacy ID would change its identity type.
+      fieldIndices.set('discordUsername', explicitUsernameIndices);
+      const usernameColumns = new Set(explicitUsernameIndices);
+      fieldIndices.set(
+        'discordId',
+        legacyDiscordIndices.filter((index) => !usernameColumns.has(index)),
+      );
+    } else {
+      // Older sources may store either a numeric ID or a username in the old ID heading.
+      fieldIndices.set('discordUsername', legacyDiscordIndices);
+    }
+    const indices = (field: string) => fieldIndices.get(field) || [];
     if (
       ['name', 'email', 'departments'].some((field) => !indices(field).length)
     )

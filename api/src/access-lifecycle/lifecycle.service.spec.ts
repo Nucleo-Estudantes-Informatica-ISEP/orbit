@@ -10,7 +10,7 @@ import { PrismaService } from '../prisma.service';
 import { IntakeService } from './intake.service';
 import { ConnectorsService } from './connectors.service';
 import { env } from 'node:process';
-import { ProviderError } from './provider-http';
+import { ProviderError, ProviderHttp } from './provider-http';
 
 describe('LifecycleService', () => {
   const prisma = {
@@ -480,6 +480,108 @@ describe('LifecycleService', () => {
         }),
       ).rejects.toThrow('Sheets');
       expect(prisma.lifecycleProcess.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(
+    ['GRANT', 'REVOKE'].flatMap((action) =>
+      ['legacy-first', 'username-first'].flatMap((order) =>
+        ['person.name', ''].map((username) => ({
+          action: action as 'GRANT' | 'REVOKE',
+          order,
+          username,
+        })),
+      ),
+    ),
+  )(
+    'rejects $action for a numeric Discord username colliding with a legacy ID ($order, declared username $username)',
+    async ({ action, order, username }) => {
+      const settings = [
+        'ACCESS_SHEETS_ID',
+        'ACCESS_SHEETS_RANGE',
+        'ACCESS_SHEETS_COLUMNS',
+        'ACCESS_SHEETS_DEPARTMENTS',
+      ];
+      const saved = settings.map((key) => [key, env[key]] as const);
+      try {
+        env.ACCESS_SHEETS_ID = 'configured-sheet';
+        env.ACCESS_SHEETS_RANGE = 'Membros!A1:Z500';
+        env.ACCESS_SHEETS_DEPARTMENTS = '{}';
+        delete env.ACCESS_SHEETS_COLUMNS;
+        const legacyId = '123456789012345678';
+        const accountHeaders =
+          order === 'legacy-first'
+            ? ['ID Discord', 'Username Discord']
+            : ['Username Discord', 'ID Discord'];
+        const values =
+          order === 'legacy-first'
+            ? [legacyId, username]
+            : [username, legacyId];
+        const http = {
+          google: jest.fn().mockResolvedValue('Bearer test'),
+          request: jest.fn().mockResolvedValue({
+            values: [
+              ['Nome', 'Email', 'Departamento', ...accountHeaders],
+              ['External person', 'external@example.com', 'it', ...values],
+            ],
+          }),
+        };
+        const actualIntake = new IntakeService(http as unknown as ProviderHttp);
+        const [row] = await actualIntake.responses('SHEETS');
+        intake.find.mockResolvedValue(row);
+        prisma.accessResource.findMany.mockResolvedValue([
+          {
+            id: 'resource',
+            provider: 'DISCORD',
+            remoteId: 'role',
+            containerId: 'guild',
+            automatic: true,
+            sensitive: false,
+            departmentIds: [],
+          },
+        ]);
+        connectors.resolveIdentity.mockImplementation(
+          ({ providerUserId }: { providerUserId: string }) =>
+            Promise.resolve({
+              providerUserId:
+                providerUserId === `@${legacyId}`
+                  ? '999999999999999999'
+                  : legacyId,
+            }),
+        );
+        await expect(
+          service.create('actor', {
+            ...createDto(),
+            kind: action === 'GRANT' ? 'ONBOARD' : 'OFFBOARD',
+            intakeSource: 'SHEETS',
+            intakeKey: row.key,
+            selectedOperations: [
+              { resourceId: 'resource', action, accountUsername: legacyId },
+            ],
+          }),
+        ).rejects.toThrow(BadRequestException);
+        expect(prisma.lifecycleProcess.create).not.toHaveBeenCalled();
+        const correctIdentity = username
+          ? { accountUsername: username }
+          : { providerUserId: legacyId };
+        const result = await service.create('actor', {
+          ...createDto(),
+          kind: action === 'GRANT' ? 'ONBOARD' : 'OFFBOARD',
+          intakeSource: 'SHEETS',
+          intakeKey: row.key,
+          selectedOperations: [
+            { resourceId: 'resource', action, ...correctIdentity },
+          ],
+        });
+        expect(result.operations).toMatchObject({
+          create: [{ providerUserId: legacyId }],
+        });
+      } finally {
+        for (const [key, value] of saved) {
+          if (value === undefined) delete env[key];
+          else env[key] = value;
+        }
+      }
     },
   );
 

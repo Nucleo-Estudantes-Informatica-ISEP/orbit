@@ -150,4 +150,128 @@ describe('Forms / Sheets intake', () => {
       codaEmail: 'coda@example.com',
     });
   });
+
+  it.each([
+    ['legacy-first', 'person.name'],
+    ['username-first', 'person.name'],
+    ['legacy-first', ''],
+    ['username-first', ''],
+  ])(
+    'keeps Discord ID and username distinct with %s columns and username %j',
+    async (order, username) => {
+      const legacyId = '123456789012345678';
+      const accountHeaders =
+        order === 'legacy-first'
+          ? ['ID Discord', 'Username Discord']
+          : ['Username Discord', 'ID Discord'];
+      const accounts =
+        order === 'legacy-first' ? [legacyId, username] : [username, legacyId];
+      http.request.mockResolvedValue({
+        values: [
+          ['Nome', 'Email', 'Departamento', ...accountHeaders],
+          ['Pessoa', 'person@example.com', 'Informática', ...accounts],
+        ],
+      });
+      const [row] = await intake.responses();
+      expect(row.accounts).toMatchObject({
+        discordId: legacyId,
+        discordUsername: username,
+      });
+    },
+  );
+
+  it.each(['configured.person', ''])(
+    'pins a configured Discord username column, including a blank value %j',
+    async (username) => {
+      const legacyId = '123456789012345678';
+      process.env.ACCESS_SHEETS_COLUMNS = JSON.stringify({
+        discordUsername: 'Conta Discord escolhida',
+      });
+      http.request.mockResolvedValue({
+        values: [
+          [
+            'Nome',
+            'Email',
+            'Departamento',
+            'ID Discord',
+            'Username Discord',
+            'Conta Discord escolhida',
+          ],
+          [
+            'Pessoa',
+            'person@example.com',
+            'Informática',
+            legacyId,
+            'other.person',
+            username,
+          ],
+        ],
+      });
+      const [row] = await intake.responses();
+      expect(row.accounts).toMatchObject({
+        discordId: legacyId,
+        discordUsername: username,
+      });
+    },
+  );
+
+  it('preserves an explicitly mapped numeric username in the old heading without labelling it a legacy ID', async () => {
+    process.env.ACCESS_SHEETS_COLUMNS = JSON.stringify({
+      discordUsername: 'ID Discord',
+    });
+    const username = '123456789012345678';
+    http.request.mockResolvedValue({
+      values: [
+        ['Nome', 'Email', 'Departamento', 'ID Discord'],
+        ['Pessoa', 'person@example.com', 'Informática', username],
+      ],
+    });
+    const [row] = await intake.responses();
+    expect(row.accounts).toMatchObject({
+      discordId: '',
+      discordUsername: username,
+    });
+  });
+
+  it('prioritizes configured columns over aliases regardless of sheet order', async () => {
+    process.env.ACCESS_SHEETS_COLUMNS = JSON.stringify({
+      email: 'Contacto escolhido',
+    });
+    http.request.mockResolvedValue({
+      values: [
+        ['Nome', 'Email', 'Departamento', 'Contacto escolhido'],
+        ['Pessoa', 'old@example.com', 'Informática', 'person@example.com'],
+      ],
+    });
+    expect((await intake.responses())[0].email).toBe('person@example.com');
+  });
+
+  it('reads the first nonempty conditional username without borrowing the legacy ID', async () => {
+    const legacyId = '123456789012345678';
+    http.request.mockResolvedValue({
+      values: [
+        [
+          'Nome',
+          'Email',
+          'Departamento',
+          'ID Discord',
+          'Username Discord',
+          'Username Discord',
+        ],
+        [
+          'Pessoa',
+          'person@example.com',
+          'Informática',
+          legacyId,
+          '',
+          'person.name',
+        ],
+      ],
+    });
+    const [row] = await intake.responses();
+    expect(row.accounts).toMatchObject({
+      discordId: legacyId,
+      discordUsername: 'person.name',
+    });
+  });
 });
