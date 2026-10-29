@@ -113,7 +113,7 @@ export class LifecycleWorker implements OnModuleInit, OnModuleDestroy {
           : observed;
         const declaredIdentity = candidate.result as {
           accountName?: string;
-          identitySource?: 'SHEETS' | 'OPERATOR';
+          identitySource?: 'FORMS' | 'SHEETS' | 'OPERATOR';
         } | null;
         await this.prisma.$transaction(async (tx) => {
           const changed = await tx.accessOperation.updateMany({

@@ -107,13 +107,17 @@ export class CreateLifecycleDto {
   @ApiProperty() @IsString() @MinLength(5) @MaxLength(2000) reason: string;
   @ApiPropertyOptional({
     description:
-      'Hash of an existing Forms response in the configured Sheets range',
+      'Hash of a response from the selected Forms or manual Sheets origin',
   })
   @IsOptional()
   @IsString()
   @MinLength(64)
   @MaxLength(64)
   intakeKey?: string;
+  @ApiPropertyOptional({ enum: ['FORMS', 'SHEETS'] })
+  @IsOptional()
+  @IsIn(['FORMS', 'SHEETS'])
+  intakeSource?: 'FORMS' | 'SHEETS';
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
@@ -130,6 +134,14 @@ export class CreateLifecycleDto {
 }
 
 export class LifecycleQueryDto {
+  @ApiPropertyOptional({
+    enum: ['FORMS', 'SHEETS'],
+    description:
+      'Intake origin; defaults to Forms when configured, otherwise Sheets.',
+  })
+  @IsOptional()
+  @IsIn(['FORMS', 'SHEETS'])
+  intakeSource?: 'FORMS' | 'SHEETS';
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
@@ -333,6 +345,9 @@ export class AccessConfigurationResponseDto {
   @ApiProperty({ type: [String] }) permissions: string[];
   @ApiPropertyOptional() formUrl?: string;
   @ApiProperty() intakeConfigured: boolean;
+  @ApiProperty({ type: [String], enum: ['FORMS', 'SHEETS'] }) intakeSources: (
+    'FORMS' | 'SHEETS'
+  )[];
   @ApiProperty() executorEnabled: boolean;
   @ApiProperty() dryRun: boolean;
 }
@@ -348,6 +363,8 @@ export class AccessPolicyResponseDto extends AccessPolicyDto {
 }
 
 export class IntakeResponseDto {
+  @ApiProperty({ enum: ['FORMS', 'SHEETS'] }) source: 'FORMS' | 'SHEETS';
+  @ApiPropertyOptional({ format: 'date-time' }) submittedAt?: string;
   @ApiProperty() key: string;
   @ApiProperty() name: string;
   @ApiProperty() email: string;

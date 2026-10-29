@@ -66,10 +66,23 @@ export interface AccessConfiguration {
   permissions: string[];
   formUrl?: string;
   intakeConfigured: boolean;
+  intakeSources?: IntakeSource[];
   executorEnabled?: boolean;
   dryRun?: boolean;
 }
+export type IntakeSource = "FORMS" | "SHEETS";
+export function availableIntakeSources(
+  config: Pick<AccessConfiguration, "intakeSources" | "intakeConfigured">,
+): IntakeSource[] {
+  const configured =
+    config.intakeSources ?? (config.intakeConfigured ? ["SHEETS"] : []);
+  return (["FORMS", "SHEETS"] as const).filter((source) =>
+    configured.includes(source),
+  );
+}
 export interface IntakeResponse {
+  source?: IntakeSource;
+  submittedAt?: string;
   key: string;
   name: string;
   email: string;
@@ -103,7 +116,7 @@ export interface AccessOperation {
     detail?: string;
     remoteId?: string;
     accountName?: string;
-    identitySource?: "SHEETS" | "OPERATOR";
+    identitySource?: "FORMS" | "SHEETS" | "OPERATOR";
   };
   evidence: {
     id: string;

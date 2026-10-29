@@ -53,6 +53,7 @@ export class LifecycleController {
   }
 
   @Get('intake')
+  @ApiServiceUnavailableResponse({ type: ErrorResponseDto })
   @ApiOkResponse({ type: IntakeResponseDto, isArray: true })
   intake(
     @CurrentUser('userId') actor: string,

@@ -18,12 +18,14 @@ import { useLocale } from "@/lib/locale-context";
 import {
   cleanOperation,
   intakeAccount,
+  availableIntakeSources,
   positions,
 } from "@/lib/access-lifecycle";
 import type {
   AccessConfiguration,
   AccessResource,
   IntakeResponse,
+  IntakeSource,
   LifecycleProcess,
   SelectedOperation,
 } from "@/lib/access-lifecycle";
@@ -49,6 +51,7 @@ type RequestPayload = {
   targetPositions: string[];
   reason: string;
   intakeKey?: string;
+  intakeSource?: IntakeSource;
   sourceNote?: string;
   selectedOperations: SelectedOperation[];
 };
@@ -80,7 +83,7 @@ export function AccessRequestForm({
   previous?: LifecycleProcess;
   onCreate: (payload: RequestPayload) => Promise<void>;
 }) {
-  const { t } = useLocale();
+  const { t, formatDate } = useLocale();
   const [step, setStep] = useState(0);
   const stepHeading = useRef<HTMLHeadingElement>(null);
   const stepBody = useRef<HTMLDivElement>(null);
@@ -88,8 +91,9 @@ export function AccessRequestForm({
     stepBody.current?.scrollTo({ top: 0 });
     stepHeading.current?.focus({ preventScroll: true });
   }, [step]);
-  const [source, setSource] = useState<"forms" | "manual">(
-    !previous && config.intakeConfigured ? "forms" : "manual",
+  const origins = availableIntakeSources(config);
+  const [source, setSource] = useState<IntakeSource | "manual">(
+    !previous ? origins[0] || "manual" : "manual",
   );
   const [intake, setIntake] = useState<IntakeResponse>();
   const [query, setQuery] = useState("");
@@ -150,14 +154,14 @@ export function AccessRequestForm({
   }
 
   async function search() {
-    if (query.trim().length < 3) return;
+    if (source === "manual" || query.trim().length < 3) return;
     const version = ++searchVersion.current;
     setSearchState("loading");
     setError("");
     setResponses([]);
     try {
       const rows = await api.get<IntakeResponse[]>(
-        `${root}/intake?query=${encodeURIComponent(query.trim())}`,
+        `${root}/intake?query=${encodeURIComponent(query.trim())}&intakeSource=${source}`,
       );
       if (version !== searchVersion.current) return;
       setResponses(rows);
@@ -180,7 +184,7 @@ export function AccessRequestForm({
       {
         resourceId: resource.id,
         action,
-        ...intakeAccount(resource, source === "forms" ? intake : undefined),
+        ...intakeAccount(resource, source !== "manual" ? intake : undefined),
       },
       resource.provider,
       action,
@@ -191,7 +195,7 @@ export function AccessRequestForm({
     event.preventDefault();
     setError("");
     if (step === 0) {
-      if (source === "forms" && !intake) return;
+      if (source !== "manual" && !intake) return;
       setStep(1);
       return;
     }
@@ -253,8 +257,8 @@ export function AccessRequestForm({
           targetDepartmentIds: departments,
           targetPositions: effectivePositions,
           reason,
-          ...(source === "forms" && intake
-            ? { intakeKey: intake.key }
+          ...(source !== "manual" && intake
+            ? { intakeKey: intake.key, intakeSource: source }
             : { sourceNote }),
           selectedOperations: operations.map(cleanOperation),
         });
@@ -490,41 +494,45 @@ export function AccessRequestForm({
                   {t("access.intakeScope")}
                 </p>
               )}
-            {config.intakeConfigured && (
-              <div
-                className="flex flex-wrap gap-2"
-                role="group"
-                aria-label={t("access.personSource")}
-              >
-                {(["forms", "manual"] as const).map((value) => (
-                  <Button
-                    key={value}
-                    type="button"
-                    variant={source === value ? "default" : "outline"}
-                    aria-pressed={source === value}
-                    onClick={() => {
-                      setSource(value);
-                      setIntake(undefined);
-                      setOperations([]);
-                      setError("");
-                      searchVersion.current++;
-                      setResponses([]);
-                      setSearchState("idle");
-                    }}
-                  >
-                    {t(`access.sourceMode.${value}`)}
-                  </Button>
-                ))}
-              </div>
-            )}
-            {source === "forms" ? (
+            <div
+              className="flex flex-wrap gap-2"
+              role="group"
+              aria-label={t("access.personSource")}
+            >
+              {(["FORMS", "SHEETS", "manual"] as const).map((value) => (
+                <Button
+                  key={value}
+                  type="button"
+                  variant={source === value ? "default" : "outline"}
+                  aria-pressed={source === value}
+                  disabled={value !== "manual" && !origins.includes(value)}
+                  title={
+                    value !== "manual" && !origins.includes(value)
+                      ? t("access.originUnavailable")
+                      : undefined
+                  }
+                  onClick={() => {
+                    setSource(value);
+                    setIntake(undefined);
+                    setOperations([]);
+                    setError("");
+                    searchVersion.current++;
+                    setResponses([]);
+                    setSearchState("idle");
+                  }}
+                >
+                  {t(`access.sourceMode.${value}`)}
+                </Button>
+              ))}
+            </div>
+            {source !== "manual" ? (
               <>
                 <div className="space-y-2 rounded-lg border p-4">
                   <label
                     htmlFor="intake-search"
                     className="text-sm font-medium"
                   >
-                    {t("access.intake")}
+                    {t(`access.intake.${source}`)}
                   </label>
                   <div className="flex gap-2">
                     <Input
@@ -582,6 +590,15 @@ export function AccessRequestForm({
                         <span className="text-muted-foreground">
                           {row.email}
                         </span>
+                        {row.submittedAt && (
+                          <span className="block text-xs text-muted-foreground">
+                            {t("access.submittedAt")}:{" "}
+                            {formatDate(row.submittedAt, {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                        )}
                       </button>
                     ))}
                   </div>
@@ -878,7 +895,7 @@ export function AccessRequestForm({
           disabled={
             busy ||
             (step === 0 &&
-              source === "forms" &&
+              source !== "manual" &&
               (!intake || searchState === "loading")) ||
             (step === 1 &&
               (!departments.length ||

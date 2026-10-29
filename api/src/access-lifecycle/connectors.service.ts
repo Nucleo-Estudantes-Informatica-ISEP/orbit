@@ -10,7 +10,7 @@ export type ConnectorResult = {
   detail: string;
   remoteId?: string;
   accountName?: string;
-  identitySource?: 'SHEETS' | 'OPERATOR';
+  identitySource?: 'FORMS' | 'SHEETS' | 'OPERATOR';
 };
 type Resource = Pick<
   AccessResource,

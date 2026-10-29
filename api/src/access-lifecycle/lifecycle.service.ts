@@ -137,6 +137,7 @@ export class LifecycleService {
           ? formUrl
           : undefined,
       intakeConfigured: this.intake.configured,
+      intakeSources: this.intake.sources,
       executorEnabled: process.env.ACCESS_EXECUTOR_ENABLED === 'true',
       dryRun: process.env.ACCESS_EXECUTOR_DRY_RUN !== 'false',
     };
@@ -149,7 +150,7 @@ export class LifecycleService {
         'Pesquisar pelo menos três caracteres no Forms/Sheets',
       );
     const search = normalizeIntakeText(query.query).split(' ');
-    return (await this.intake.responses())
+    return (await this.intake.responses(query.intakeSource))
       .filter(
         (row) =>
           row.departmentIds.length &&
@@ -228,9 +229,13 @@ export class LifecycleService {
       throw new BadRequestException('Recurso desativado ou desconhecido');
     let source: Prisma.InputJsonValue;
     let declaredAccounts: Record<string, string> | undefined;
+    let declaredSource: 'FORMS' | 'SHEETS' = 'SHEETS';
+    if (dto.intakeSource && !dto.intakeKey)
+      throw new BadRequestException('Selecionar um registo da origem indicada');
     if (dto.intakeKey) {
-      const row = await this.intake.find(dto.intakeKey);
+      const row = await this.intake.find(dto.intakeKey, dto.intakeSource);
       declaredAccounts = row.accounts;
+      declaredSource = row.source || 'SHEETS';
       assertScope(actor.departmentId, actor.global, row.departmentIds);
       if (
         row.name !== dto.targetName ||
@@ -240,7 +245,7 @@ export class LifecycleService {
           'Identidade difere da resposta Forms/Sheets',
         );
       source = {
-        type: 'GOOGLE_FORMS_SHEETS',
+        type: declaredSource === 'FORMS' ? 'GOOGLE_FORMS' : 'GOOGLE_SHEETS',
         responseKey: row.key,
         importedAt: new Date().toISOString(),
       };
@@ -374,7 +379,7 @@ export class LifecycleService {
           }
           if (!sameAccount)
             throw new BadRequestException(
-              'Conta externa difere da resposta Sheets da pessoa; atualizar a origem ou corrigir a conta',
+              'Conta externa difere da resposta Forms/Sheets da pessoa; atualizar a origem ou corrigir a conta',
             );
         }
         const accountName =
@@ -402,7 +407,7 @@ export class LifecycleService {
                 result: {
                   ...(accountName ? { accountName } : {}),
                   ...(fields.length
-                    ? { identitySource: declared ? 'SHEETS' : 'OPERATOR' }
+                    ? { identitySource: declared ? declaredSource : 'OPERATOR' }
                     : {}),
                 },
               }

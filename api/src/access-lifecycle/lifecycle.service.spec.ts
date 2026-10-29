@@ -39,7 +39,12 @@ describe('LifecycleService', () => {
     $transaction: jest.fn(),
     $queryRaw: jest.fn(),
   };
-  const intake = { responses: jest.fn(), find: jest.fn() };
+  const intake = {
+    sources: ['FORMS', 'SHEETS'],
+    configured: true,
+    responses: jest.fn(),
+    find: jest.fn(),
+  };
   const connectors = {
     resolveIdentity: jest.fn(),
     validateDiscordResource: jest.fn(),
@@ -138,6 +143,7 @@ describe('LifecycleService', () => {
       expect(await service.configuration('actor')).toMatchObject({
         executorEnabled: false,
         dryRun: true,
+        intakeSources: ['FORMS', 'SHEETS'],
       });
       env.ACCESS_EXECUTOR_ENABLED = 'true';
       env.ACCESS_EXECUTOR_DRY_RUN = 'false';
@@ -641,6 +647,80 @@ describe('LifecycleService', () => {
       ForbiddenException,
     );
     expect(prisma.lifecycleProcess.findMany).not.toHaveBeenCalled();
+  });
+
+  it.each(['FORMS', 'SHEETS'] as const)(
+    'keeps department scope when searching the selected %s origin',
+    async (intakeSource) => {
+      intake.responses.mockResolvedValue([
+        { name: 'Pessoa', email: 'person@example.com', departmentIds: ['it'] },
+        {
+          name: 'Pessoa',
+          email: 'other@example.com',
+          departmentIds: ['external'],
+        },
+      ]);
+      expect(
+        await service.intakeResponses('actor', {
+          query: 'Pessoa',
+          offset: 0,
+          intakeSource,
+        }),
+      ).toHaveLength(1);
+      expect(intake.responses).toHaveBeenCalledWith(intakeSource);
+    },
+  );
+
+  it.each([
+    ['FORMS', 'ONBOARD', 'GRANT'],
+    ['FORMS', 'OFFBOARD', 'REVOKE'],
+    ['SHEETS', 'ONBOARD', 'GRANT'],
+    ['SHEETS', 'OFFBOARD', 'REVOKE'],
+  ] as const)(
+    'records %s provenance for %s processes',
+    async (intakeSource, kind, action) => {
+      prisma.accessResource.findMany.mockResolvedValue([
+        {
+          id: 'resource',
+          provider: 'GITHUB',
+          remoteId: 'org',
+          automatic: true,
+          sensitive: false,
+          departmentIds: [],
+        },
+      ]);
+      intake.find.mockResolvedValue({
+        source: intakeSource,
+        name: 'External person',
+        email: 'external@example.com',
+        departmentIds: ['it'],
+        accounts: { githubUsername: 'person' },
+      });
+      connectors.resolveIdentity.mockResolvedValue({ providerUserId: '123' });
+      const result = await service.create('actor', {
+        ...createDto(),
+        kind,
+        intakeSource,
+        intakeKey: 'a'.repeat(64),
+        selectedOperations: [
+          { resourceId: 'resource', action, accountUsername: 'person' },
+        ],
+      });
+      expect(intake.find).toHaveBeenCalledWith('a'.repeat(64), intakeSource);
+      expect(result.source).toMatchObject({
+        type: intakeSource === 'FORMS' ? 'GOOGLE_FORMS' : 'GOOGLE_SHEETS',
+      });
+      expect(result.operations).toMatchObject({
+        create: [{ result: { identitySource: intakeSource } }],
+      });
+    },
+  );
+
+  it('rejects a selected origin without an intake record', async () => {
+    await expect(
+      service.create('actor', { ...createDto(), intakeSource: 'FORMS' }),
+    ).rejects.toThrow(BadRequestException);
+    expect(prisma.lifecycleProcess.create).not.toHaveBeenCalled();
   });
 
   it('refuses cross-department creation before accessing resources', async () => {

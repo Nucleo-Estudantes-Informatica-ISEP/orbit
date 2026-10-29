@@ -324,7 +324,8 @@ export default function AccessPage() {
               </Badge>
               <p className="whitespace-pre-wrap text-sm">{selected.reason}</p>
               <p className="text-sm text-muted-foreground">
-                {t("access.source")}: {selected.source.type}{" "}
+                {t("access.source")}:{" "}
+                {t(`access.sourceType.${selected.source.type}`)}{" "}
                 {selected.source.note}
               </p>
               <p className="text-sm">

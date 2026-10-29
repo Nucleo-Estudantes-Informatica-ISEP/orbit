@@ -22,6 +22,16 @@
           "intakeConfigured": {
             "type": "boolean"
           },
+          "intakeSources": {
+            "items": {
+              "enum": [
+                "FORMS",
+                "SHEETS"
+              ],
+              "type": "string"
+            },
+            "type": "array"
+          },
           "permissions": {
             "items": {
               "type": "string"
@@ -49,6 +59,7 @@
           "departments",
           "permissions",
           "intakeConfigured",
+          "intakeSources",
           "executorEnabled",
           "dryRun"
         ],
@@ -1120,9 +1131,16 @@
         "additionalProperties": false,
         "properties": {
           "intakeKey": {
-            "description": "Hash of an existing Forms response in the configured Sheets range",
+            "description": "Hash of a response from the selected Forms or manual Sheets origin",
             "maxLength": 64,
             "minLength": 64,
+            "type": "string"
+          },
+          "intakeSource": {
+            "enum": [
+              "FORMS",
+              "SHEETS"
+            ],
             "type": "string"
           },
           "kind": {
@@ -1947,9 +1965,21 @@
               "type": "string"
             },
             "type": "array"
+          },
+          "source": {
+            "enum": [
+              "FORMS",
+              "SHEETS"
+            ],
+            "type": "string"
+          },
+          "submittedAt": {
+            "format": "date-time",
+            "type": "string"
           }
         },
         "required": [
+          "source",
           "key",
           "name",
           "email",
@@ -3905,6 +3935,19 @@
         "operationId": "Lifecycle_intake",
         "parameters": [
           {
+            "description": "Intake origin; defaults to Forms when configured, otherwise Sheets.",
+            "in": "query",
+            "name": "intakeSource",
+            "required": false,
+            "schema": {
+              "enum": [
+                "FORMS",
+                "SHEETS"
+              ],
+              "type": "string"
+            }
+          },
+          {
             "in": "query",
             "name": "query",
             "required": false,
@@ -4028,6 +4071,16 @@
             "description": ""
           },
           "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "503": {
             "content": {
               "application/json": {
                 "schema": {
@@ -4320,6 +4373,19 @@
       "get": {
         "operationId": "Lifecycle_list",
         "parameters": [
+          {
+            "description": "Intake origin; defaults to Forms when configured, otherwise Sheets.",
+            "in": "query",
+            "name": "intakeSource",
+            "required": false,
+            "schema": {
+              "enum": [
+                "FORMS",
+                "SHEETS"
+              ],
+              "type": "string"
+            }
+          },
           {
             "in": "query",
             "name": "query",

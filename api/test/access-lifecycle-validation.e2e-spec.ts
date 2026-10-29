@@ -14,6 +14,7 @@ describe('Access lifecycle HTTP validation', () => {
     create: jest.fn().mockResolvedValue({ id: actorId }),
     decide: jest.fn().mockResolvedValue({ id: actorId }),
     list: jest.fn().mockResolvedValue([]),
+    intakeResponses: jest.fn().mockResolvedValue([]),
   };
   const valid = {
     kind: 'ONBOARD',
@@ -69,6 +70,22 @@ describe('Access lifecycle HTTP validation', () => {
     expect(service.list).toHaveBeenCalledWith(
       actorId,
       expect.objectContaining({ providerUserId: 'person' }),
+    );
+  });
+  it('validates the origin selector on intake and process creation', async () => {
+    await request(app.getHttpServer())
+      .get('/access-lifecycle/intake?query=person&intakeSource=OTHER')
+      .expect(400);
+    await request(app.getHttpServer())
+      .post('/access-lifecycle/processes')
+      .send({ ...valid, intakeSource: 'OTHER' })
+      .expect(400);
+    await request(app.getHttpServer())
+      .get('/access-lifecycle/intake?query=person&intakeSource=FORMS')
+      .expect(200);
+    expect(service.intakeResponses).toHaveBeenCalledWith(
+      actorId,
+      expect.objectContaining({ intakeSource: 'FORMS' }),
     );
   });
   it('rejects forged requester, approver and nested verification flags', async () => {
