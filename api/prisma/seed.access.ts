@@ -3,6 +3,7 @@ import { AccessProvider, PrismaClient, SystemPermission } from '@prisma/client';
 import {
   applyAccessBootstrap,
   readAccessBootstrap,
+  initialAccessBootstrap,
 } from '../src/access-lifecycle/bootstrap.config';
 
 const prisma = new PrismaClient();
@@ -13,6 +14,8 @@ const idFor = (key: string) => {
 
 async function main() {
   const bootstrap = readAccessBootstrap(process.env);
+  const firstInitialization = (await prisma.accessResource.count()) === 0;
+  const createdKeys = new Set<string>();
   const departments = await prisma.department.findMany();
   const normalized = (name: string) =>
     name
@@ -33,6 +36,13 @@ async function main() {
   ) => {
     const id = idFor(key);
     resources[key] = id;
+    if (
+      !(await prisma.accessResource.findUnique({
+        where: { id },
+        select: { id: true },
+      }))
+    )
+      createdKeys.add(key);
     await prisma.accessResource.upsert({
       where: { id },
       update: {},
@@ -42,12 +52,18 @@ async function main() {
         provider,
         resourceType: type,
         remoteId: 'CONFIGURE_ME',
-        automatic: false,
+        automatic: ['DISCORD', 'GITHUB', 'GOOGLE_DRIVE'].includes(provider),
         sensitive,
-        enabled: false,
+        enabled: true,
         instructions:
           instructions ||
-          'Configurar identificadores e instruções; confirmar execução na plataforma.',
+          (provider === 'DISCORD'
+            ? 'Orbit resolve o username no servidor e atribui/remove o cargo aprovado, incluindo cargos administrativos abaixo do bot. Confirmar o resultado remoto; se a pessoa ainda não entrou no servidor, aguardar entrada e repetir.'
+            : provider === 'GOOGLE_DRIVE'
+              ? 'Orbit identifica a conta pelo email Google, concede escrita ou revoga a permissão aprovada e confirma o resultado. Configurar a pasta; se faltar o destino, o responsável deve tratar o passo manualmente e registar evidência.'
+              : provider === 'WHATSAPP'
+                ? 'Após aprovação, adicionar/convidar o número indicado ao grupo correspondente e confirmar adesão; na saída remover e confirmar. Se faltar link, contactar o administrador do grupo e registar evidência.'
+                : 'Configurar o destino do recurso na administração; executar a ação aprovada para a conta indicada e confirmar o resultado.'),
       },
     });
   };
@@ -85,7 +101,7 @@ async function main() {
     'DISCORD',
     'DISCORD_ROLE',
     true,
-    'Atribuição/revogação manual por administrador autorizado; nunca incluir por defeito.',
+    'Exceção sensível: justificar acesso e obter aprovação. Orbit atribui/remove automaticamente se o cargo estiver abaixo do bot; nunca incluir por defeito.',
   );
   await add('drive-general', 'Drive · Geral', 'GOOGLE_DRIVE', 'DRIVE_FOLDER');
   await add(
@@ -94,7 +110,7 @@ async function main() {
     'GOOGLE_DRIVE',
     'DRIVE_FOLDER',
     true,
-    'Confirmar acesso limitado e auditar herança; rever grants em descendentes.',
+    'Orbit gere a permissão aprovada pelo email Google. Revogar acesso direto na pasta e descendentes; se persistir herança/grupos, identificar a origem e registar o passo ainda necessário.',
   );
   await add(
     'drive-presidency',
@@ -102,7 +118,7 @@ async function main() {
     'GOOGLE_DRIVE',
     'DRIVE_FOLDER',
     true,
-    'Confirmar acesso limitado e auditar organizer/herança antes de ativar automação.',
+    'Presidência: configurar a pasta e partilhá-la com a service account. Até existir destino, um responsável da Presidência deve adicionar/remover o email Google na pasta e confirmar em evidência. Com destino configurado, Orbit gere a permissão automaticamente.',
   );
   await add('github', 'GitHub · Organização', 'GITHUB', 'GITHUB_ORG');
   await add(
@@ -119,7 +135,7 @@ async function main() {
     'CODA',
     'MANUAL',
     false,
-    'Convidar conta verificada para a team Coda. Convite enviado: aguarda aceitação. Só concluir depois de confirmar pertença. Offboarding: remover da team e confirmar. Configurar o ID/nome da team e o link administrativo antes de ativar.',
+    'No Coda, um administrador abre as definições de membros da team de Relações Externas e convida o email indicado. Registar convite enviado como aguarda conta; só concluir após aceitação. Na saída remover da team e confirmar. Se faltar link, pedir acesso ao responsável de Relações Externas; o passo mantém-se manual.',
   );
   await add(
     'freedcamp',
@@ -127,7 +143,7 @@ async function main() {
     'FREEDCAMP',
     'MANUAL',
     false,
-    'Convidar conta verificada para a team Freedcamp. Convite enviado: aguarda aceitação. Só concluir depois de confirmar pertença. Offboarding: remover da team e confirmar. Configurar o ID/nome da team e o link administrativo antes de ativar.',
+    'No Freedcamp, um administrador abre a gestão da team de Marketing e convida o email indicado. Registar envio como aguarda conta; só concluir após aceitação. Na saída remover da team e confirmar. Se faltar link, contactar o responsável de Marketing; o passo mantém-se manual.',
   );
   await add(
     'whatsapp-community',
@@ -164,7 +180,7 @@ async function main() {
     'EMAIL',
     'MANUAL',
     true,
-    'Só mediante pedido explícito. Gestão manual cPanel; nunca guardar passwords na evidência nem apagar mailbox/conteúdo neste fluxo.',
+    'Só mediante pedido explícito aprovado. No cPanel > Contas de email, criar/atualizar o endereço NEI indicado e enviar instruções de acesso por canal privado. Na saída suspender login e envio/receção conforme decisão; preservar mailbox/conteúdo. Confirmar o resultado em evidência, sem passwords ou tokens.',
   );
   const policy = async (
     key: string,
@@ -241,12 +257,15 @@ async function main() {
   );
   for (const current of departments) {
     const key = `department:${current.id}`;
-    await add(
-      `discord:${key}`,
-      `Discord · ${current.name}`,
-      'DISCORD',
-      'DISCORD_ROLE',
-    );
+    if (normalized(current.name) === 'direcao')
+      resources[`discord:${key}`] = resources['discord-board'];
+    else
+      await add(
+        `discord:${key}`,
+        `Discord · ${current.name}`,
+        'DISCORD',
+        'DISCORD_ROLE',
+      );
     await add(
       `whatsapp:${key}`,
       `WhatsApp · ${current.name}`,
@@ -289,9 +308,10 @@ async function main() {
       [external],
       active,
     );
-  const admin = !bootstrap.rolePermissions
-    ? await prisma.role.findUnique({ where: { name: 'ADMIN' } })
-    : null;
+  const admin =
+    firstInitialization && !bootstrap.rolePermissions
+      ? await prisma.role.findUnique({ where: { name: 'ADMIN' } })
+      : null;
   if (admin)
     await prisma.role.update({
       where: { id: admin.id },
@@ -306,9 +326,13 @@ async function main() {
         ],
       },
     });
-  await applyAccessBootstrap(prisma, resources, bootstrap);
+  await applyAccessBootstrap(
+    prisma,
+    resources,
+    initialAccessBootstrap(bootstrap, createdKeys, firstInitialization),
+  );
   console.log(
-    'Access policies initialized and explicit bootstrap applied. Unconfigured resources remain disabled. No member or user accounts created.',
+    'Access policies initialized. Unconfigured resources retain manual instructions; automatic changes require configured destinations. Existing policies are preserved. No member or user accounts created.',
   );
 }
 

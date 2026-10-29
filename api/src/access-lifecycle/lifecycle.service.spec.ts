@@ -32,10 +32,12 @@ describe('LifecycleService', () => {
     $transaction: jest.fn(),
     $queryRaw: jest.fn(),
   };
+  const intake = { responses: jest.fn(), find: jest.fn() };
+  const connectors = { resolveIdentity: jest.fn() };
   const service = new LifecycleService(
     prisma as unknown as PrismaService,
-    {} as IntakeService,
-    {} as ConnectorsService,
+    intake as unknown as IntakeService,
+    connectors as unknown as ConnectorsService,
   );
   const createDto = () => ({
     kind: 'ONBOARD' as const,
@@ -139,6 +141,261 @@ describe('LifecycleService', () => {
       if (dryRun === undefined) delete env.ACCESS_EXECUTOR_DRY_RUN;
       else env.ACCESS_EXECUTOR_DRY_RUN = dryRun;
     }
+  });
+
+  it('returns the full resource catalogue to coordinators while keeping department and administrative-link scope', async () => {
+    prisma.department.findMany.mockResolvedValue([{ id: 'it', name: 'IT' }]);
+    prisma.accessResource.findMany.mockResolvedValue([
+      {
+        id: 'tool',
+        departmentIds: ['external'],
+        adminUrl: 'https://private.example/team',
+      },
+    ]);
+    const config = await service.configuration('actor');
+    expect(config.resources).toMatchObject([{ id: 'tool', adminUrl: null }]);
+    expect(prisma.accessResource.findMany).toHaveBeenCalledWith({
+      orderBy: { name: 'asc' },
+    });
+    expect(prisma.department.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'it' } }),
+    );
+  });
+
+  it.each([
+    'CODA',
+    'FREEDCAMP',
+    'DISCORD',
+    'GITHUB',
+    'GOOGLE_DRIVE',
+    'FIGMA',
+    'WHATSAPP',
+    'EMAIL',
+  ])(
+    'allows an own-department person to receive a justified %s resource normally used elsewhere',
+    async (provider) => {
+      prisma.accessPolicy.findMany.mockResolvedValue([
+        {
+          id: 'external-policy',
+          name: 'RE defaults',
+          version: 1,
+          enabled: true,
+          departmentIds: ['external'],
+          positions: ['MEMBER'],
+          resourceIds: ['resource'],
+        },
+      ]);
+      prisma.accessResource.findMany.mockImplementation(
+        ({ where }: { where: { id?: { in: string[] } } }) =>
+          Promise.resolve(
+            where.id?.in.length === 0
+              ? []
+              : [
+                  {
+                    id: 'resource',
+                    provider,
+                    name: 'Coda',
+                    remoteId: 'CONFIGURE_ME',
+                    automatic: false,
+                    sensitive: false,
+                    departmentIds: ['external'],
+                  },
+                ],
+          ),
+      );
+      const dto = {
+        ...createDto(),
+        selectedOperations: [
+          {
+            resourceId: 'resource',
+            action: 'GRANT' as const,
+            providerUserId: 'person@example.com',
+            accountEmail: 'person@example.com',
+            exceptionReason: 'Approved cross-tool collaboration',
+          },
+        ],
+      };
+      const result = await service.create('actor', dto);
+      expect(result.targetDepartmentIds).toEqual(['it']);
+      expect(result.policySnapshot).toMatchObject({ defaultResourceIds: [] });
+      expect(result.operations).toMatchObject({
+        create: [
+          {
+            provider,
+            automatic: false,
+            exceptionReason: 'Approved cross-tool collaboration',
+          },
+        ],
+      });
+      await expect(
+        service.create('actor', {
+          ...dto,
+          selectedOperations: [
+            { ...dto.selectedOperations[0], exceptionReason: undefined },
+          ],
+        }),
+      ).rejects.toThrow('justificação');
+    },
+  );
+
+  it('resolves a username before freezing the draft without requiring a client verification claim', async () => {
+    prisma.accessResource.findMany.mockResolvedValue([
+      {
+        id: 'resource',
+        provider: 'GITHUB',
+        name: 'GitHub',
+        remoteId: 'test-org',
+        automatic: true,
+        sensitive: false,
+        departmentIds: [],
+      },
+    ]);
+    connectors.resolveIdentity.mockResolvedValue({ providerUserId: '123' });
+    const result = await service.create('actor', {
+      ...createDto(),
+      selectedOperations: [
+        { resourceId: 'resource', action: 'GRANT', providerUserId: 'person' },
+      ],
+    });
+    expect(result.operations).toMatchObject({
+      create: [
+        {
+          providerUserId: '123',
+          automatic: true,
+          result: { accountName: 'person' },
+        },
+      ],
+    });
+    expect(connectors.resolveIdentity).toHaveBeenCalledTimes(1);
+  });
+
+  it('queues an automatic request without a human verification note', async () => {
+    prisma.lifecycleProcess.findFirst.mockResolvedValue({
+      ...process(),
+      operations: [{ ...process().operations[0], verificationNote: null }],
+    });
+    await service.decide('actor', 'process', {
+      approved: true,
+      note: 'Reviewed account and access scope',
+    });
+    expect(prisma.accessOperation.update).toHaveBeenCalledWith({
+      where: { id: 'operation' },
+      data: { status: 'PENDING' },
+    });
+  });
+
+  it('distinguishes an explicit numeric username from a legacy account ID before approval', async () => {
+    prisma.accessResource.findMany.mockResolvedValue([
+      {
+        id: 'resource',
+        provider: 'GITHUB',
+        name: 'GitHub',
+        remoteId: 'test-org',
+        automatic: true,
+        sensitive: false,
+        departmentIds: [],
+      },
+    ]);
+    connectors.resolveIdentity.mockResolvedValue({ providerUserId: '456' });
+    const result = await service.create('actor', {
+      ...createDto(),
+      selectedOperations: [
+        { resourceId: 'resource', action: 'GRANT', accountUsername: '123' },
+      ],
+    });
+    expect(connectors.resolveIdentity).toHaveBeenCalledWith(
+      expect.objectContaining({ providerUserId: '@123' }),
+    );
+    expect(result.operations).toMatchObject({
+      create: [{ providerUserId: '456', result: { accountName: '123' } }],
+    });
+  });
+
+  it('keeps an unconfigured Presidency Drive step manual without hiding it', async () => {
+    prisma.accessResource.findMany.mockResolvedValue([
+      {
+        id: 'resource',
+        provider: 'GOOGLE_DRIVE',
+        name: 'Drive Presidency',
+        remoteId: 'CONFIGURE_ME',
+        automatic: true,
+        sensitive: true,
+        departmentIds: [],
+        instructions:
+          'A Presidency operator shares the folder and records evidence',
+      },
+    ]);
+    const result = await service.create('actor', {
+      ...createDto(),
+      selectedOperations: [
+        {
+          resourceId: 'resource',
+          action: 'GRANT',
+          accountEmail: 'person@example.com',
+          exceptionReason: 'Presidency approved temporary collaboration',
+        },
+      ],
+    });
+    expect(result.operations).toMatchObject({
+      create: [
+        {
+          providerUserId: 'person@example.com',
+          automatic: false,
+          resourceSnapshot: {
+            instructions:
+              'A Presidency operator shares the folder and records evidence',
+          },
+        },
+      ],
+    });
+  });
+
+  it('rejects a Google email that differs from the submitted principal', async () => {
+    prisma.accessResource.findMany.mockResolvedValue([
+      {
+        id: 'resource',
+        provider: 'GOOGLE_DRIVE',
+        remoteId: 'folder',
+        automatic: true,
+        sensitive: false,
+        departmentIds: [],
+      },
+    ]);
+    await expect(
+      service.create('actor', {
+        ...createDto(),
+        selectedOperations: [
+          {
+            resourceId: 'resource',
+            action: 'GRANT',
+            providerUserId: 'one@example.com',
+            accountEmail: 'other@example.com',
+          },
+        ],
+      }),
+    ).rejects.toThrow('Email Google difere');
+    expect(prisma.lifecycleProcess.create).not.toHaveBeenCalled();
+  });
+
+  it('searches accents and separated name terms within the live department scope', async () => {
+    intake.responses.mockResolvedValue([
+      {
+        name: 'José da Silva',
+        email: 'person@example.com',
+        departmentIds: ['it'],
+      },
+      {
+        name: 'José da Silva',
+        email: 'other@example.com',
+        departmentIds: ['external'],
+      },
+    ]);
+    expect(
+      await service.intakeResponses('actor', {
+        query: '  jose silva ',
+        offset: 0,
+      }),
+    ).toHaveLength(1);
   });
 
   it('uses live permissions and rejects suspended operators', async () => {

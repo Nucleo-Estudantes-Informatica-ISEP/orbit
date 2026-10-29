@@ -491,8 +491,12 @@ export default function AccessPage() {
                   </div>
                   <p className="text-sm">{op.resourceSnapshot.instructions}</p>
                   <p className="break-all text-sm text-muted-foreground">
-                    {t("access.remoteId")}: {op.providerUserId || "—"} ·{" "}
-                    {op.accountEmail}
+                    {t("access.remoteId")}:{" "}
+                    {op.result?.accountName ||
+                      op.accountEmail ||
+                      op.providerUserId ||
+                      "—"}{" "}
+                    · {op.accountEmail}
                   </p>
                   {op.verificationNote && (
                     <p className="text-sm">

@@ -78,6 +78,7 @@ export interface IntakeResponse {
   accounts: Record<string, string>;
 }
 export interface SelectedOperation {
+  accountUsername?: string;
   resourceId: string;
   action: "GRANT" | "REVOKE" | "VERIFY";
   providerUserId?: string;
@@ -98,7 +99,7 @@ export interface AccessOperation {
   automatic: boolean;
   attempts: number;
   lastError?: string;
-  result?: { detail: string; remoteId?: string };
+  result?: { detail?: string; remoteId?: string; accountName?: string };
   evidence: {
     id: string;
     performedById: string;
@@ -132,21 +133,35 @@ export interface LifecycleProcess {
 export function intakeAccount(
   resource: AccessResource,
   intake?: IntakeResponse,
-): Pick<SelectedOperation, "providerUserId" | "accountEmail"> {
+): Pick<
+  SelectedOperation,
+  "providerUserId" | "accountEmail" | "accountUsername"
+> {
   const accounts = intake?.accounts || {};
   const ids: Partial<Record<Provider, string>> = {
-    DISCORD: accounts.discordId,
-    GITHUB: accounts.githubId,
+    DISCORD: accounts.discordUsername || accounts.discordId,
+    GITHUB: accounts.githubUsername || accounts.githubId,
     GOOGLE_DRIVE: accounts.googleEmail,
     WHATSAPP: accounts.phone,
     FIGMA: accounts.figmaEmail,
+    CODA: accounts.codaEmail,
+    FREEDCAMP: accounts.freedcampEmail,
+    EMAIL: accounts.institutionalEmail,
   };
   const emails: Partial<Record<Provider, string>> = {
     GOOGLE_DRIVE: accounts.googleEmail,
     FIGMA: accounts.figmaEmail,
+    CODA: accounts.codaEmail,
+    FREEDCAMP: accounts.freedcampEmail,
+    EMAIL: accounts.institutionalEmail,
   };
   return {
-    providerUserId: ids[resource.provider] || undefined,
+    ...(["DISCORD", "GITHUB"].includes(resource.provider) &&
+    (resource.provider === "DISCORD"
+      ? accounts.discordUsername
+      : accounts.githubUsername)
+      ? { accountUsername: ids[resource.provider] || undefined }
+      : { providerUserId: ids[resource.provider] || undefined }),
     accountEmail: emails[resource.provider] || undefined,
   };
 }

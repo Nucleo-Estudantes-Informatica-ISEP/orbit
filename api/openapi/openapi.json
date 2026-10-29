@@ -2650,6 +2650,12 @@
             "maxLength": 254,
             "type": "string"
           },
+          "accountUsername": {
+            "description": "Discord/GitHub username. Preferred for new clients; distinguishes numeric usernames from legacy providerUserId IDs.",
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
           "action": {
             "enum": [
               "GRANT",
@@ -2664,7 +2670,8 @@
             "type": "string"
           },
           "providerUserId": {
-            "maxLength": 200,
+            "description": "Discord/GitHub username or Google account email. Legacy numeric account/permission IDs remain accepted. Orbit resolves and verifies remote identities.",
+            "maxLength": 254,
             "minLength": 1,
             "type": "string"
           },
@@ -2673,6 +2680,7 @@
             "type": "string"
           },
           "verificationNote": {
+            "description": "Optional operator context. Automatic identity verification is performed by Orbit, not asserted by this text.",
             "maxLength": 1000,
             "minLength": 5,
             "type": "string"
@@ -3940,11 +3948,12 @@
             }
           },
           {
+            "description": "Search external accounts by declared username/email or a legacy numeric ID.",
             "in": "query",
             "name": "providerUserId",
             "required": false,
             "schema": {
-              "maxLength": 200,
+              "maxLength": 254,
               "type": "string"
             }
           },
@@ -4354,11 +4363,12 @@
             }
           },
           {
+            "description": "Search external accounts by declared username/email or a legacy numeric ID.",
             "in": "query",
             "name": "providerUserId",
             "required": false,
             "schema": {
-              "maxLength": 200,
+              "maxLength": 254,
               "type": "string"
             }
           },

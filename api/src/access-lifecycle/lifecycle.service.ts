@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, SystemPermission } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
-import { IntakeService } from './intake.service';
+import { IntakeService, normalizeIntakeText } from './intake.service';
 import { ConnectorsService } from './connectors.service';
 import {
   AccessPolicyDto,
@@ -109,7 +109,6 @@ export class LifecycleService {
         };
     const [resources, policies, departments] = await Promise.all([
       this.prisma.accessResource.findMany({
-        where: scope,
         orderBy: { name: 'asc' },
       }),
       this.prisma.accessPolicy.findMany({
@@ -148,14 +147,16 @@ export class LifecycleService {
       throw new BadRequestException(
         'Pesquisar pelo menos três caracteres no Forms/Sheets',
       );
-    const search = query.query.toLowerCase();
+    const search = normalizeIntakeText(query.query).split(' ');
     return (await this.intake.responses())
       .filter(
         (row) =>
           row.departmentIds.length &&
           (actor.global ||
             row.departmentIds.every((id) => id === actor.departmentId)) &&
-          `${row.name} ${row.email}`.toLowerCase().includes(search),
+          search.every((term) =>
+            normalizeIntakeText(`${row.name} ${row.email}`).includes(term),
+          ),
       )
       .slice(query.offset, query.offset + 25);
   }
@@ -247,47 +248,103 @@ export class LifecycleService {
         );
       source = { type: 'MANUAL', note: dto.sourceNote };
     }
-    const operations = dto.selectedOperations.map((op) => {
-      const resource = resources.find((value) => value.id === op.resourceId)!;
-      if (
-        resource.departmentIds.length &&
-        !resource.departmentIds.some((id) =>
-          dto.targetDepartmentIds.includes(id),
+    const identities = new Map<
+      string,
+      Promise<{ providerUserId: string | null }>
+    >();
+    const operations = await Promise.all(
+      dto.selectedOperations.map(async (op) => {
+        const resource = resources.find((value) => value.id === op.resourceId)!;
+        if (
+          (resource.sensitive ||
+            !preview.resources.some((value) => value.id === resource.id)) &&
+          !op.exceptionReason?.trim()
         )
-      )
-        throw new ForbiddenException('Recurso fora do contexto do pedido');
-      if (
-        (resource.sensitive ||
-          !preview.resources.some((value) => value.id === resource.id)) &&
-        !op.exceptionReason?.trim()
-      )
-        throw new BadRequestException(
-          'Recurso sensível ou exceção à política exige justificação explícita',
-        );
-      if (dto.kind === 'ONBOARD' && op.action === 'REVOKE')
-        throw new BadRequestException('Onboarding não pode revogar acessos');
-      if (dto.kind === 'OFFBOARD' && op.action === 'GRANT')
-        throw new BadRequestException(
-          'Concessões Alumni exigem ALUMNI_TRANSITION explícita',
-        );
-      assertOperationIdentity(
-        op.action,
-        op.providerUserId,
-        op.verificationNote,
-      );
-      return {
-        action: op.action,
-        provider: resource.provider,
-        resourceSnapshot: JSON.parse(
-          JSON.stringify(resource),
-        ) as Prisma.InputJsonValue,
-        providerUserId: op.providerUserId?.trim() || undefined,
-        accountEmail: op.accountEmail,
-        verificationNote: op.verificationNote?.trim() || undefined,
-        exceptionReason: op.exceptionReason,
-        automatic: resource.automatic,
-      };
-    });
+          throw new BadRequestException(
+            'Recurso sensível ou exceção à política exige justificação explícita',
+          );
+        if (dto.kind === 'ONBOARD' && op.action === 'REVOKE')
+          throw new BadRequestException('Onboarding não pode revogar acessos');
+        if (dto.kind === 'OFFBOARD' && op.action === 'GRANT')
+          throw new BadRequestException(
+            'Concessões Alumni exigem ALUMNI_TRANSITION explícita',
+          );
+        if (
+          resource.provider === 'GOOGLE_DRIVE' &&
+          op.providerUserId?.includes('@') &&
+          op.accountEmail &&
+          op.providerUserId.trim().toLowerCase() !==
+            op.accountEmail.trim().toLowerCase()
+        )
+          throw new BadRequestException(
+            'Email Google difere da conta indicada',
+          );
+        if (
+          op.accountUsername &&
+          !['DISCORD', 'GITHUB'].includes(resource.provider)
+        )
+          throw new BadRequestException('Username apenas para Discord/GitHub');
+        if (
+          op.accountUsername !== undefined &&
+          (!op.accountUsername.trim().replace(/^@/, '') || op.providerUserId)
+        )
+          throw new BadRequestException(
+            'Indicar o username ou o ID legado, sem combinar ambos',
+          );
+        const principal = op.accountUsername
+          ? `@${op.accountUsername.trim().replace(/^@/, '')}`
+          : resource.provider === 'GOOGLE_DRIVE'
+            ? op.providerUserId || op.accountEmail
+            : op.providerUserId;
+        assertOperationIdentity(op.action, principal);
+        let providerUserId = principal?.trim();
+        if (
+          providerUserId &&
+          resource.automatic &&
+          ['DISCORD', 'GITHUB'].includes(resource.provider) &&
+          resource.remoteId !== 'CONFIGURE_ME'
+        ) {
+          const key = `${resource.provider}:${resource.containerId || ''}:${providerUserId}`;
+          if (!identities.has(key))
+            identities.set(
+              key,
+              this.connectors.resolveIdentity({
+                provider: resource.provider,
+                providerUserId,
+                accountEmail: op.accountEmail || null,
+                verificationNote: null,
+                resourceSnapshot: JSON.parse(
+                  JSON.stringify(resource),
+                ) as Prisma.JsonValue,
+              }),
+            );
+          providerUserId =
+            (await identities.get(key)!).providerUserId || undefined;
+        }
+        const accountName =
+          op.accountUsername?.trim() ||
+          (principal &&
+          !(
+            ['DISCORD', 'GITHUB'].includes(resource.provider) &&
+            /^\d+$/.test(principal)
+          )
+            ? principal
+            : undefined);
+        return {
+          action: op.action,
+          provider: resource.provider,
+          resourceSnapshot: JSON.parse(
+            JSON.stringify(resource),
+          ) as Prisma.InputJsonValue,
+          providerUserId,
+          accountEmail: op.accountEmail,
+          verificationNote: op.verificationNote?.trim() || undefined,
+          exceptionReason: op.exceptionReason,
+          automatic: resource.automatic && resource.remoteId !== 'CONFIGURE_ME',
+          ...(accountName ? { result: { accountName } } : {}),
+        };
+      }),
+    );
     const result = await this.prisma.lifecycleProcess.create({
       data: {
         kind: dto.kind,
@@ -331,7 +388,29 @@ export class LifecycleService {
                 some: {
                   ...(query.provider ? { provider: query.provider } : {}),
                   ...(query.providerUserId
-                    ? { providerUserId: query.providerUserId }
+                    ? {
+                        OR: [
+                          {
+                            providerUserId: {
+                              contains: query.providerUserId,
+                              mode: 'insensitive' as const,
+                            },
+                          },
+                          {
+                            accountEmail: {
+                              contains: query.providerUserId,
+                              mode: 'insensitive' as const,
+                            },
+                          },
+                          {
+                            result: {
+                              path: ['accountName'],
+                              string_contains: query.providerUserId,
+                              mode: 'insensitive' as const,
+                            },
+                          },
+                        ],
+                      }
                     : {}),
                 },
               },
@@ -415,9 +494,7 @@ export class LifecycleService {
               ? 'CANCELLED'
               : !op.automatic
                 ? 'AWAITING_MANUAL'
-                : !op.providerUserId ||
-                    !op.verificationNote ||
-                    op.verificationNote.length < 5
+                : !op.providerUserId
                   ? 'AWAITING_ACCOUNT'
                   : 'PENDING',
           },
@@ -444,7 +521,7 @@ export class LifecycleService {
       !['AWAITING_MANUAL', 'AWAITING_ACCOUNT', 'FAILED'].includes(op.status)
     )
       throw new BadRequestException('Operação não aguarda confirmação');
-    assertOperationIdentity(op.action, op.providerUserId, op.verificationNote);
+    assertOperationIdentity(op.action, op.providerUserId);
     if (dto.outcome === 'AWAITING_ACCOUNT' && op.action === 'REVOKE')
       throw new BadRequestException('Convite pendente não confirma revogação');
     // Automatic results are verified by the provider, not marked successful by a client.
@@ -490,13 +567,9 @@ export class LifecycleService {
       throw new BadRequestException(
         'Limite de tentativas atingido; criar pedido revisto',
       );
-    if (
-      !op.providerUserId ||
-      !op.verificationNote ||
-      op.verificationNote.trim().length < 5
-    )
+    if (!op.providerUserId)
       throw new BadRequestException(
-        'Criar pedido revisto com identidade verificada para nova aprovação',
+        'Criar pedido revisto com username ou email para nova aprovação',
       );
     const changed = await this.prisma.accessOperation.updateMany({
       where: { id: operationId, status: op.status, updatedAt: op.updatedAt },
@@ -611,8 +684,6 @@ export class LifecycleService {
   }
 
   private validateResource(dto: AccessResourceDto) {
-    if (dto.enabled && dto.remoteId === 'CONFIGURE_ME')
-      throw new BadRequestException('Configurar recurso antes de ativar');
     const types: Record<string, string[]> = {
       DISCORD: ['DISCORD_ROLE'],
       GITHUB: ['GITHUB_ORG', 'GITHUB_TEAM'],
@@ -635,13 +706,12 @@ export class LifecycleService {
     if (
       dto.provider === 'DISCORD' &&
       /server.?manager/i.test(dto.name) &&
-      (dto.automatic || !dto.sensitive)
+      !dto.sensitive
     )
-      throw new BadRequestException(
-        'server-manager exige recurso manual sensível',
-      );
+      throw new BadRequestException('server-manager exige recurso sensível');
     if (
       dto.automatic &&
+      dto.remoteId !== 'CONFIGURE_ME' &&
       (dto.provider === 'DISCORD' || dto.resourceType === 'GITHUB_TEAM') &&
       !dto.containerId
     )

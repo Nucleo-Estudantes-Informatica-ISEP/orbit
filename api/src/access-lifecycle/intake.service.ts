@@ -6,6 +6,48 @@ import {
 import { createHash } from 'node:crypto';
 import { ProviderHttp } from './provider-http';
 
+export const normalizeIntakeText = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+const labelKey = (value: string) =>
+  normalizeIntakeText(value).replace(/[^a-z0-9]/g, '');
+const aliases: Record<string, string[]> = {
+  name: ['Nome e Apelido', 'Nome'],
+  email: ['E-Mail Pessoal', 'Email'],
+  departments: ['Departamento', 'Departamentos'],
+  positions: ['Cargo', 'Cargos'],
+  discordId: ['ID Discord', 'Discord ID'],
+  discordUsername: ['Username Discord', 'ID Discord', 'Discord ID'],
+  githubId: ['GitHub ID'],
+  githubUsername: ['Username GitHub', 'Utilizador GitHub', 'GitHub'],
+  googleEmail: ['Email Google', 'E-mail Google'],
+  phone: ['Nº Telemóvel', 'Telefone'],
+  figmaEmail: ['Email Figma'],
+  codaEmail: ['Email Coda'],
+  freedcampEmail: ['Email Freedcamp'],
+  institutionalEmail: ['E-mail NEI'],
+};
+const declaredPositions: Record<string, string> = {
+  membro: 'MEMBER',
+  coordenador: 'COORDINATOR',
+  coordenadora: 'COORDINATOR',
+  coordenacao: 'COORDINATOR',
+  cocoordenador: 'CO_COORDINATOR',
+  cocoordenadora: 'CO_COORDINATOR',
+  cocoordenacao: 'CO_COORDINATOR',
+  direcao: 'BOARD',
+  tesoureiro: 'BOARD',
+  tesoureira: 'BOARD',
+  presidencia: 'PRESIDENCY',
+  presidente: 'PRESIDENCY',
+  vicepresidente: 'PRESIDENCY',
+  alumni: 'ALUMNI',
+};
+
 export interface IntakeResponse {
   key: string;
   name: string;
@@ -65,20 +107,37 @@ export class IntakeService {
       await this.http.google('sheets'),
     );
     const [headers, ...rows] = result?.values || [];
+    const indices = (field: string) =>
+      (headers || []).flatMap((header, index) =>
+        [columns[field], ...(aliases[field] || [])]
+          .filter(Boolean)
+          .some((name) => labelKey(name) === labelKey(header))
+          ? [index]
+          : [],
+      );
     if (
       !headers ||
-      !headers.includes(columns.name) ||
-      !headers.includes(columns.email) ||
-      !headers.includes(columns.departments)
+      ['name', 'email', 'departments'].some((field) => !indices(field).length)
     )
       throw new ServiceUnavailableException(
         'Colunas obrigatórias em falta no Sheets',
       );
     const get = (row: string[], field: string) =>
-      String(row[headers.indexOf(columns[field])] || '').trim();
+      indices(field)
+        .map((index) => String(row[index] || '').trim())
+        .find(Boolean) || '';
+    const departmentMap = Object.fromEntries(
+      Object.entries(departments).map(([label, id]) => [labelKey(label), id]),
+    );
+    const positionMap = {
+      ...declaredPositions,
+      ...Object.fromEntries(
+        Object.entries(positions).map(([label, id]) => [labelKey(label), id]),
+      ),
+    };
     const split = (value: string) =>
       value
-        .split(/[,;]/)
+        .split(/[,;\n]/)
         .map((v) => v.trim())
         .filter(Boolean);
     return rows
@@ -90,15 +149,32 @@ export class IntakeService {
         name: get(row, 'name'),
         email: get(row, 'email').toLowerCase(),
         departmentIds: split(get(row, 'departments')).map(
-          (value) => departments[value] || value,
+          (value) => departmentMap[labelKey(value)] || value,
         ),
         positions: split(get(row, 'positions')).map(
-          (value) => positions[value] || value,
+          (value) => positionMap[labelKey(value)] || value,
         ),
         accounts: Object.fromEntries(
-          ['discordId', 'githubId', 'googleEmail', 'phone', 'figmaEmail'].map(
-            (field) => [field, get(row, field)],
-          ),
+          [
+            'discordId',
+            'discordUsername',
+            'githubId',
+            'githubUsername',
+            'googleEmail',
+            'phone',
+            'figmaEmail',
+            'codaEmail',
+            'freedcampEmail',
+            'institutionalEmail',
+          ].map((field) => [
+            field,
+            field === 'discordUsername' &&
+            /^\d{15,22}$/.test(get(row, field)) &&
+            !columns.discordUsername &&
+            !headers.some((header) => labelKey(header) === 'usernamediscord')
+              ? ''
+              : get(row, field),
+          ]),
         ),
       }));
   }

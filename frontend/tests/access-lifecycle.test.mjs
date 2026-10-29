@@ -15,6 +15,11 @@ test("Forms account hints do not forge verification evidence", () => {
   assert.equal("verificationNote" in values, false);
 });
 
+test("normal username fields distinguish numeric GitHub usernames from old numeric IDs", () => {
+  assert.deepEqual(intakeAccount({provider:"GITHUB"},{accounts:{githubUsername:"123"}}),{accountUsername:"123",accountEmail:undefined});
+  assert.deepEqual(intakeAccount({provider:"DISCORD"},{accounts:{discordUsername:"person.name"}}),{accountUsername:"person.name",accountEmail:undefined});
+});
+
 test("empty optional fields are omitted so validated DTOs accept an incomplete grant", () => {
   assert.deepEqual(
     cleanOperation({

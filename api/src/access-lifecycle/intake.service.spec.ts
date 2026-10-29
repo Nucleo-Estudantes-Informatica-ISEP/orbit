@@ -111,4 +111,43 @@ describe('Forms / Sheets intake', () => {
     process.env.ACCESS_SHEETS_RANGE = 'Respostas!A:Z';
     await expect(intake.responses()).rejects.toThrow('última linha');
   });
+
+  it('normalizes existing headers and labels and reads nonempty conditional duplicate columns', async () => {
+    process.env.ACCESS_SHEETS_DEPARTMENTS = '{"Informática":"department-it"}';
+    http.request.mockResolvedValue({
+      values: [
+        [
+          ' Nome e Apelido ',
+          'E-Mail Pessoal',
+          'Departamento',
+          'Departamento',
+          'Cargo',
+          'ID Discord',
+          'Username GitHub',
+          'Email Google',
+          'Email Coda',
+        ],
+        [
+          'Pessoa',
+          'person@example.com',
+          '',
+          'informatica',
+          'coordenadora',
+          'person.name',
+          'person-github',
+          'drive@example.com',
+          'coda@example.com',
+        ],
+      ],
+    });
+    const [row] = await intake.responses();
+    expect(row.departmentIds).toEqual(['department-it']);
+    expect(row.positions).toEqual(['COORDINATOR']);
+    expect(row.accounts).toMatchObject({
+      discordUsername: 'person.name',
+      githubUsername: 'person-github',
+      googleEmail: 'drive@example.com',
+      codaEmail: 'coda@example.com',
+    });
+  });
 });

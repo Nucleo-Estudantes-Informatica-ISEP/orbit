@@ -116,7 +116,12 @@ export class LifecycleWorker implements OnModuleInit, OnModuleDestroy {
             where: { id: candidate.id, status: 'RUNNING', leaseToken: token },
             data: {
               status: result.status,
-              result: this.connectors.asJson(result),
+              result: this.connectors.asJson({
+                ...result,
+                accountName:
+                  (candidate.result as { accountName?: string } | null)
+                    ?.accountName || result.accountName,
+              }),
               lastError: null,
               leaseToken: null,
               leaseUntil: null,

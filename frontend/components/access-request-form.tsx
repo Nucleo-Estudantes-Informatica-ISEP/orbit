@@ -122,12 +122,7 @@ export function AccessRequestForm({
     values.includes(value)
       ? values.filter((item) => item !== value)
       : [...values, value];
-  const resources = config.resources.filter(
-    (resource) =>
-      resource.enabled &&
-      (!resource.departmentIds.length ||
-        resource.departmentIds.some((id) => departments.includes(id))),
-  );
+  const resources = config.resources.filter((resource) => resource.enabled);
   const suggested = resources.filter((resource) =>
     recommendedIds.includes(resource.id),
   );
@@ -281,19 +276,19 @@ export function AccessRequestForm({
     const op = operations.find((item) => item.resourceId === resource.id);
     const exception =
       resource.sensitive || !recommendedIds.includes(resource.id);
-    const isEmail = teamProviders.includes(resource.provider);
-    const googleGrant =
-      resource.provider === "GOOGLE_DRIVE" && op?.action === "GRANT";
-    const identityLabel = isEmail
-      ? "email"
-      : resource.provider === "WHATSAPP"
-        ? "phone"
-        : resource.provider === "GOOGLE_DRIVE"
-          ? "googlePermission"
-          : resource.provider === "GITHUB"
-            ? "githubId"
-            : "discordId";
-    const numericId = /^(DISCORD|GITHUB|GOOGLE_DRIVE)$/.test(resource.provider);
+    const isEmail =
+      teamProviders.includes(resource.provider) ||
+      resource.provider === "GOOGLE_DRIVE";
+    const identityLabel =
+      resource.provider === "GOOGLE_DRIVE"
+        ? "googleEmail"
+        : isEmail
+          ? "email"
+          : resource.provider === "WHATSAPP"
+            ? "phone"
+            : resource.provider === "GITHUB"
+              ? "githubId"
+              : "discordId";
     const instructions =
       resource.instructions ===
       "Configurar identificadores e instruções; confirmar execução na plataforma."
@@ -374,142 +369,60 @@ export function AccessRequestForm({
                 ))}
               </select>
             </label>
-            {googleGrant ? (
-              <>
-                <label className="grid gap-1.5 text-sm">
-                  {t("access.identity.googleEmail")}
-                  <Input
-                    type="email"
-                    maxLength={200}
-                    value={op.accountEmail || ""}
-                    onChange={(event) =>
-                      updateOperation(
-                        changeAccountEmail(
+            <label className="grid gap-1.5 text-sm">
+              {t(`access.identity.${identityLabel}`)}
+              <Input
+                type={
+                  isEmail
+                    ? "email"
+                    : resource.provider === "WHATSAPP"
+                      ? "tel"
+                      : "text"
+                }
+                required={op.action === "REVOKE"}
+                maxLength={isEmail ? 254 : 200}
+                autoComplete="off"
+                value={
+                  isEmail
+                    ? op.accountEmail ||
+                      (op.providerUserId?.includes("@")
+                        ? op.providerUserId
+                        : "") ||
+                      ""
+                    : op.accountUsername || op.providerUserId || ""
+                }
+                onChange={(event) =>
+                  updateOperation(
+                    isEmail
+                      ? changeAccountEmail(
                           op,
                           resource.provider,
                           event.target.value,
-                        ),
-                      )
-                    }
-                  />
-                </label>
-                <details
-                  className="text-sm"
-                  open={/^\d+$/.test(op.providerUserId || "") || undefined}
-                >
-                  <summary className="cursor-pointer text-muted-foreground">
-                    {t("access.existingGooglePermission")}
-                  </summary>
-                  <label className="mt-3 grid gap-1.5">
-                    {t("access.identity.googlePermission")}
-                    <Input
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      value={
-                        /^\d+$/.test(op.providerUserId || "")
-                          ? op.providerUserId
-                          : ""
-                      }
-                      onChange={(event) =>
-                        updateOperation(
-                          changeRemoteIdentity(
-                            op,
-                            event.target.value || op.accountEmail || "",
-                          ),
                         )
-                      }
-                    />
-                  </label>
-                </details>
-              </>
-            ) : (
-              <>
-                <label className="grid gap-1.5 text-sm">
-                  {t(`access.identity.${identityLabel}`)}
-                  <Input
-                    type={
-                      isEmail
-                        ? "email"
-                        : resource.provider === "WHATSAPP"
-                          ? "tel"
-                          : "text"
-                    }
-                    inputMode={numericId ? "numeric" : undefined}
-                    pattern={numericId ? "[0-9]+" : undefined}
-                    required={op.action === "REVOKE"}
-                    maxLength={200}
-                    value={
-                      isEmail
-                        ? op.accountEmail || op.providerUserId || ""
-                        : op.providerUserId || ""
-                    }
-                    onChange={(event) =>
-                      updateOperation(
-                        isEmail
-                          ? changeAccountEmail(
-                              op,
-                              resource.provider,
-                              event.target.value,
-                            )
-                          : changeRemoteIdentity(op, event.target.value),
-                      )
-                    }
-                  />
-                </label>
-                {resource.provider === "GOOGLE_DRIVE" && (
-                  <details
-                    className="text-sm"
-                    open={Boolean(op.accountEmail) || undefined}
-                  >
-                    <summary className="cursor-pointer text-muted-foreground">
-                      {t("access.googleConfirmationEmail")}
-                    </summary>
-                    <label className="mt-3 grid gap-1.5">
-                      {t("access.identity.googleEmail")}
-                      <Input
-                        type="email"
-                        maxLength={254}
-                        value={op.accountEmail || ""}
-                        onChange={(event) =>
-                          updateOperation(
-                            changeAccountEmail(
-                              op,
-                              resource.provider,
-                              event.target.value,
-                            ),
-                          )
-                        }
-                      />
-                    </label>
-                  </details>
-                )}
-              </>
-            )}
-            <label className="grid gap-1.5 text-sm">
-              {t("access.verification")}
-              <Textarea
-                required={op.action === "REVOKE"}
-                minLength={5}
-                maxLength={1000}
-                rows={2}
-                placeholder={t(
-                  `access.verificationPlaceholder.${resource.provider}`,
-                )}
-                value={op.verificationNote || ""}
-                onChange={(event) =>
-                  updateOperation({
-                    ...op,
-                    verificationNote: event.target.value,
-                  })
+                      : changeRemoteIdentity(
+                          op,
+                          event.target.value,
+                          resource.provider,
+                        ),
+                  )
                 }
               />
             </label>
-            {resource.automatic &&
-              (!op.providerUserId?.trim() || !op.verificationNote?.trim()) && (
-                <p className="text-sm text-muted-foreground">
-                  {t("access.pendingIdentityHelp")}
-                </p>
-              )}
+            {resource.remoteId === "CONFIGURE_ME" && (
+              <p
+                role="status"
+                className="rounded-md border border-amber-500/50 p-3 text-sm"
+              >
+                {t("access.configurationRequired")}
+              </p>
+            )}
+            {["DISCORD", "GITHUB", "GOOGLE_DRIVE"].includes(
+              resource.provider,
+            ) && (
+              <p className="text-sm text-muted-foreground">
+                {t("access.automaticIdentityHelp")}
+              </p>
+            )}
             {exception && (
               <label className="grid gap-1.5 text-sm">
                 {t(
@@ -571,6 +484,12 @@ export function AccessRequestForm({
             <p className="text-sm text-muted-foreground">
               {t("access.personHelp")}
             </p>
+            {config.intakeConfigured &&
+              !config.permissions.includes("ACCESS_ALL_DEPARTMENTS") && (
+                <p className="text-sm text-muted-foreground">
+                  {t("access.intakeScope")}
+                </p>
+              )}
             {config.intakeConfigured && (
               <div
                 className="flex flex-wrap gap-2"

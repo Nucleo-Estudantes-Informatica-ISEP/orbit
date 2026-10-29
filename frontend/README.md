@@ -2,7 +2,7 @@
 
 Next.js 16 frontend for Orbit. It runs on port 3090 and proxies `/api/*` to the internal Orbit API in Docker. Read [`../AGENTS.md`](../AGENTS.md) and [`AGENTS.md`](./AGENTS.md) before changing it.
 
-`/dashboard/access` provides external access requests, Forms/Sheets response lookup, resource selection, Presidency approval, execution evidence and versioned resource/policy administration. Visibility requires `ACCESS_READ`; the API enforces current permissions and department scope independently. Provider credentials stay on the API server. See the [access lifecycle guide](../docs/access-lifecycle.md).
+`/dashboard/access` provides external access requests, Forms/Sheets response lookup, resource selection, Presidency approval, execution evidence and versioned resource/policy administration. Visibility requires `ACCESS_READ`; the API enforces current permissions and department scope independently. Operators enter Discord/GitHub usernames and Google emails; Orbit resolves technical IDs. Department scope limits the people managed, while the full service catalogue supports justified cross-department defaults. Provider credentials stay on the API server. See the [access lifecycle guide](../docs/access-lifecycle.md).
 
 ## Local setup
 

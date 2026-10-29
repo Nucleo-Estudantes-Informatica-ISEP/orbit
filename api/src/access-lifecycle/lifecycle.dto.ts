@@ -27,22 +27,37 @@ import {
 } from '@prisma/client';
 
 export class SelectedOperationDto {
-  @ApiProperty({ format: 'uuid' }) @IsUUID() resourceId: string;
-  @ApiProperty({ enum: AccessAction })
-  @IsEnum(AccessAction)
-  action: AccessAction;
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    description:
+      'Discord/GitHub username. Preferred for new clients; distinguishes numeric usernames from legacy providerUserId IDs.',
+  })
   @IsOptional()
   @IsString()
   @MinLength(1)
   @MaxLength(200)
+  accountUsername?: string;
+  @ApiProperty({ format: 'uuid' }) @IsUUID() resourceId: string;
+  @ApiProperty({ enum: AccessAction })
+  @IsEnum(AccessAction)
+  action: AccessAction;
+  @ApiPropertyOptional({
+    description:
+      'Discord/GitHub username or Google account email. Legacy numeric account/permission IDs remain accepted. Orbit resolves and verifies remote identities.',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(254)
   providerUserId?: string;
   @ApiPropertyOptional()
   @IsOptional()
   @IsEmail()
   @MaxLength(254)
   accountEmail?: string;
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    description:
+      'Optional operator context. Automatic identity verification is performed by Orbit, not asserted by this text.',
+  })
   @IsOptional()
   @IsString()
   @MinLength(5)
@@ -128,10 +143,13 @@ export class LifecycleQueryDto {
   @IsOptional()
   @IsEnum(AccessProvider)
   provider?: AccessProvider;
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    description:
+      'Search external accounts by declared username/email or a legacy numeric ID.',
+  })
   @IsOptional()
   @IsString()
-  @MaxLength(200)
+  @MaxLength(254)
   providerUserId?: string;
   @ApiPropertyOptional({ default: 0 })
   @IsOptional()
