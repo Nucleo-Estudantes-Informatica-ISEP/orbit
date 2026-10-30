@@ -76,10 +76,15 @@ export default function AccessPage() {
 
   const load = useCallback(async () => {
     if (!user?.permissions?.includes("ACCESS_READ")) return;
+    if (remoteQuery && remoteQuery.trim().length < 3) {
+      setProcesses([]);
+      setError(t("access.remoteSearchMinimum"));
+      return;
+    }
     const params = new URLSearchParams({ offset: String(offset) });
     if (query) params.set("query", query);
     if (status) params.set("status", status);
-    if (remoteQuery) params.set("providerUserId", remoteQuery);
+    if (remoteQuery) params.set("providerUserId", remoteQuery.trim());
     try {
       const [configuration, items] = await Promise.all([
         api.get<AccessConfiguration>(`${root}/configuration`),
@@ -319,7 +324,8 @@ export default function AccessPage() {
               </Badge>
               <p className="whitespace-pre-wrap text-sm">{selected.reason}</p>
               <p className="text-sm text-muted-foreground">
-                {t("access.source")}: {selected.source.type}{" "}
+                {t("access.source")}:{" "}
+                {t(`access.sourceType.${selected.source.type}`)}{" "}
                 {selected.source.note}
               </p>
               <p className="text-sm">
@@ -491,9 +497,30 @@ export default function AccessPage() {
                   </div>
                   <p className="text-sm">{op.resourceSnapshot.instructions}</p>
                   <p className="break-all text-sm text-muted-foreground">
-                    {t("access.remoteId")}: {op.providerUserId || "—"} ·{" "}
-                    {op.accountEmail}
+                    {t("access.remoteId")}:{" "}
+                    {op.result?.accountName ||
+                      op.accountEmail ||
+                      op.providerUserId ||
+                      "—"}{" "}
+                    {op.accountEmail &&
+                    op.result?.accountName &&
+                    op.accountEmail !== op.result.accountName
+                      ? ` · ${op.accountEmail}`
+                      : ""}
                   </p>
+                  {["DISCORD", "GITHUB"].includes(op.provider) &&
+                    op.providerUserId &&
+                    /^\d+$/.test(op.providerUserId) &&
+                    op.result?.accountName && (
+                      <p className="break-all text-sm text-muted-foreground">
+                        {t("access.resolvedAccountId")}: {op.providerUserId}
+                      </p>
+                    )}
+                  {op.result?.identitySource && (
+                    <p className="text-sm text-muted-foreground">
+                      {t(`access.identitySource.${op.result.identitySource}`)}
+                    </p>
+                  )}
                   {op.verificationNote && (
                     <p className="text-sm">
                       {t("access.verification")}: {op.verificationNote}

@@ -111,12 +111,24 @@ export class LifecycleWorker implements OnModuleInit, OnModuleDestroy {
               detail: `DRY_RUN: ${observed.detail}. Nenhuma alteração executada; desativar dry-run e repetir ou concluir manualmente.`,
             }
           : observed;
+        const declaredIdentity = candidate.result as {
+          accountName?: string;
+          identitySource?: 'FORMS' | 'SHEETS' | 'OPERATOR';
+        } | null;
         await this.prisma.$transaction(async (tx) => {
           const changed = await tx.accessOperation.updateMany({
             where: { id: candidate.id, status: 'RUNNING', leaseToken: token },
             data: {
               status: result.status,
-              result: this.connectors.asJson(result),
+              result: this.connectors.asJson({
+                ...result,
+                ...(declaredIdentity?.accountName
+                  ? { accountName: declaredIdentity.accountName }
+                  : {}),
+                ...(declaredIdentity?.identitySource
+                  ? { identitySource: declaredIdentity.identitySource }
+                  : {}),
+              }),
               lastError: null,
               leaseToken: null,
               leaseUntil: null,

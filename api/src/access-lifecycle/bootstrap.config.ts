@@ -12,6 +12,21 @@ export interface AccessBootstrap {
   rolePermissions?: Record<string, SystemPermission[]>;
 }
 
+export function initialAccessBootstrap(
+  config: AccessBootstrap,
+  createdKeys: Set<string>,
+  initializeRoles: boolean,
+): AccessBootstrap {
+  return {
+    resources: Object.fromEntries(
+      Object.entries(config.resources).filter(([key]) => createdKeys.has(key)),
+    ),
+    ...(initializeRoles && config.rolePermissions
+      ? { rolePermissions: config.rolePermissions }
+      : {}),
+  };
+}
+
 function invalid(): never {
   throw new Error('Invalid access bootstrap configuration');
 }
@@ -102,7 +117,6 @@ export async function applyAccessBootstrap(
       });
       if (!current) return invalid();
       const next = { ...current, ...patch };
-      if (next.enabled && next.remoteId === 'CONFIGURE_ME') return invalid();
       if (
         next.automatic &&
         !['DISCORD', 'GITHUB', 'GOOGLE_DRIVE'].includes(next.provider)
@@ -110,6 +124,7 @@ export async function applyAccessBootstrap(
         return invalid();
       if (
         next.automatic &&
+        next.remoteId !== 'CONFIGURE_ME' &&
         (next.provider === 'DISCORD' || next.resourceType === 'GITHUB_TEAM') &&
         !next.containerId
       )
@@ -117,7 +132,7 @@ export async function applyAccessBootstrap(
       if (
         next.provider === 'DISCORD' &&
         /server.?manager/i.test(next.name) &&
-        (next.automatic || !next.sensitive)
+        !next.sensitive
       )
         return invalid();
       if (

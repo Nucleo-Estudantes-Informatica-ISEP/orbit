@@ -63,6 +63,24 @@ describe('persistent access executor', () => {
     );
     expect(lifecycle.completeIfReady).toHaveBeenCalledWith(prisma, 'process');
   });
+  it.each(['FORMS', 'SHEETS'] as const)(
+    'preserves the declared account and its %s source after execution',
+    async (identitySource) => {
+      prisma.accessOperation.findFirst.mockResolvedValue({
+        ...candidate,
+        result: { accountName: 'person.name', identitySource },
+      });
+      await worker.tick();
+      const [saved] = prisma.accessOperation.updateMany.mock.calls.at(-1) as [
+        { data: { result: unknown } },
+      ];
+      expect(saved.data.result).toMatchObject({
+        accountName: 'person.name',
+        identitySource,
+        detail: 'Verified',
+      });
+    },
+  );
   it('recovers expired final leases as failed rather than leaving them running forever', async () => {
     prisma.accessOperation.findFirst.mockResolvedValue({
       ...candidate,

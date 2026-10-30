@@ -2,7 +2,7 @@
 
 NestJS 11 API for Orbit, backed by PostgreSQL/Prisma and MinIO. Repository-wide workflow and verification rules live in [`../AGENTS.md`](../AGENTS.md).
 
-External access lifecycle routes live under `/access-lifecycle`. See [configuration and operations](../docs/access-lifecycle.md) for Forms/Sheets intake, scoped permissions, immutable approvals, provider credentials, dry-run execution and manual evidence. Initialize disabled resource defaults with `npm run access:seed` after migrations; the production image supports `node dist/prisma/seed.access.js`. The executor is disabled unless `ACCESS_EXECUTOR_ENABLED=true`, and remains read-only until `ACCESS_EXECUTOR_DRY_RUN=false`.
+External access lifecycle routes live under `/access-lifecycle`. See [configuration and operations](../docs/access-lifecycle.md) for independent Google Forms responses and manual Sheets intake, scoped permissions, immutable approvals, provider credentials, dry-run execution and manual evidence. `ACCESS_FORMS_ID` enables direct read-only Forms API access; `ACCESS_SHEETS_ID`/`ACCESS_SHEETS_RANGE` keep the independent manual registry available. Both origins support onboarding/offboarding and preserve their provenance. Initialize editable resource/policy defaults with `npm run access:seed` after migrations; the production image supports `node dist/prisma/seed.access.js`. Unconfigured destinations retain visible manual instructions. Discord/GitHub usernames and Google emails are resolved and verified by Orbit. The executor is disabled unless `ACCESS_EXECUTOR_ENABLED=true`, and remains read-only until `ACCESS_EXECUTOR_DRY_RUN=false`.
 
 ## Local setup
 

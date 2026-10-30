@@ -1,7 +1,24 @@
-import { readAccessBootstrap, applyAccessBootstrap } from './bootstrap.config';
+import {
+  readAccessBootstrap,
+  applyAccessBootstrap,
+  initialAccessBootstrap,
+} from './bootstrap.config';
 import type { PrismaClient } from '@prisma/client';
 
 describe('access bootstrap configuration', () => {
+  it('does not overwrite editable resources or operator permissions when seeding again', () => {
+    const config = readAccessBootstrap({
+      ACCESS_BOOTSTRAP_RESOURCES:
+        '{"existing":{"automatic":false},"new":{"enabled":true}}',
+      ACCESS_BOOTSTRAP_ROLE_PERMISSIONS: '{"ADMIN":["ACCESS_READ"]}',
+    });
+    expect(initialAccessBootstrap(config, new Set(['new']), false)).toEqual({
+      resources: { new: { enabled: true } },
+    });
+    expect(
+      initialAccessBootstrap(config, new Set(['existing', 'new']), true),
+    ).toEqual(config);
+  });
   it('rejects unknown fields and permissions outside the access module', () => {
     expect(() =>
       readAccessBootstrap({
@@ -31,12 +48,10 @@ describe('access bootstrap configuration', () => {
         update: jest.fn(),
       },
       role: {
-        findUnique: jest
-          .fn()
-          .mockResolvedValue({
-            id: 'role',
-            permissions: ['USERS_READ', 'ACCESS_APPROVE'],
-          }),
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'role',
+          permissions: ['USERS_READ', 'ACCESS_APPROVE'],
+        }),
         update: jest.fn(),
       },
       $transaction: jest.fn(),
@@ -86,15 +101,13 @@ describe('access bootstrap configuration', () => {
   it('validates every resource before performing mutations', async () => {
     const prisma = {
       accessResource: {
-        findUnique: jest
-          .fn()
-          .mockResolvedValue({
-            id: 'resource',
-            name: 'Figma',
-            provider: 'FIGMA',
-            remoteId: 'team',
-            automatic: false,
-          }),
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'resource',
+          name: 'Figma',
+          provider: 'FIGMA',
+          remoteId: 'team',
+          automatic: false,
+        }),
         update: jest.fn(),
       },
       role: { findUnique: jest.fn() },

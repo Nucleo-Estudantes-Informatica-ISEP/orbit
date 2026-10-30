@@ -6,8 +6,6 @@ import type {
   SelectedOperation,
 } from "./access-lifecycle";
 
-const permissionId = (value?: string) => /^\d+$/.test(value || "");
-
 export function reuseAccessOperations(
   previous: AccessOperation[],
   resources: AccessResource[],
@@ -22,7 +20,17 @@ export function reuseAccessOperations(
         {
           resourceId: resource.id,
           action: "VERIFY",
-          providerUserId: op.result?.remoteId || op.providerUserId,
+          ...(["DISCORD", "GITHUB"].includes(resource.provider) &&
+          op.result?.accountName
+            ? { accountUsername: op.result.accountName }
+            : {}),
+          providerUserId:
+            resource.provider === "GOOGLE_DRIVE"
+              ? op.accountEmail || op.result?.remoteId || op.providerUserId
+              : ["DISCORD", "GITHUB"].includes(resource.provider) &&
+                  op.result?.accountName
+                ? undefined
+                : op.result?.remoteId || op.providerUserId,
           accountEmail: op.accountEmail,
         },
         resource.provider,
@@ -65,10 +73,13 @@ export function hasOriginPosition(positions: string[]): boolean {
 export function changeRemoteIdentity(
   operation: SelectedOperation,
   value: string,
+  provider?: Provider,
 ): SelectedOperation {
   return {
     ...operation,
-    providerUserId: value,
+    ...(["DISCORD", "GITHUB"].includes(provider || "")
+      ? { accountUsername: value, providerUserId: undefined }
+      : { providerUserId: value }),
     verificationNote:
       operation.providerUserId === value
         ? operation.verificationNote
@@ -78,19 +89,15 @@ export function changeRemoteIdentity(
 
 export function changeAccountEmail(
   operation: SelectedOperation,
-  provider: Provider,
+  _provider: Provider,
   value: string,
 ): SelectedOperation {
-  const bindPrincipal =
-    provider !== "GOOGLE_DRIVE" ||
-    (operation.action === "GRANT" && !permissionId(operation.providerUserId));
   return {
     ...operation,
     accountEmail: value,
-    ...(bindPrincipal ? { providerUserId: value } : {}),
+    providerUserId: value,
     verificationNote:
-      operation.accountEmail === value &&
-      (!bindPrincipal || operation.providerUserId === value)
+      operation.accountEmail === value && operation.providerUserId === value
         ? operation.verificationNote
         : undefined,
   };
@@ -101,9 +108,9 @@ export function changeAccessAction(
   provider: Provider,
   action: SelectedOperation["action"],
 ): SelectedOperation {
-  if (provider !== "GOOGLE_DRIVE" || permissionId(operation.providerUserId))
+  if (provider !== "GOOGLE_DRIVE" || !operation.accountEmail)
     return { ...operation, action };
-  const principal = action === "GRANT" ? operation.accountEmail : undefined;
+  const principal = operation.accountEmail;
   return {
     ...operation,
     action,
