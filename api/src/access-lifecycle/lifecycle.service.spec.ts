@@ -180,6 +180,32 @@ describe('LifecycleService', () => {
   });
 
   it.each([
+    [['ACCESS_READ', 'ACCESS_MANAGE'], false],
+    [['ACCESS_READ', 'ACCESS_ALL_DEPARTMENTS'], false],
+    [['ACCESS_READ', 'ACCESS_MANAGE', 'ACCESS_ALL_DEPARTMENTS'], true],
+  ] as const)(
+    'exposes catalogue management links only to global managers: %s',
+    async (permissions, visible) => {
+      prisma.user.findUnique.mockResolvedValue(actor([...permissions]));
+      prisma.department.findMany.mockResolvedValue([]);
+      prisma.accessResource.findMany.mockResolvedValue([
+        {
+          id: 'tool',
+          departmentIds: ['external'],
+          adminUrl: 'https://private.example/team',
+        },
+      ]);
+      const config = await service.configuration('actor');
+      expect(config.resources).toMatchObject([
+        {
+          id: 'tool',
+          adminUrl: visible ? 'https://private.example/team' : null,
+        },
+      ]);
+    },
+  );
+
+  it.each([
     'CODA',
     'FREEDCAMP',
     'DISCORD',

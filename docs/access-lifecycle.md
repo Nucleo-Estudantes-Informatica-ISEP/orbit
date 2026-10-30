@@ -78,7 +78,7 @@ Este percurso de exceção não concede acessos ao guardar o pedido. A justifica
 
 O processo passa por `DRAFT → PENDING_APPROVAL → APPROVED|REJECTED`. Só o autor submete/cancela, antes da decisão. A decisão e o snapshot completo são gravados na mesma transação, com controlo de versão para impedir decisões concorrentes. Dados e operações são imutáveis: correções exigem novo pedido. A aprovação cobre os recursos concretos; recursos sensíveis ou fora da predefinição exigem justificação individual. `OFFBOARD` não pode conceder acessos; Alumni exige `ALUMNI_TRANSITION` explícito. Antes de revogar, solicitante e Presidência devem confirmar se outra função/departamento ainda legitima o acesso.
 
-Links administrativos/convites só aparecem na configuração para administradores e nos processos aprovados para executores autorizados. Não são expostos no preview, rascunhos ou histórico decidido. Histórico, evidências e snapshots preservam a atribuição ao operador. A organização deve definir retenção de dados pessoais e responsáveis por consultar/exportar o histórico; este módulo não presume um inventário completo de todos os membros.
+Links administrativos/convites só aparecem na configuração para gestores com `ACCESS_MANAGE` e `ACCESS_ALL_DEPARTMENTS`, e nos processos aprovados para executores autorizados. Uma permissão de gestão sem âmbito global não expõe esses links. Não são expostos no preview, rascunhos ou histórico decidido. Histórico, evidências e snapshots preservam a atribuição ao operador. A organização deve definir retenção de dados pessoais e responsáveis por consultar/exportar o histórico; este módulo não presume um inventário completo de todos os membros.
 
 ## Catálogo e predefinições
 

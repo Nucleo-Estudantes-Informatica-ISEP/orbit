@@ -128,7 +128,7 @@ export class LifecycleService {
     return {
       resources: protectAdminLinks(
         resources,
-        actor.permissions.includes('ACCESS_MANAGE'),
+        actor.global && actor.permissions.includes('ACCESS_MANAGE'),
       ),
       policies,
       departments,
