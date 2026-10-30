@@ -710,6 +710,82 @@ describe('LifecycleService', () => {
     },
   );
 
+  it.each(['DISCORD', 'GITHUB'])(
+    'blocks approval of unresolved sensitive %s identities at submit and decision',
+    async (provider) => {
+      const pending = {
+        ...process(),
+        operations: [
+          {
+            ...process().operations[0],
+            provider,
+            providerUserId: '@person',
+            resourceSnapshot: { sensitive: true },
+          },
+        ],
+      };
+      prisma.lifecycleProcess.findFirst.mockResolvedValue({
+        ...pending,
+        status: 'DRAFT',
+        requestedByUserId: 'actor',
+      });
+      await expect(service.submit('actor', 'process')).rejects.toThrow(
+        'identificada',
+      );
+      expect(prisma.lifecycleProcess.updateMany).not.toHaveBeenCalled();
+      prisma.lifecycleProcess.findFirst.mockResolvedValue(pending);
+      await expect(
+        service.decide('actor', 'process', {
+          approved: true,
+          note: 'Reviewed independently',
+        }),
+      ).rejects.toThrow('identificada');
+      expect(prisma.processApproval.create).not.toHaveBeenCalled();
+      await expect(
+        service.decide('actor', 'process', {
+          approved: false,
+          note: 'Identity unresolved, reject request',
+        }),
+      ).resolves.toBeDefined();
+    },
+  );
+
+  it('does not block descriptive resource edits on a Discord outage', async () => {
+    prisma.user.findUnique.mockResolvedValue(
+      actor(['ACCESS_READ', 'ACCESS_MANAGE', 'ACCESS_ALL_DEPARTMENTS']),
+    );
+    prisma.accessResource.findUnique.mockResolvedValue({
+      provider: 'DISCORD',
+      name: 'Role',
+      remoteId: 'role',
+      containerId: 'guild',
+      resourceType: 'DISCORD_ROLE',
+      automatic: true,
+      sensitive: true,
+      enabled: true,
+      departmentIds: [],
+      version: 2,
+    });
+    prisma.accessResource.updateMany.mockResolvedValue({ count: 1 });
+    connectors.validateDiscordResource.mockRejectedValue(
+      new ProviderError('DISCORD_NOT_CONFIGURED'),
+    );
+    await service.saveResource(
+      'actor',
+      { name: 'Renamed role', instructions: 'New instructions', version: 2 },
+      'resource',
+    );
+    expect(connectors.validateDiscordResource).not.toHaveBeenCalled();
+    expect(prisma.accessResource.updateMany).toHaveBeenCalled();
+    await expect(
+      service.saveResource(
+        'actor',
+        { sensitive: false, version: 2 },
+        'resource',
+      ),
+    ).rejects.toThrow(ServiceUnavailableException);
+  });
+
   it.each(['a', 'ab', '   '])(
     'rejects a broad remote-account filter %j before the SQL scan',
     async (providerUserId) => {

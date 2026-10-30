@@ -530,6 +530,7 @@ export class LifecycleService {
     const { process } = await this.scopedProcess(id, actorId, 'ACCESS_CREATE');
     if (process.requestedByUserId !== actorId || process.status !== 'DRAFT')
       throw new ForbiddenException('Só o solicitante pode submeter o rascunho');
+    this.assertSensitiveIdentities(process.operations);
     const changed = await this.prisma.lifecycleProcess.updateMany({
       where: { id, status: 'DRAFT', version: process.version },
       data: {
@@ -548,6 +549,7 @@ export class LifecycleService {
       throw new BadRequestException('Decisão exige justificação');
     const { process } = await this.scopedProcess(id, actorId, 'ACCESS_APPROVE');
     assertDecision(process.requestedByUserId, actorId, process.status);
+    if (dto.approved) this.assertSensitiveIdentities(process.operations);
     await this.prisma.$transaction(async (tx) => {
       const changed = await tx.lifecycleProcess.updateMany({
         where: { id, status: 'PENDING_APPROVAL', version: process.version },
@@ -765,7 +767,32 @@ export class LifecycleService {
     return result;
   }
 
-  private async validateResource(dto: AccessResourceDto) {
+  private assertSensitiveIdentities(
+    operations: {
+      provider: string;
+      automatic: boolean;
+      providerUserId: string | null;
+      resourceSnapshot: Prisma.JsonValue;
+    }[],
+  ) {
+    if (
+      operations.some(
+        (op) =>
+          op.automatic &&
+          ['DISCORD', 'GITHUB'].includes(op.provider) &&
+          (op.resourceSnapshot as { sensitive?: boolean })?.sensitive &&
+          !/^\d+$/.test(op.providerUserId || ''),
+      )
+    )
+      throw new BadRequestException(
+        'Recurso sensível exige conta identificada antes da aprovação; criar novo pedido após confirmar a conta/entrada no servidor',
+      );
+  }
+
+  private async validateResource(
+    dto: AccessResourceDto,
+    validateRemote = true,
+  ) {
     const types: Record<string, string[]> = {
       DISCORD: ['DISCORD_ROLE'],
       GITHUB: ['GITHUB_ORG', 'GITHUB_TEAM'],
@@ -799,7 +826,7 @@ export class LifecycleService {
     )
       throw new BadRequestException('Servidor/organização obrigatórios');
     try {
-      await this.connectors.validateDiscordResource(dto);
+      if (validateRemote) await this.connectors.validateDiscordResource(dto);
     } catch (error) {
       throwProviderFailure(error);
     }
@@ -828,7 +855,19 @@ export class LifecycleService {
       where: { id },
     });
     if (!existing) throw new NotFoundException('Recurso não encontrado');
-    await this.validateResource({ ...existing, ...dto } as AccessResourceDto);
+    const updated = { ...existing, ...dto } as AccessResourceDto;
+    const validateRemote = (
+      [
+        'provider',
+        'resourceType',
+        'remoteId',
+        'containerId',
+        'sensitive',
+        'automatic',
+        'enabled',
+      ] as const
+    ).some((field) => updated[field] !== existing[field]);
+    await this.validateResource(updated, validateRemote);
     const { version, ...data } = dto as UpdateAccessResourceDto;
     const result = await this.prisma.accessResource.updateMany({
       where: { id, version },

@@ -29,6 +29,48 @@ describe('person-facing external identities', () => {
     delete process.env.ACCESS_DISCORD_PRIVILEGED_GRANTS_ENABLED;
   });
 
+  it.each(['DISCORD', 'GITHUB'])(
+    'never resolves an approved %s username to a new owner during execution',
+    async (provider) => {
+      http.request.mockResolvedValue([
+        { user: { id: '923456789012345678', username: 'person' } },
+      ]);
+      expect(await service.execute(op(provider, '@person'))).toMatchObject({
+        status: 'AWAITING_MANUAL',
+      });
+      expect(http.request).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['DISCORD', 'GITHUB'])(
+    'resolves an unresolved %s username only once during read-only inventory',
+    async (provider) => {
+      http.request.mockResolvedValue(provider === 'DISCORD' ? [] : undefined);
+      const result = await service.inventory(op(provider, '@missingperson'));
+      expect(result.observation.status).toBe('AWAITING_MANUAL');
+      expect(result.discovered).toEqual([]);
+      expect(http.request).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each(['REVOKE', 'VERIFY'])(
+    'rejects an invalid Drive principal for %s before reporting any result',
+    async (action) => {
+      http.request.mockImplementation((url: string) => {
+        if (url.includes('/permissions?')) return { permissions: [] };
+        if (url.includes('/drive/v3/files?')) return { files: [] };
+        return { mimeType: 'application/vnd.google-apps.folder' };
+      });
+      await expect(
+        service.execute({
+          ...op('GOOGLE_DRIVE', 'typo', action),
+          accountEmail: null,
+        }),
+      ).rejects.toThrow('DRIVE_EMAIL_REQUIRED');
+      expect(http.request).not.toHaveBeenCalled();
+    },
+  );
+
   it.each(['@departed.person', 'departed.person', '@123456789012345678'])(
     'hands an unresolved Discord revocation of %s to manual evidence without claiming absence',
     async (username) => {
@@ -39,7 +81,7 @@ describe('person-facing external identities', () => {
         status: 'AWAITING_MANUAL',
         accountName: username,
       });
-      expect(http.request).toHaveBeenCalledTimes(1);
+      expect(http.request).not.toHaveBeenCalled();
     },
   );
 
@@ -71,7 +113,7 @@ describe('person-facing external identities', () => {
     const error = new Error('Provider unavailable');
     http.request.mockRejectedValue(error);
     await expect(
-      service.execute(op('DISCORD', '@departed.person', 'REVOKE')),
+      service.resolveIdentity(op('DISCORD', '@departed.person', 'REVOKE')),
     ).rejects.toBe(error);
   });
 
@@ -252,8 +294,8 @@ describe('person-facing external identities', () => {
     http.request.mockResolvedValue([]);
     expect(
       (await service.execute(op('DISCORD', '@123456789012345678'))).status,
-    ).toBe('AWAITING_ACCOUNT');
-    expect(http.request).toHaveBeenCalledTimes(1);
+    ).toBe('AWAITING_MANUAL');
+    expect(http.request).not.toHaveBeenCalled();
   });
 
   it('rejects an ambiguous exact Discord match', async () => {

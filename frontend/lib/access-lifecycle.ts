@@ -94,13 +94,8 @@ export function intakePositions(
   kind: string,
   response: Pick<IntakeResponse, "source" | "positions">,
 ): string[] {
-  if (
-    kind === "ONBOARD" &&
-    response.source === "FORMS" &&
-    response.positions.length === 0
-  ) {
-    return ["MEMBER"];
-  }
+  if (response.source === "FORMS")
+    return kind === "ONBOARD" ? ["MEMBER"] : [];
   return response.positions.filter((position) => positions.includes(position));
 }
 

@@ -4,7 +4,7 @@ import { ServiceUnavailableException } from '@nestjs/common';
 
 describe('independent Forms and Sheets origins', () => {
   const http = { request: jest.fn(), google: jest.fn() };
-  const intake = new IntakeService(http as unknown as ProviderHttp);
+  let intake: IntakeService;
   const items = [
     ['name', 'Nome e Apelido'],
     ['email', 'E-Mail Pessoal'],
@@ -37,6 +37,7 @@ describe('independent Forms and Sheets origins', () => {
   });
   beforeEach(() => {
     jest.resetAllMocks();
+    intake = new IntakeService(http as unknown as ProviderHttp);
     process.env.ACCESS_FORMS_ID = 'configured-form';
     process.env.ACCESS_SHEETS_ID = 'configured-sheet';
     process.env.ACCESS_SHEETS_RANGE = 'Membros!A1:L5000';
@@ -73,7 +74,7 @@ describe('independent Forms and Sheets origins', () => {
       name: 'Pessoa',
       email: 'person@example.com',
       departmentIds: ['department-it'],
-      positions: ['COORDINATOR'],
+      positions: [],
       accounts: {
         discordUsername: 'person.name',
         githubUsername: 'person-github',
@@ -89,6 +90,62 @@ describe('independent Forms and Sheets origins', () => {
       ),
     ).toBe(true);
   });
+  it('coalesces concurrent searches and expires the Forms cache after 30 seconds', async () => {
+    const time = jest.spyOn(Date, 'now').mockReturnValue(1000);
+    try {
+      const rows = await Promise.all([
+        intake.responses('FORMS'),
+        intake.responses('FORMS'),
+      ]);
+      expect(http.request).toHaveBeenCalledTimes(2);
+      rows[0][0].accounts.googleEmail = 'modified@example.com';
+      expect((await intake.responses('FORMS'))[0].accounts.googleEmail).toBe(
+        'google@example.com',
+      );
+      expect(http.request).toHaveBeenCalledTimes(2);
+      time.mockReturnValue(31001);
+      await intake.responses('FORMS');
+      expect(http.request).toHaveBeenCalledTimes(4);
+    } finally {
+      time.mockRestore();
+    }
+  });
+  it('invalidates the cache on mapping/form changes and does not cache provider errors', async () => {
+    await intake.responses('FORMS');
+    process.env.ACCESS_FORMS_FIELDS = '{"figmaEmail":"figma1"}';
+    expect((await intake.responses('FORMS'))[0].accounts.figmaEmail).toBe('');
+    expect(http.request).toHaveBeenCalledTimes(4);
+    process.env.ACCESS_FORMS_ID = 'another-configured-form';
+    http.request.mockRejectedValueOnce(
+      new ProviderError('PROVIDER_HTTP_503', true),
+    );
+    await expect(intake.responses('FORMS')).rejects.toThrow(
+      ServiceUnavailableException,
+    );
+    await expect(intake.responses('FORMS')).resolves.toHaveLength(1);
+    expect(http.request).toHaveBeenCalledTimes(7);
+  });
+  it.each(['Presidente', 'Direção', 'Coordenador', 'Co-coordenador', 'Alumni'])(
+    'does not use respondent-declared Cargo %s as a default position',
+    async (cargo) => {
+      http.request.mockImplementation((url: string) =>
+        url.includes('/responses?')
+          ? {
+              responses: [
+                {
+                  ...response(),
+                  answers: {
+                    ...response().answers,
+                    cargo: { textAnswers: { answers: [{ value: cargo }] } },
+                  },
+                },
+              ],
+            }
+          : { items },
+      );
+      expect((await intake.responses('FORMS'))[0].positions).toEqual([]);
+    },
+  );
   it('keeps the manual membership sheet independent and available', async () => {
     const [row] = await intake.responses('SHEETS');
     expect(row.source).toBe('SHEETS');

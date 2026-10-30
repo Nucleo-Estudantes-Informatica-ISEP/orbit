@@ -29,10 +29,10 @@ test("welcome defaults do not infer an origin position for offboarding or other 
   assert.deepEqual(intakePositions("ONBOARD", { positions: [] }), []);
 });
 
-test("declared positions remain authoritative, including unknown values that require review", () => {
+test("respondent positions cannot elevate welcome defaults; the manual registry preserves positions", () => {
   assert.deepEqual(
     intakePositions("ONBOARD", { source: "FORMS", positions: ["BOARD"] }),
-    ["BOARD"],
+    ["MEMBER"],
   );
   assert.deepEqual(
     intakePositions("ONBOARD", {
@@ -43,8 +43,11 @@ test("declared positions remain authoritative, including unknown values that req
   );
   assert.deepEqual(
     intakePositions("ONBOARD", { source: "FORMS", positions: ["Unknown"] }),
-    [],
+    ["MEMBER"],
   );
+  for (const kind of ["OFFBOARD", "CHANGE_ACCESS", "ALUMNI_TRANSITION"]) {
+    assert.deepEqual(intakePositions(kind, { source: "FORMS", positions: ["PRESIDENCY"] }), []);
+  }
 });
 
 test("an Alumni destination alone is not an origin position", () => {

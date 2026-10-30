@@ -16,10 +16,12 @@ Existem duas origens independentes, disponíveis em onboarding, offboarding, alt
 
 O Orbit copia apenas os dados necessários para o pedido escolhido, sem importar um diretório inteiro. Nome/email têm de corresponder ao registo selecionado. O hash do Forms inclui formulário, ID da resposta, data da última submissão e valores; respostas iguais de submissões diferentes mantêm identidades distintas e mostram a data, da mais recente para a mais antiga. No Sheets mantém-se o hash anterior para compatibilidade. Registos alterados ou duplicados de forma ambígua exigem nova pesquisa. O formulário e a folha originais são apenas lidos.
 
+As pesquisas Forms usam cache em memória de 30 segundos por instância da API, com chamadas concorrentes agrupadas e invalidação ao mudar formulário/mapeamentos. Falhas não servem dados antigos. A criação do pedido força uma leitura atual para validar a chave da resposta e detetar edições/remoções ocorridas depois da pesquisa. O registo manual Sheets mantém leitura independente. Qualquer resposta Cargo no Forms é ignorada; os cargos do registo manual são mantidos, e o operador escolhe as funções necessárias sob aprovação independente.
+
 | Dado normal da pessoa | Quando é necessário | Cabeçalho compatível |
 | --- | --- | --- |
 | Nome e email de contacto | Todos | `Nome e Apelido`, `E-Mail Pessoal` |
-| Departamento; cargo quando já conhecido no registo | Departamento obrigatório. O Forms de boas-vindas não pergunta cargo; apenas no onboarding, a UI sugere Membro se a resposta Forms não declarar cargo | `Departamento`; `Cargo` mantém-se no registo manual |
+| Departamento; cargo quando já conhecido no registo | Departamento obrigatório. O Forms de boas-vindas não pergunta cargo; no onboarding, a UI sugere apenas Membro. Respostas Cargo de Forms antigos são ignoradas | `Departamento`; `Cargo` mantém-se no registo manual |
 | Username Discord | Para os cargos no servidor; não é o nome de apresentação | `ID Discord` pode manter o nome e passar a guardar o username; também aceita `Username Discord` |
 | Username GitHub | Informática e Coordenação de qualquer departamento | `Username GitHub` |
 | Email da conta Google | Drive Geral e pastas aprovadas de Direção/Presidência | `Email Google` |
@@ -41,13 +43,13 @@ O intervalo do registo manual é limitado e inclui cabeçalhos: `Membros!A1:L500
 
 O [Forms de boas-vindas](forms-member-example.md) e o [script de criação](examples/orbit-member-form.gs) criam apenas uma cópia do modelo e um Sheets novo ligado às respostas, na conta Google que os executar. Não eliminam ficheiros nem procuram cópias anteriores. Conservam os títulos do modelo e acrescentam Departamento e contas condicionais. Não perguntam cargo nem email NEI. Não há trigger de normalização nem folha Membros adicional: o registo manual atual e os seus cabeçalhos continuam intactos e independentes. Os links e o mapeamento completo ACCESS_FORMS_FIELDS aparecem no fim da execução.
 
-O Orbit resolve usernames Discord/GitHub para IDs estáveis ao guardar o rascunho quando a conta já existe. A aprovação guarda esse principal. Uma conta Discord ainda fora do servidor mantém o username declarado e aguarda entrada; `retry` volta a pesquisar o username exato, nunca nomes de apresentação/apelidos. O conector confirma servidor, conta, hierarquia e estado antes/depois da alteração. GitHub confirma também o ID remoto. IDs numéricos históricos continuam compatíveis.
+O Orbit resolve usernames Discord/GitHub para IDs estáveis ao guardar o rascunho quando a conta já existe. A aprovação guarda esse principal; execução e `retry` nunca associam um username a outra conta. Se a conta ainda não for identificável, a operação aguarda execução manual com evidência, ou exige novo pedido após a conta existir/entrar no servidor. Recursos automáticos sensíveis Discord/GitHub exigem ID estável antes de submeter e aprovar. O conector confirma servidor, conta, hierarquia e estado antes/depois da alteração. GitHub confirma também o ID remoto. IDs numéricos históricos continuam compatíveis.
 
 No Drive, indicar apenas o email Google: o conector encontra e valida internamente a permissão em concessões, consultas e revogações. O ID devolvido fica no resultado técnico para auditoria/retry; não é um campo do formulário. A comparação do email ignora maiúsculas/espaços exteriores. Pedidos antigos com ID explícito continuam a exigir correspondência com a conta e nunca são redirecionados silenciosamente para outro email. Alterar o email na UI substitui o principal e limpa contexto de verificação anterior.
 
 Os dados do Forms são declarados pela pessoa. A confirmação técnica da conta e do resultado automático pertence ao Orbit; não se pede ao operador uma frase de verificação para desbloquear o executor. Isto não constitui prova de identidade civil. Serviços manuais são confirmados após execução com evidência atribuída ao operador.
 
-Se uma revogação Discord/GitHub por username não conseguir identificar a conta, o resultado é `AWAITING_MANUAL`: uma pesquisa sem resultados não prova que a pessoa saiu ou que perdeu acesso. Um executor autorizado confirma a conta aprovada e a ausência/revogação do acesso, registando evidência no processo já aprovado. Quando existe um ID Discord estável aprovado e a consulta à guild verificada confirma ausência de membro, a revogação pode concluir sem escrita. Concessões de usernames ainda não encontrados continuam a aguardar conta/entrada.
+Se uma revogação Discord/GitHub por username não conseguir identificar a conta, o resultado é `AWAITING_MANUAL`: uma pesquisa sem resultados não prova que a pessoa saiu ou que perdeu acesso. Um executor autorizado confirma a conta aprovada e a ausência/revogação do acesso, registando evidência no processo já aprovado. Quando existe um ID Discord estável aprovado e a consulta à guild verificada confirma ausência de membro, a revogação pode concluir sem escrita. A consulta de inventário pode resolver nomes para observação sem modificar a identidade aprovada. No Drive, revogar/consultar exige email Google válido ou ID numérico de permissão legado; texto livre inválido falha antes das chamadas remotas.
 
 Quando o registo selecionado declara Discord, GitHub ou Google, a API bloqueia uma conta diferente antes de guardar o pedido, incluindo nas revogações. Discord/GitHub permitem comparar o mesmo ID estável para compatibilidade com IDs históricos ou usernames alterados. O aprovador vê o username/email, o ID resolvido de Discord/GitHub e a origem da associação: correspondência com Forms, Sheets ou indicação do operador sem conta declarada na fonte. A origem fica no snapshot e é preservada pelo executor. Erros de conta inválida/ambígua ou divergente devolvem HTTP 400; configuração indisponível, limites do fornecedor e falhas remotas devolvem 503 com código saneado. Nesse caso não há rascunho parcial: corrigir a conta/configuração ou voltar a tentar quando o fornecedor recuperar.
 
@@ -80,6 +82,8 @@ O processo passa por `DRAFT → PENDING_APPROVAL → APPROVED|REJECTED`. Só o a
 
 Links administrativos/convites só aparecem na configuração para gestores com `ACCESS_MANAGE` e `ACCESS_ALL_DEPARTMENTS`, e nos processos aprovados para executores autorizados. Uma permissão de gestão sem âmbito global não expõe esses links. Não são expostos no preview, rascunhos ou histórico decidido. Histórico, evidências e snapshots preservam a atribuição ao operador. A organização deve definir retenção de dados pessoais e responsáveis por consultar/exportar o histórico; este módulo não presume um inventário completo de todos os membros.
 
+O catálogo completo inclui identificadores de configuração `remoteId`/`containerId`, incluindo recursos sensíveis. São identificadores de pastas/cargos/servidores, sem credenciais ou permissão de acesso implícita. Conhecê-los não evita a autorização do Orbit ou da plataforma: selecionar um recurso sensível continua a exigir justificação e aprovação independente. Editar nomes, instruções ou departamentos de um recurso não exige disponibilidade do Discord; alterações à plataforma/tipo, destino, sensibilidade ou ativação automática mantêm validação remota e a execução volta a validar os bits reais.
+
 ## Catálogo e predefinições
 
 Depois de aplicar a migração, executar a inicialização **uma vez**, e novamente apenas para acrescentar predefinições em falta:
@@ -92,6 +96,18 @@ npm run access:seed
 Na imagem de produção: `node dist/prisma/seed.access.js`. O seed usa IDs determinísticos, não cria utilizadores e preserva recursos/políticas existentes (`upsert` sem updates). As políticas são editadas e versionadas na administração da app; alterações não modificam processos existentes. Recursos novos ficam visíveis; destinos ainda não configurados mantêm instruções manuais e não executam chamadas automáticas. A migração operacional ativa os quatro passos de stock ainda inalterados e, numa alteração intencional única, define `automatic=true` nos cinco IDs de stock Discord/Drive listados no SQL que estejam ativos e configurados. Esta última alteração aplica-se também a versões superiores a 1 e substitui uma escolha manual anterior nesses cinco recursos, conforme o requisito de automatizar os cargos/pastas configurados. Não altera políticas, recursos personalizados ou snapshots. Revisões posteriores continuam editáveis na BD e o seed não repõe essas flags.
 
 A migração de contacto Alumni repõe também o passo WhatsApp Alumínios em instalações antigas onde o recurso de stock continua desativado, sem destino e na versão inicial. O passo permanece manual e visível sem link. Recursos configurados, versões posteriores editadas por administradores, políticas e snapshots não são alterados.
+
+Os cinco recursos da alteração operacional são:
+
+| Recurso | ID de stock |
+| --- | --- |
+| Discord · Direção | `a8b1a10f-49a5-47a3-aa55-731d2cb3088f` |
+| Discord · Presi | `5b08139b-9c69-4e69-aa54-649bf3539cbc` |
+| Discord · server-manager | `1948a016-81f2-408e-a6cb-0ffe91601769` |
+| Drive · Geral | `c16de9e7-6933-4956-a119-c23be1f5fcea` |
+| Drive · Direção | `91091a77-0190-4465-ad84-2f5cd81ab626` |
+
+Esta migração não cria uma linha de auditoria de edição por administrador: o SQL versionado regista a correção operacional e incrementa a versão de cada recurso alterado. Também torna automáticas as revogações aprovadas destes recursos. `ACCESS_DISCORD_PRIVILEGED_GRANTS_ENABLED` limita apenas novas concessões administrativas; não bloqueia revogações aprovadas. O executor e o dry-run mantêm as suas opções independentes, e a migração não reescreve pedidos já existentes.
 
 Na primeira inicialização, instalações com configuração já recolhida podem definir `ACCESS_BOOTSTRAP_RESOURCES` e `ACCESS_BOOTSTRAP_ROLE_PERMISSIONS` antes de executar o seed. Exemplo sem credenciais nem convites privados:
 
@@ -124,7 +140,7 @@ O executor corre no processo API, sem Redis/n8n/serviço adicional. Está deslig
 
 Uma operação é reclamada por compare-and-swap na BD, com lease de dois minutos renovada a cada 20 segundos. Reinícios recuperam leases expiradas. Revogações têm prioridade; erros transitórios usam backoff de 30 segundos até cinco tentativas automáticas e oito tentativas totais incluindo retries. Os conectores verificam estado antes de repetir alterações. O resultado mantém o username/email declarado além do ID técnico resolvido. Erros persistidos são códigos saneados, sem respostas completas nem credenciais.
 
-Um convite pendente não conta como acesso concedido. Não repetir convites GitHub existentes. Usar Repetir / verificar aceitação para voltar a consultar. Falta de username/email aguarda conta; mudar o principal após aprovação exige novo pedido. Uma pessoa Discord que já declarou username mas ainda não entrou pode ser reconsultada sem inventar um ID. Resultados automáticos só admitem conclusão manual quando o conector declarou intervenção pendente. SKIPPED exige motivo e não afirma execução. O processo termina apenas quando não há passos pendentes, falhados ou por confirmar.
+Um convite pendente não conta como acesso concedido. Não repetir convites GitHub existentes. Usar Repetir / verificar aceitação para voltar a consultar uma conta com ID estável aprovado. Falta de username/email aguarda conta; mudar o principal após aprovação exige novo pedido. Um username sem ID estável nunca é resolvido pelo executor após a aprovação. Resultados automáticos só admitem conclusão manual quando o conector declarou intervenção pendente. SKIPPED exige motivo e não afirma execução. O processo termina apenas quando não há passos pendentes, falhados ou por confirmar.
 
 `Consultar inventário remoto parcial` é uma consulta sem mutações antes da aprovação, baseada nas contas/recursos já indicados no pedido. Discord mostra também roles adicionais detetadas, incluindo privilégios administrativos. Recurso não configurado detetado requer configuração e novo pedido; nunca é revogado implicitamente. `Consultar estado remoto` regista observações no histórico sem reabrir a aprovação nem alterar o resultado técnico anterior.
 

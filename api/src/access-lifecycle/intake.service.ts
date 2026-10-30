@@ -65,6 +65,12 @@ export interface IntakeResponse {
 export class IntakeService {
   constructor(private readonly http: ProviderHttp) {}
 
+  private formsCache?: {
+    key: string;
+    expiresAt: number;
+    rows: Promise<IntakeResponse[]>;
+  };
+
   get sources(): IntakeSource[] {
     const sources: IntakeSource[] = [];
     if (process.env.ACCESS_FORMS_ID) sources.push('FORMS');
@@ -79,6 +85,7 @@ export class IntakeService {
 
   async responses(
     source: IntakeSource | undefined = this.sources[0],
+    refresh = false,
   ): Promise<IntakeResponse[]> {
     if (!source || !this.sources.includes(source))
       throw new ServiceUnavailableException(
@@ -86,10 +93,39 @@ export class IntakeService {
       );
     try {
       return source === 'FORMS'
-        ? await this.formsResponses()
+        ? await this.cachedFormsResponses(refresh)
         : await this.sheetResponses();
     } catch (error) {
       throwProviderFailure(error);
+    }
+  }
+
+  private async cachedFormsResponses(
+    refresh: boolean,
+  ): Promise<IntakeResponse[]> {
+    const key = JSON.stringify([
+      process.env.ACCESS_FORMS_ID,
+      process.env.ACCESS_FORMS_FIELDS,
+      process.env.ACCESS_SHEETS_DEPARTMENTS,
+      process.env.ACCESS_SHEETS_POSITIONS,
+    ]);
+    if (
+      !refresh &&
+      this.formsCache?.key === key &&
+      this.formsCache.expiresAt > Date.now()
+    )
+      return structuredClone(await this.formsCache.rows);
+    // One bounded cache per application instance; concurrent searches share the
+    // same fetch. Failed fetches are never retained or served as stale results.
+    const entry = { key, expiresAt: Infinity, rows: this.formsResponses() };
+    this.formsCache = entry;
+    try {
+      const rows = await entry.rows;
+      entry.expiresAt = Date.now() + 30_000;
+      return structuredClone(rows);
+    } catch (error) {
+      if (this.formsCache === entry) this.formsCache = undefined;
+      throw error;
     }
   }
 
@@ -329,9 +365,14 @@ export class IntakeService {
               departmentIds: split(get(row, 'departments')).map(
                 (value) => departmentMap[labelKey(value)] || value,
               ),
-              positions: split(get(row, 'positions')).map(
-                (value) => positionMap[labelKey(value)] || value,
-              ),
+              // The membership registry is maintained by administrators. Forms
+              // is respondent input and cannot select an elevated default role.
+              positions:
+                source === 'FORMS'
+                  ? []
+                  : split(get(row, 'positions')).map(
+                      (value) => positionMap[labelKey(value)] || value,
+                    ),
               accounts: Object.fromEntries(
                 [
                   'discordId',
@@ -362,7 +403,9 @@ export class IntakeService {
     let failure: Error | undefined;
     for (const origin of source ? [source] : this.sources) {
       try {
-        const matches = (await this.responses(origin)).filter(
+        // Creation revalidates the immutable response key against Google so a
+        // cached search cannot hide a response edited/deleted in the meantime.
+        const matches = (await this.responses(origin, true)).filter(
           (row) => row.key === key,
         );
         if (matches.length > 1)

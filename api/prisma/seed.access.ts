@@ -58,7 +58,7 @@ async function main() {
         instructions:
           instructions ||
           (provider === 'DISCORD'
-            ? 'Orbit resolve o username no servidor e atribui/remove o cargo aprovado, incluindo cargos administrativos abaixo do bot. Confirmar o resultado remoto; se a pessoa ainda não entrou no servidor, aguardar entrada e repetir.'
+            ? 'Orbit resolve o username ao criar o pedido e atribui/remove o cargo da conta aprovada, incluindo cargos administrativos abaixo do bot. Se a conta não foi identificada, tratar manualmente com evidência ou criar novo pedido após a entrada no servidor; repetir nunca associa outra conta.'
             : provider === 'GOOGLE_DRIVE'
               ? 'Orbit identifica a conta pelo email Google, concede escrita ou revoga a permissão aprovada e confirma o resultado. Configurar a pasta; se faltar o destino, o responsável deve tratar o passo manualmente e registar evidência.'
               : provider === 'WHATSAPP'

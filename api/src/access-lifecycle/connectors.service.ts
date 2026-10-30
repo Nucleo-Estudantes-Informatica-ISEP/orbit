@@ -221,20 +221,22 @@ export class ConnectorsService {
         detail: 'Indicar username ou email da conta no pedido',
       };
     const accountName = operation.providerUserId;
-    operation = await this.resolveIdentity(operation);
+    // Only request creation may bind a username to an account. Resolving an
+    // approved name here could grant access to a different owner of that name.
+    operation = {
+      ...operation,
+      providerUserId: operation.providerUserId.trim(),
+    };
     if (
       ['DISCORD', 'GITHUB'].includes(operation.provider) &&
       !/^\d+$/.test(operation.providerUserId || '')
     )
       return {
-        status:
-          operation.action === 'REVOKE'
-            ? 'AWAITING_MANUAL'
-            : 'AWAITING_ACCOUNT',
+        status: 'AWAITING_MANUAL',
         detail:
           operation.action === 'REVOKE'
             ? 'Conta não identificada. Confirmar manualmente a conta aprovada e a ausência/revogação do acesso; registar evidência. Uma pesquisa sem resultados não confirma que a pessoa saiu.'
-            : 'Conta não encontrada. Discord: entrar primeiro no servidor com o username indicado; depois repetir a verificação.',
+            : 'O pedido aprovado não contém uma conta identificada. Confirmar manualmente a conta e a ação aprovada com evidência, ou criar novo pedido após a conta existir/entrar no servidor. Repetir não associa outra conta a este pedido.',
         accountName: accountName || undefined,
       };
     if (operation.provider === 'DISCORD')
@@ -623,6 +625,12 @@ export class ConnectorsService {
   ): Promise<ConnectorResult> {
     if (!/^[\w-]+$/.test(resource.remoteId))
       throw new ProviderError('DRIVE_INVALID_FOLDER');
+    if (
+      ['REVOKE', 'VERIFY'].includes(op.action) &&
+      !/^\d+$/.test(op.providerUserId || '') &&
+      !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(op.providerUserId || '')
+    )
+      throw new ProviderError('DRIVE_EMAIL_REQUIRED');
     const token = await this.http.google('drive');
     const root = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(resource.remoteId)}`;
     const meta = await this.http.request<{

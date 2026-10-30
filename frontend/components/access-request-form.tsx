@@ -703,7 +703,7 @@ export function AccessRequestForm({
                 onChange={(event) => {
                   const nextKind = event.target.value;
                   setKind(nextKind);
-                  if (intake?.source === "FORMS" && !intake.positions.length) {
+                  if (intake?.source === "FORMS") {
                     setTargetPositions(intakePositions(nextKind, intake));
                   }
                   setOperations([]);
