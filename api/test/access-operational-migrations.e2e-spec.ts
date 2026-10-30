@@ -79,7 +79,7 @@ describe('Alumni contact migration (PostgreSQL)', () => {
   });
 });
 
-describe('Operational resource audit reconciliation (PostgreSQL)', () => {
+describe('Operational resource migration scope (PostgreSQL)', () => {
   const prisma = new PrismaService();
   const ids = [
     'a8b1a10f-49a5-47a3-aa55-731d2cb3088f',
@@ -88,13 +88,6 @@ describe('Operational resource audit reconciliation (PostgreSQL)', () => {
     'c16de9e7-6933-4956-a119-c23be1f5fcea',
     '91091a77-0190-4465-ad84-2f5cd81ab626',
   ];
-  const migration = readFileSync(
-    join(
-      __dirname,
-      '../prisma/migrations/20261030181500_access_operational_audit/migration.sql',
-    ),
-    'utf8',
-  );
   const operationalUpdate = readFileSync(
     join(
       __dirname,
@@ -105,8 +98,8 @@ describe('Operational resource audit reconciliation (PostgreSQL)', () => {
   beforeAll(() => prisma.$connect());
   afterAll(() => prisma.$disconnect());
 
-  it('audits the five automatic stock resources once and preserves later manual choices', async () => {
-    const rollback = new Error('Rollback audit fixtures');
+  it('changes only configured enabled manual stock rows, preserving existing automatic choices and unrelated rows', async () => {
+    const rollback = new Error('Rollback migration scope fixtures');
     await expect(
       prisma.$transaction(async (tx) => {
         for (const [index, id] of ids.entries()) {
@@ -114,9 +107,9 @@ describe('Operational resource audit reconciliation (PostgreSQL)', () => {
             name: `Operational test ${index}`,
             provider: 'DISCORD' as const,
             resourceType: 'DISCORD_ROLE',
-            remoteId: 'configured-role',
-            enabled: true,
-            automatic: false,
+            remoteId: index === 3 ? 'CONFIGURE_ME' : 'configured-role',
+            enabled: index !== 2,
+            automatic: index === 1,
             sensitive: true,
             version: 5,
           };
@@ -126,32 +119,48 @@ describe('Operational resource audit reconciliation (PostgreSQL)', () => {
             update: data,
           });
         }
-        await tx.$executeRawUnsafe(operationalUpdate);
-        await tx.$executeRawUnsafe(migration);
-        await tx.$executeRawUnsafe(migration);
-        const audit = await tx.auditLog.findMany({
-          where: {
-            entity: 'AccessResource',
-            entityId: { in: ids },
-            action: 'ACCESS_OPERATIONAL_DEFAULTS_RECONCILED',
+        const customId = randomUUID();
+        await tx.accessResource.create({
+          data: {
+            id: customId,
+            name: 'Custom manual resource',
+            provider: 'DISCORD',
+            resourceType: 'DISCORD_ROLE',
+            remoteId: 'configured-role',
+            automatic: false,
+            version: 5,
           },
         });
-        expect(audit).toHaveLength(5);
-        expect(new Set(audit.map((row) => row.entityId))).toEqual(new Set(ids));
-        expect(audit.every((row) => row.performedById === null)).toBe(true);
-        expect(
-          await tx.accessResource.count({
-            where: { id: { in: ids }, automatic: true, version: 6 },
-          }),
-        ).toBe(5);
-        await tx.accessResource.update({
-          where: { id: ids[0] },
-          data: { automatic: false, version: 7 },
+        await tx.$executeRawUnsafe(operationalUpdate);
+        const rows = await tx.accessResource.findMany({
+          where: { id: { in: [...ids, customId] } },
         });
-        await tx.$executeRawUnsafe(migration);
+        const byId = new Map(rows.map((row) => [row.id, row]));
+        expect(byId.get(ids[0])).toMatchObject({ automatic: true, version: 6 });
+        expect(byId.get(ids[4])).toMatchObject({ automatic: true, version: 6 });
+        expect(byId.get(ids[1])).toMatchObject({ automatic: true, version: 5 });
+        expect(byId.get(ids[2])).toMatchObject({
+          automatic: false,
+          enabled: false,
+          version: 5,
+        });
+        expect(byId.get(ids[3])).toMatchObject({
+          automatic: false,
+          remoteId: 'CONFIGURE_ME',
+          version: 5,
+        });
+        expect(byId.get(customId)).toMatchObject({
+          automatic: false,
+          version: 5,
+        });
+        // Reapplying this correction does not bump already automatic versions.
+        await tx.$executeRawUnsafe(operationalUpdate);
         expect(
-          await tx.accessResource.findUniqueOrThrow({ where: { id: ids[0] } }),
-        ).toMatchObject({ automatic: false, version: 7 });
+          await tx.accessResource.findMany({
+            where: { id: { in: [...ids, customId] } },
+            orderBy: { id: 'asc' },
+          }),
+        ).toEqual([...rows].sort((a, b) => a.id.localeCompare(b.id)));
         throw rollback;
       }),
     ).rejects.toBe(rollback);

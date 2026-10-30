@@ -107,7 +107,7 @@ Os cinco recursos da alteração operacional são:
 | Drive · Geral | `c16de9e7-6933-4956-a119-c23be1f5fcea` |
 | Drive · Direção | `91091a77-0190-4465-ad84-2f5cd81ab626` |
 
-Esta migração incrementa a versão de cada recurso alterado e também torna automáticas as revogações aprovadas destes recursos. `ACCESS_DISCORD_PRIVILEGED_GRANTS_ENABLED` limita apenas novas concessões administrativas; não bloqueia revogações aprovadas. O executor e o dry-run mantêm as suas opções independentes, e a migração não reescreve pedidos já existentes. A migração posterior `20261030181500_access_operational_audit` acrescenta um evento `ACCESS_OPERATIONAL_DEFAULTS_RECONCILED` no `AuditLog` para cada um dos cinco recursos que ainda esteja ativo, configurado e automático. É uma observação de reconciliação do sistema, sem atribuição a um administrador nem alegação de conhecer o valor anterior; pode incluir recursos que já eram automáticos. Não modifica recursos e não duplica eventos ao repetir. Escolhas manuais posteriores mantêm-se. A migração original já aplicada não é reescrita.
+Esta migração incrementa a versão de cada recurso alterado e também torna automáticas as revogações aprovadas destes recursos. `ACCESS_DISCORD_PRIVILEGED_GRANTS_ENABLED` limita apenas novas concessões administrativas; não bloqueia revogações aprovadas. O executor e o dry-run mantêm as suas opções independentes, e a migração não reescreve pedidos já existentes. Não é criado um backfill de auditoria por recurso: o estado atual `automatic=true` não prova que tenha sido a migração a alterá-lo, e as instalações que já a aplicaram não guardaram o valor anterior. A migração de reconciliação proposta durante a revisão foi retirada antes da release. A migração operacional já aplicada não é reescrita. A [verificação de produção da release #113](access-release-113.md) regista o estado consultado e o efeito previsto, sem o apresentar como alteração já executada.
 
 Na primeira inicialização, instalações com configuração já recolhida podem definir `ACCESS_BOOTSTRAP_RESOURCES` e `ACCESS_BOOTSTRAP_ROLE_PERMISSIONS` antes de executar o seed. Exemplo sem credenciais nem convites privados:
 
@@ -164,7 +164,7 @@ PEMs podem usar quebras de linha reais ou `\n`. Na produção, guardar estas var
 ## Preparação da release
 
 - [ ] Antes do merge/deploy, confirmar no ambiente de produção `ACCESS_EXECUTOR_ENABLED=false`, `ACCESS_EXECUTOR_DRY_RUN=true` e `ACCESS_DISCORD_PRIVILEGED_GRANTS_ENABLED=false` explícito. Registar a confirmação na release; a opção de concessões privilegiadas não bloqueia revogações aprovadas quando o executor está ativo.
-- [ ] Após deploy, confirmar SHA, migrator concluído, `/health`, frontend e fluxo autenticado. Confirmar os eventos de reconciliação para os recursos elegíveis e, quando for executado o seed, o marcador de inicialização/adoção sem avisos inesperados.
+- [ ] Após deploy, confirmar SHA, migrator concluído, `/health`, frontend e fluxo autenticado. Comparar os cinco recursos com o registo anterior ao deploy; não inferir alterações históricas só pelo estado final. Quando for executado o seed, confirmar o marcador de inicialização/adoção sem avisos inesperados.
 - [ ] Ativar o executor/concessões privilegiadas apenas na etapa própria de configuração e validação remota. Até essa decisão, manter o executor desligado e dry-run ligado. Rever alterações manuais dos cinco recursos na administração após a correção operacional.
 
 ## API e validação operacional
