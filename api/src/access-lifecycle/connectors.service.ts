@@ -2,10 +2,15 @@ import { Injectable } from '@nestjs/common';
 import type { AccessOperation, AccessResource, Prisma } from '@prisma/client';
 import { ProviderError, ProviderHttp } from './provider-http';
 
+const privilegedDiscordPermissions = 8n | (1n << 5n) | (1n << 28n);
+type DiscordRole = { id: string; managed?: boolean; permissions: string };
+
 export type ConnectorResult = {
   status: 'SUCCEEDED' | 'AWAITING_ACCOUNT' | 'AWAITING_MANUAL';
   detail: string;
   remoteId?: string;
+  accountName?: string;
+  identitySource?: 'FORMS' | 'SHEETS' | 'OPERATOR';
 };
 type Resource = Pick<
   AccessResource,
@@ -27,7 +32,137 @@ interface DrivePermission {
 export class ConnectorsService {
   constructor(private readonly http: ProviderHttp) {}
 
+  private assertDiscordRole(
+    resource: { remoteId: string; sensitive: boolean },
+    role: DiscordRole | undefined,
+    guild: string,
+  ) {
+    if (
+      !role ||
+      role.managed ||
+      role.id === guild ||
+      ((BigInt(role.permissions) & privilegedDiscordPermissions) !== 0n &&
+        !resource.sensitive)
+    )
+      throw new ProviderError('DISCORD_PROTECTED_ROLE');
+  }
+
+  async validateDiscordResource(resource: {
+    provider: string;
+    enabled: boolean;
+    automatic: boolean;
+    remoteId: string;
+    containerId?: string | null;
+    sensitive: boolean;
+  }) {
+    if (
+      resource.provider !== 'DISCORD' ||
+      !resource.enabled ||
+      !resource.automatic ||
+      resource.remoteId === 'CONFIGURE_ME'
+    )
+      return;
+    const token = process.env.ACCESS_DISCORD_BOT_TOKEN;
+    if (!token || !resource.containerId)
+      throw new ProviderError('DISCORD_NOT_CONFIGURED');
+    if (
+      ![resource.remoteId, resource.containerId].every((value) =>
+        /^\d{15,22}$/.test(value),
+      )
+    )
+      throw new ProviderError('DISCORD_INVALID_ID');
+    const roles = await this.http.request<DiscordRole[]>(
+      `https://discord.com/api/v10/guilds/${resource.containerId}/roles`,
+      `Bot ${token}`,
+    );
+    this.assertDiscordRole(
+      resource,
+      roles?.find((role) => role.id === resource.remoteId),
+      resource.containerId,
+    );
+  }
+
+  async resolveIdentity<
+    T extends Pick<
+      AccessOperation,
+      | 'provider'
+      | 'providerUserId'
+      | 'accountEmail'
+      | 'verificationNote'
+      | 'resourceSnapshot'
+    >,
+  >(operation: T): Promise<T> {
+    const explicitUsername = operation.providerUserId?.trim().startsWith('@');
+    const principal = operation.providerUserId?.trim().replace(/^@/, '');
+    if (!principal) return operation;
+    if (
+      operation.provider === 'DISCORD' &&
+      (explicitUsername || !/^\d{15,22}$/.test(principal))
+    ) {
+      const resource = operation.resourceSnapshot as unknown as Resource;
+      const token = process.env.ACCESS_DISCORD_BOT_TOKEN;
+      if (!token || !resource.containerId)
+        throw new ProviderError('DISCORD_NOT_CONFIGURED');
+      if (!/^[a-zA-Z0-9_.]{2,32}(#\d{4})?$/.test(principal))
+        throw new ProviderError('DISCORD_INVALID_USERNAME');
+      const [username, discriminator] = principal.split('#');
+      const members = await this.http.request<
+        {
+          user: {
+            id: string;
+            username: string;
+            discriminator?: string;
+            bot?: boolean;
+          };
+        }[]
+      >(
+        `https://discord.com/api/v10/guilds/${encodeURIComponent(resource.containerId)}/members/search?query=${encodeURIComponent(username)}&limit=1000`,
+        `Bot ${token}`,
+      );
+      const matches = (members || []).filter(
+        (member) =>
+          member.user.username.toLowerCase() === username.toLowerCase() &&
+          (!discriminator || member.user.discriminator === discriminator),
+      );
+      if (matches.length > 1)
+        throw new ProviderError('DISCORD_AMBIGUOUS_USERNAME');
+      if (matches[0]?.user.bot) throw new ProviderError('DISCORD_BOT_EXCLUDED');
+      return {
+        ...operation,
+        providerUserId:
+          matches[0]?.user.id ||
+          (explicitUsername ? `@${principal}` : principal),
+      };
+    }
+    if (
+      operation.provider === 'GITHUB' &&
+      (explicitUsername || !/^\d+$/.test(principal))
+    ) {
+      if (!/^[a-z\d](?:[a-z\d-]{0,37}[a-z\d])?$/i.test(principal))
+        throw new ProviderError('GITHUB_INVALID_USERNAME');
+      const user = await this.http.request<GithubUser>(
+        `https://api.github.com/users/${encodeURIComponent(principal)}`,
+        await this.http.github(),
+        'GET',
+        undefined,
+        true,
+      );
+      if (user && user.login.toLowerCase() !== principal.toLowerCase())
+        throw new ProviderError('GITHUB_ACCOUNT_MISMATCH');
+      return {
+        ...operation,
+        providerUserId: user
+          ? String(user.id)
+          : explicitUsername
+            ? `@${principal}`
+            : principal,
+      };
+    }
+    return { ...operation, providerUserId: principal };
+  }
+
   async inventory(operation: AccessOperation) {
+    operation = await this.resolveIdentity(operation);
     const observation = await this.execute({ ...operation, action: 'VERIFY' });
     const resource = operation.resourceSnapshot as unknown as Resource;
     const discovered: {
@@ -38,7 +173,7 @@ export class ConnectorsService {
     if (
       operation.provider === 'DISCORD' &&
       operation.providerUserId &&
-      operation.verificationNote &&
+      /^\d+$/.test(operation.providerUserId) &&
       resource.containerId
     ) {
       const token = process.env.ACCESS_DISCORD_BOT_TOKEN;
@@ -65,7 +200,7 @@ export class ConnectorsService {
             remoteId: role.id,
             name: role.name,
             administrative:
-              (BigInt(role.permissions) & ((1n << 28n) | 8n)) !== 0n,
+              (BigInt(role.permissions) & privilegedDiscordPermissions) !== 0n,
           });
       }
     }
@@ -74,19 +209,48 @@ export class ConnectorsService {
 
   async execute(operation: AccessOperation): Promise<ConnectorResult> {
     const resource = operation.resourceSnapshot as unknown as Resource;
-    if (
-      !operation.providerUserId?.trim() ||
-      !operation.verificationNote ||
-      operation.verificationNote.trim().length < 5
-    )
+    if (resource.remoteId === 'CONFIGURE_ME')
+      return {
+        status: 'AWAITING_MANUAL',
+        detail:
+          'Configurar o recurso na administração; executar e confirmar o passo manualmente ou criar novo pedido após configuração.',
+      };
+    if (!operation.providerUserId?.trim())
       return {
         status: 'AWAITING_ACCOUNT',
-        detail: 'Confirmar conta externa antes de executar',
+        detail: 'Indicar username ou email da conta no pedido',
+      };
+    const accountName = operation.providerUserId;
+    // Only request creation may bind a username to an account. Resolving an
+    // approved name here could grant access to a different owner of that name.
+    operation = {
+      ...operation,
+      providerUserId: operation.providerUserId.trim(),
+    };
+    if (
+      ['DISCORD', 'GITHUB'].includes(operation.provider) &&
+      !/^\d+$/.test(operation.providerUserId || '')
+    )
+      return {
+        status: 'AWAITING_MANUAL',
+        detail:
+          operation.action === 'REVOKE'
+            ? 'Conta não identificada. Confirmar manualmente a conta aprovada e a ausência/revogação do acesso; registar evidência. Uma pesquisa sem resultados não confirma que a pessoa saiu.'
+            : 'O pedido aprovado não contém uma conta identificada. Confirmar manualmente a conta e a ação aprovada com evidência, ou criar novo pedido após a conta existir/entrar no servidor. Repetir não associa outra conta a este pedido.',
+        accountName: accountName || undefined,
       };
     if (operation.provider === 'DISCORD')
-      return this.discord(operation, resource);
+      return {
+        ...(await this.discord(operation, resource)),
+        remoteId: operation.providerUserId!,
+        accountName: accountName || undefined,
+      };
     if (operation.provider === 'GITHUB')
-      return this.github(operation, resource);
+      return {
+        ...(await this.github(operation, resource)),
+        remoteId: operation.providerUserId!,
+        accountName: accountName || undefined,
+      };
     if (operation.provider === 'GOOGLE_DRIVE')
       return this.drive(operation, resource);
     return { status: 'AWAITING_MANUAL', detail: 'Serviço de gestão manual' };
@@ -121,13 +285,29 @@ export class ConnectorsService {
     if (!member)
       return {
         status: op.action === 'REVOKE' ? 'SUCCEEDED' : 'AWAITING_ACCOUNT',
-        detail: 'Conta ainda fora do servidor',
+        detail:
+          op.action === 'REVOKE'
+            ? 'Conta aprovada não pertence ao servidor; cargo sem acesso.'
+            : 'Conta ainda fora do servidor',
       };
     if (member.user.bot) throw new ProviderError('DISCORD_BOT_EXCLUDED');
     const roles = await this.http.request<
       { id: string; position: number; managed: boolean; permissions: string }[]
     >(`${base}/roles`, auth);
     const role = roles?.find((value) => value.id === resource.remoteId);
+    this.assertDiscordRole(resource, role, guild);
+    const present = member.roles.includes(resource.remoteId);
+    if (
+      op.action === 'GRANT' &&
+      !present &&
+      (BigInt(role!.permissions) & privilegedDiscordPermissions) !== 0n &&
+      process.env.ACCESS_DISCORD_PRIVILEGED_GRANTS_ENABLED !== 'true'
+    )
+      return {
+        status: 'AWAITING_MANUAL',
+        detail:
+          'Automação de concessões administrativas desativada. Um responsável deve executar a ação aprovada e registar evidência, ou ativar a opção de automação privilegiada e repetir.',
+      };
     const bot = await this.http.request<{ id: string }>(
       'https://discord.com/api/v10/users/@me',
       auth,
@@ -136,8 +316,6 @@ export class ConnectorsService {
       `${base}/members/${bot?.id}`,
       auth,
     );
-    if (!role || role.managed || role.id === guild)
-      throw new ProviderError('DISCORD_PROTECTED_ROLE');
     const botRoles =
       roles?.filter((value) => self?.roles.includes(value.id)) || [];
     if (
@@ -146,16 +324,9 @@ export class ConnectorsService {
           (BigInt(value.permissions) & (1n << 28n)) !== 0n ||
           (BigInt(value.permissions) & 8n) !== 0n,
       ) ||
-      Math.max(...botRoles.map((value) => value.position)) <= role.position
+      Math.max(...botRoles.map((value) => value.position)) <= role!.position
     )
       throw new ProviderError('DISCORD_ROLE_HIERARCHY');
-    // Administrative roles are intentionally handed to a human, including server-manager.
-    if ((BigInt(role.permissions) & ((1n << 28n) | 8n)) !== 0n)
-      return {
-        status: 'AWAITING_MANUAL',
-        detail: 'Cargo administrativo requer intervenção manual',
-      };
-    const present = member.roles.includes(resource.remoteId);
     if (op.action === 'VERIFY')
       return {
         status: present ? 'SUCCEEDED' : 'AWAITING_MANUAL',
@@ -387,7 +558,58 @@ export class ConnectorsService {
     );
   }
 
-  private driveExistingGrant(permission: DrivePermission): ConnectorResult {
+  private async driveExistingGrant(
+    permission: DrivePermission,
+    file: string,
+    token: string,
+  ): Promise<ConnectorResult> {
+    if (
+      permission.type === 'user' &&
+      ['reader', 'commenter'].includes(permission.role)
+    ) {
+      let id = permission.id;
+      if (permission.permissionDetails?.some((value) => value.inherited)) {
+        if (!permission.emailAddress)
+          return {
+            status: 'AWAITING_MANUAL',
+            detail:
+              'Google não disponibilizou o email da permissão herdada; confirmar a conta com o responsável.',
+            remoteId: id,
+          };
+        const direct = await this.http.request<DrivePermission>(
+          `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(file)}/permissions?supportsAllDrives=true&sendNotificationEmail=true&fields=id`,
+          token,
+          'POST',
+          {
+            type: 'user',
+            role: 'writer',
+            emailAddress: permission.emailAddress,
+          },
+        );
+        if (!direct?.id)
+          throw new ProviderError('DRIVE_GRANT_UNVERIFIED', true);
+        id = direct.id;
+      } else
+        await this.http.request(
+          `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(file)}/permissions/${encodeURIComponent(permission.id)}?supportsAllDrives=true`,
+          token,
+          'PATCH',
+          { role: 'writer' },
+        );
+      const after = (await this.drivePermissions(file, token)).find(
+        (value) =>
+          value.id === id &&
+          value.emailAddress?.toLowerCase() ===
+            permission.emailAddress?.toLowerCase(),
+      );
+      if (!after || !this.driveCanWrite(after))
+        throw new ProviderError('DRIVE_GRANT_UNVERIFIED', true);
+      return {
+        status: 'SUCCEEDED',
+        detail: 'Escrita concedida e confirmada pela API Google',
+        remoteId: id,
+      };
+    }
     return {
       status: this.driveCanWrite(permission) ? 'SUCCEEDED' : 'AWAITING_MANUAL',
       detail: this.driveCanWrite(permission)
@@ -401,10 +623,14 @@ export class ConnectorsService {
     op: AccessOperation,
     resource: Resource,
   ): Promise<ConnectorResult> {
-    if (op.action === 'REVOKE' && !/^\d+$/.test(op.providerUserId || ''))
-      throw new ProviderError('DRIVE_REQUIRES_PERMISSION_ID');
     if (!/^[\w-]+$/.test(resource.remoteId))
       throw new ProviderError('DRIVE_INVALID_FOLDER');
+    if (
+      ['REVOKE', 'VERIFY'].includes(op.action) &&
+      !/^\d+$/.test(op.providerUserId || '') &&
+      !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(op.providerUserId || '')
+    )
+      throw new ProviderError('DRIVE_EMAIL_REQUIRED');
     const token = await this.http.google('drive');
     const root = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(resource.remoteId)}`;
     const meta = await this.http.request<{
@@ -416,17 +642,46 @@ export class ConnectorsService {
     );
     if (meta?.mimeType !== 'application/vnd.google-apps.folder')
       throw new ProviderError('DRIVE_NOT_A_FOLDER');
-    if (resource.sensitive && !meta.inheritedPermissionsDisabled)
+    const permissions = await this.drivePermissions(resource.remoteId, token);
+    if (
+      resource.sensitive &&
+      op.action === 'GRANT' &&
+      permissions.some(
+        (permission) =>
+          ['group', 'domain', 'anyone'].includes(permission.type) ||
+          permission.permissionDetails?.some((detail) => detail.inherited),
+      )
+    )
       return {
         status: 'AWAITING_MANUAL',
-        detail: 'Auditar acesso limitado/herança antes de gerir pasta sensível',
+        detail:
+          'Pasta sensível com acesso indireto por herança, grupo, domínio ou link; o responsável deve auditar essa origem antes de conceder acesso. Nenhuma alteração executada.',
       };
-    const permissions = await this.drivePermissions(resource.remoteId, token);
-    const accountEmail = op.accountEmail?.trim().toLowerCase();
-    const match = permissions.find(
-      (value) => value.id === op.providerUserId && value.type === 'user',
-    );
+    const emailPrincipal = op.providerUserId?.includes('@')
+      ? op.providerUserId.trim().toLowerCase()
+      : undefined;
+    const accountEmail =
+      op.accountEmail?.trim().toLowerCase() || emailPrincipal;
+    if (emailPrincipal && accountEmail !== emailPrincipal)
+      throw new ProviderError('DRIVE_ACCOUNT_MISMATCH');
+    if (emailPrincipal && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailPrincipal))
+      throw new ProviderError('DRIVE_EMAIL_REQUIRED');
+    const emailMatches = emailPrincipal
+      ? permissions.filter(
+          (value) =>
+            value.type === 'user' &&
+            value.emailAddress?.toLowerCase() === emailPrincipal,
+        )
+      : [];
+    if (emailMatches.length > 1)
+      throw new ProviderError('DRIVE_ACCOUNT_MISMATCH');
+    const match = emailPrincipal
+      ? emailMatches[0]
+      : permissions.find(
+          (value) => value.id === op.providerUserId && value.type === 'user',
+        );
     if (
+      !emailPrincipal &&
       op.action === 'REVOKE' &&
       !match &&
       op.accountEmail &&
@@ -447,7 +702,8 @@ export class ConnectorsService {
         detail: 'Permissão direta consultada; inventário parcial',
       };
     if (op.action === 'GRANT') {
-      if (match) return this.driveExistingGrant(match);
+      if (match)
+        return this.driveExistingGrant(match, resource.remoteId, token);
       if (!accountEmail) throw new ProviderError('DRIVE_EMAIL_REQUIRED');
       // Without a matching permission ID, the approved principal must be the
       // same email we send to Google. Never substitute an unrelated email for it.
@@ -457,7 +713,11 @@ export class ConnectorsService {
         (value) => value.emailAddress?.toLowerCase() === accountEmail,
       );
       if (emailMatches.length === 1 && emailMatches[0].type === 'user')
-        return this.driveExistingGrant(emailMatches[0]);
+        return this.driveExistingGrant(
+          emailMatches[0],
+          resource.remoteId,
+          token,
+        );
       if (emailMatches.length)
         throw new ProviderError('DRIVE_ACCOUNT_MISMATCH');
       const created = await this.http.request<DrivePermission>(
@@ -497,7 +757,11 @@ export class ConnectorsService {
           ? permissions
           : await this.drivePermissions(file, token);
       const permission = current.find(
-        (value) => value.id === op.providerUserId && value.type === 'user',
+        (value) =>
+          value.type === 'user' &&
+          (emailPrincipal
+            ? value.emailAddress?.toLowerCase() === emailPrincipal
+            : value.id === op.providerUserId),
       );
       if (
         current.some(
@@ -554,7 +818,10 @@ export class ConnectorsService {
             );
             const direct = childPermissions.find(
               (value) =>
-                value.id === op.providerUserId &&
+                value.type === 'user' &&
+                (emailPrincipal
+                  ? value.emailAddress?.toLowerCase() === emailPrincipal
+                  : value.id === op.providerUserId) &&
                 !value.permissionDetails?.some((detail) => detail.inherited),
             );
             if (direct) {

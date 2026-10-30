@@ -1,4 +1,4 @@
-import { PrismaClient, SystemPermission } from '@prisma/client';
+import { Prisma, PrismaClient, SystemPermission } from '@prisma/client';
 
 type ResourcePatch = {
   remoteId?: string;
@@ -10,6 +10,21 @@ type ResourcePatch = {
 export interface AccessBootstrap {
   resources: Record<string, ResourcePatch>;
   rolePermissions?: Record<string, SystemPermission[]>;
+}
+
+export function initialAccessBootstrap(
+  config: AccessBootstrap,
+  createdKeys: Set<string>,
+  initializeRoles: boolean,
+): AccessBootstrap {
+  return {
+    resources: Object.fromEntries(
+      Object.entries(config.resources).filter(([key]) => createdKeys.has(key)),
+    ),
+    ...(initializeRoles && config.rolePermissions
+      ? { rolePermissions: config.rolePermissions }
+      : {}),
+  };
 }
 
 function invalid(): never {
@@ -91,67 +106,72 @@ export async function applyAccessBootstrap(
   resourceIds: Record<string, string>,
   config: AccessBootstrap,
 ) {
-  await prisma.$transaction(async (tx) => {
-    const updates: { id: string; patch: ResourcePatch }[] = [];
-    const roles: { id: string; permissions: SystemPermission[] }[] = [];
-    for (const [key, patch] of Object.entries(config.resources)) {
-      if (!Object.prototype.hasOwnProperty.call(resourceIds, key))
-        return invalid();
-      const current = await tx.accessResource.findUnique({
-        where: { id: resourceIds[key] },
-      });
-      if (!current) return invalid();
-      const next = { ...current, ...patch };
-      if (next.enabled && next.remoteId === 'CONFIGURE_ME') return invalid();
-      if (
-        next.automatic &&
-        !['DISCORD', 'GITHUB', 'GOOGLE_DRIVE'].includes(next.provider)
-      )
-        return invalid();
-      if (
-        next.automatic &&
-        (next.provider === 'DISCORD' || next.resourceType === 'GITHUB_TEAM') &&
-        !next.containerId
-      )
-        return invalid();
-      if (
-        next.provider === 'DISCORD' &&
-        /server.?manager/i.test(next.name) &&
-        (next.automatic || !next.sensitive)
-      )
-        return invalid();
-      if (
-        !Object.entries(patch).every(
-          ([field, value]) => current[field] === value,
-        )
-      )
-        updates.push({ id: current.id, patch });
-    }
-    for (const [name, permissions] of Object.entries(
-      config.rolePermissions || {},
-    )) {
-      const current = await tx.role.findUnique({ where: { name } });
-      if (!current) return invalid();
-      const next = [
-        ...new Set([
-          ...current.permissions.filter(
-            (value) => !value.startsWith('ACCESS_'),
-          ),
-          ...permissions,
-        ]),
-      ];
-      if (JSON.stringify(current.permissions) !== JSON.stringify(next))
-        roles.push({ id: current.id, permissions: next });
-    }
-    for (const update of updates)
-      await tx.accessResource.update({
-        where: { id: update.id },
-        data: { ...update.patch, version: { increment: 1 } },
-      });
-    for (const role of roles)
-      await tx.role.update({
-        where: { id: role.id },
-        data: { permissions: role.permissions },
-      });
-  });
+  await prisma.$transaction((tx) =>
+    applyAccessBootstrapTransaction(tx, resourceIds, config),
+  );
+}
+
+/** Join the seed transaction so resource creation, roles and bootstrap commit together. */
+export async function applyAccessBootstrapTransaction(
+  tx: Prisma.TransactionClient,
+  resourceIds: Record<string, string>,
+  config: AccessBootstrap,
+) {
+  const updates: { id: string; patch: ResourcePatch }[] = [];
+  const roles: { id: string; permissions: SystemPermission[] }[] = [];
+  for (const [key, patch] of Object.entries(config.resources)) {
+    if (!Object.prototype.hasOwnProperty.call(resourceIds, key))
+      return invalid();
+    const current = await tx.accessResource.findUnique({
+      where: { id: resourceIds[key] },
+    });
+    if (!current) return invalid();
+    const next = { ...current, ...patch };
+    if (
+      next.automatic &&
+      !['DISCORD', 'GITHUB', 'GOOGLE_DRIVE'].includes(next.provider)
+    )
+      return invalid();
+    if (
+      next.automatic &&
+      next.remoteId !== 'CONFIGURE_ME' &&
+      (next.provider === 'DISCORD' || next.resourceType === 'GITHUB_TEAM') &&
+      !next.containerId
+    )
+      return invalid();
+    if (
+      next.provider === 'DISCORD' &&
+      /server.?manager/i.test(next.name) &&
+      !next.sensitive
+    )
+      return invalid();
+    if (
+      !Object.entries(patch).every(([field, value]) => current[field] === value)
+    )
+      updates.push({ id: current.id, patch });
+  }
+  for (const [name, permissions] of Object.entries(
+    config.rolePermissions || {},
+  )) {
+    const current = await tx.role.findUnique({ where: { name } });
+    if (!current) return invalid();
+    const next = [
+      ...new Set([
+        ...current.permissions.filter((value) => !value.startsWith('ACCESS_')),
+        ...permissions,
+      ]),
+    ];
+    if (JSON.stringify(current.permissions) !== JSON.stringify(next))
+      roles.push({ id: current.id, permissions: next });
+  }
+  for (const update of updates)
+    await tx.accessResource.update({
+      where: { id: update.id },
+      data: { ...update.patch, version: { increment: 1 } },
+    });
+  for (const role of roles)
+    await tx.role.update({
+      where: { id: role.id },
+      data: { permissions: role.permissions },
+    });
 }

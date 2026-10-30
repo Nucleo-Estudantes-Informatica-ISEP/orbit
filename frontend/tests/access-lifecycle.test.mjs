@@ -4,7 +4,25 @@ import {
   canConfirmManually,
   cleanOperation,
   intakeAccount,
+  availableIntakeSources,
 } from "../lib/access-lifecycle.ts";
+
+test("real Forms responses are preferred while the manual registry remains selectable", () => {
+  assert.deepEqual(
+    availableIntakeSources({
+      intakeSources: ["SHEETS", "FORMS"],
+      intakeConfigured: true,
+    }),
+    ["FORMS", "SHEETS"],
+  );
+  assert.deepEqual(availableIntakeSources({ intakeConfigured: true }), [
+    "SHEETS",
+  ]);
+  assert.deepEqual(
+    availableIntakeSources({ intakeSources: [], intakeConfigured: false }),
+    [],
+  );
+});
 
 test("Forms account hints do not forge verification evidence", () => {
   const values = intakeAccount(
@@ -13,6 +31,23 @@ test("Forms account hints do not forge verification evidence", () => {
   );
   assert.deepEqual(values, { providerUserId: "123", accountEmail: undefined });
   assert.equal("verificationNote" in values, false);
+});
+
+test("normal username fields distinguish numeric GitHub usernames from old numeric IDs", () => {
+  assert.deepEqual(
+    intakeAccount(
+      { provider: "GITHUB" },
+      { accounts: { githubUsername: "123" } },
+    ),
+    { accountUsername: "123", accountEmail: undefined },
+  );
+  assert.deepEqual(
+    intakeAccount(
+      { provider: "DISCORD" },
+      { accounts: { discordUsername: "person.name" } },
+    ),
+    { accountUsername: "person.name", accountEmail: undefined },
+  );
 });
 
 test("empty optional fields are omitted so validated DTOs accept an incomplete grant", () => {
