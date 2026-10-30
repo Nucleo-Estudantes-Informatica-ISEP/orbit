@@ -26,6 +26,175 @@ describe('person-facing external identities', () => {
   });
   afterEach(() => {
     delete process.env.ACCESS_DISCORD_BOT_TOKEN;
+    delete process.env.ACCESS_DISCORD_PRIVILEGED_GRANTS_ENABLED;
+  });
+
+  it.each(['@departed.person', 'departed.person', '@123456789012345678'])(
+    'hands an unresolved Discord revocation of %s to manual evidence without claiming absence',
+    async (username) => {
+      http.request.mockResolvedValue([]);
+      expect(
+        await service.execute(op('DISCORD', username, 'REVOKE')),
+      ).toMatchObject({
+        status: 'AWAITING_MANUAL',
+        accountName: username,
+      });
+      expect(http.request).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('hands an unresolved GitHub revocation to manual evidence rather than waiting for a new account', async () => {
+    http.request.mockResolvedValue(undefined);
+    expect(
+      await service.execute(op('GITHUB', '@departed-person', 'REVOKE')),
+    ).toMatchObject({
+      status: 'AWAITING_MANUAL',
+      accountName: '@departed-person',
+    });
+  });
+
+  it('confirms a revocation without a write when the approved stable Discord ID is absent from the verified guild', async () => {
+    const approvedId = '123456789012345678';
+    http.request
+      .mockResolvedValueOnce({ id: '323456789012345678' })
+      .mockResolvedValueOnce(undefined);
+    expect(
+      await service.execute(op('DISCORD', approvedId, 'REVOKE')),
+    ).toMatchObject({
+      status: 'SUCCEEDED',
+      remoteId: approvedId,
+    });
+    expect(http.request).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not turn a failed Discord lookup into a manual absence claim', async () => {
+    const error = new Error('Provider unavailable');
+    http.request.mockRejectedValue(error);
+    await expect(
+      service.execute(op('DISCORD', '@departed.person', 'REVOKE')),
+    ).rejects.toBe(error);
+  });
+
+  function administrativeRoleFixture(permissions: bigint, targetPosition = 4) {
+    const member = {
+      user: { id: '123456789012345678' },
+      roles: [] as string[],
+    };
+    http.request.mockImplementation(
+      (url: string, _token: string, method = 'GET') => {
+        if (url.endsWith('/users/@me')) return { id: '423456789012345678' };
+        if (url.endsWith('/members/423456789012345678'))
+          return { roles: ['523456789012345678'] };
+        if (url.endsWith('/roles'))
+          return [
+            {
+              id: '223456789012345678',
+              position: targetPosition,
+              managed: false,
+              permissions: String(permissions),
+            },
+            {
+              id: '523456789012345678',
+              position: 10,
+              managed: false,
+              permissions: '8',
+            },
+          ];
+        if (method === 'PUT') {
+          member.roles.push('223456789012345678');
+          return;
+        }
+        if (method === 'DELETE') {
+          member.roles = [];
+          return;
+        }
+        if (url.endsWith('/members/123456789012345678')) return member;
+        return { id: '323456789012345678' };
+      },
+    );
+    const operation = {
+      ...op('DISCORD', member.user.id),
+      resourceSnapshot: {
+        ...(op('DISCORD', member.user.id).resourceSnapshot as object),
+        sensitive: true,
+      },
+    };
+    return { operation, member };
+  }
+
+  it.each([8n, 1n << 5n, 1n << 28n])(
+    'requires a separate deployment opt-in before granting administrative permission %s',
+    async (permissions) => {
+      const { operation } = administrativeRoleFixture(permissions);
+      delete process.env.ACCESS_DISCORD_PRIVILEGED_GRANTS_ENABLED;
+      expect((await service.execute(operation)).status).toBe('AWAITING_MANUAL');
+      expect(
+        http.request.mock.calls.some((call: unknown[]) =>
+          ['PUT', 'DELETE'].includes(String(call[2])),
+        ),
+      ).toBe(false);
+    },
+  );
+
+  it.each([8n, 1n << 5n, 1n << 28n])(
+    'grants administrative permission %s only after explicit opt-in and successful hierarchy checks',
+    async (permissions) => {
+      process.env.ACCESS_DISCORD_PRIVILEGED_GRANTS_ENABLED = 'true';
+      const { operation, member } = administrativeRoleFixture(permissions);
+      expect((await service.execute(operation)).status).toBe('SUCCEEDED');
+      expect(member.roles).toContain('223456789012345678');
+    },
+  );
+
+  it('offers manual hand-off without role writes when privileged grants are disabled and the bot is below the target', async () => {
+    delete process.env.ACCESS_DISCORD_PRIVILEGED_GRANTS_ENABLED;
+    const { operation } = administrativeRoleFixture(8n, 11);
+    expect((await service.execute(operation)).status).toBe('AWAITING_MANUAL');
+    expect(
+      http.request.mock.calls.some((call: unknown[]) =>
+        ['PUT', 'DELETE'].includes(String(call[2])),
+      ),
+    ).toBe(false);
+  });
+
+  it('can verify an existing administrative grant without opting into new grants', async () => {
+    delete process.env.ACCESS_DISCORD_PRIVILEGED_GRANTS_ENABLED;
+    const { operation, member } = administrativeRoleFixture(8n);
+    member.roles.push('223456789012345678');
+    expect((await service.execute(operation)).status).toBe('SUCCEEDED');
+    expect(
+      http.request.mock.calls.some((call: unknown[]) =>
+        ['PUT', 'DELETE'].includes(String(call[2])),
+      ),
+    ).toBe(false);
+  });
+
+  it.each([8n, 1n << 5n, 1n << 28n])(
+    'keeps hierarchy enforcement for privileged permission %s even after opting in',
+    async (permissions) => {
+      process.env.ACCESS_DISCORD_PRIVILEGED_GRANTS_ENABLED = 'true';
+      const { operation } = administrativeRoleFixture(permissions, 11);
+      await expect(service.execute(operation)).rejects.toThrow(
+        'DISCORD_ROLE_HIERARCHY',
+      );
+      expect(
+        http.request.mock.calls.some((call: unknown[]) =>
+          ['PUT', 'DELETE'].includes(String(call[2])),
+        ),
+      ).toBe(false);
+    },
+  );
+
+  it('does not block approved privileged role revocations when privileged grants are disabled', async () => {
+    delete process.env.ACCESS_DISCORD_PRIVILEGED_GRANTS_ENABLED;
+    const { operation, member } = administrativeRoleFixture(8n);
+    member.roles.push('223456789012345678');
+    expect(
+      (await service.execute({ ...operation, action: 'REVOKE' })).status,
+    ).toBe('SUCCEEDED');
+    expect(
+      http.request.mock.calls.some((call: unknown[]) => call[2] === 'DELETE'),
+    ).toBe(true);
   });
 
   it('resolves only an exact Discord username, never a matching nickname', async () => {
@@ -98,6 +267,7 @@ describe('person-facing external identities', () => {
   });
 
   it('automates an approved administrative Discord role below the bot', async () => {
+    process.env.ACCESS_DISCORD_PRIVILEGED_GRANTS_ENABLED = 'true';
     const member = {
       user: { id: '123456789012345678' },
       roles: [] as string[],

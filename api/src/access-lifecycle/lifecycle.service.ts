@@ -109,6 +109,8 @@ export class LifecycleService {
           ],
         };
     const [resources, policies, departments] = await Promise.all([
+      // Coordinators may request any service for people in their own department.
+      // Only policy defaults/people are scoped; private links remain redacted below.
       this.prisma.accessResource.findMany({
         orderBy: { name: 'asc' },
       }),
@@ -263,6 +265,9 @@ export class LifecycleService {
     const operations = await Promise.all(
       dto.selectedOperations.map(async (op) => {
         const resource = resources.find((value) => value.id === op.resourceId)!;
+        // Out-of-department resources cannot be policy defaults (preview filters
+        // them). They require a per-operation exception, frozen for independent
+        // approval; this creates a draft and never executes the requested action.
         if (
           (resource.sensitive ||
             !preview.resources.some((value) => value.id === resource.id)) &&

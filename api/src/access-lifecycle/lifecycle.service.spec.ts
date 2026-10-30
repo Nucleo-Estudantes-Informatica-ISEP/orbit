@@ -11,6 +11,7 @@ import { IntakeService } from './intake.service';
 import { ConnectorsService } from './connectors.service';
 import { env } from 'node:process';
 import { ProviderError, ProviderHttp } from './provider-http';
+import type { AccessOperation } from '@prisma/client';
 
 describe('LifecycleService', () => {
   const prisma = {
@@ -298,6 +299,73 @@ describe('LifecycleService', () => {
       where: { id: 'operation' },
       data: { status: 'PENDING' },
     });
+  });
+
+  it('does not let a coordinator approve a justified cross-department exception', async () => {
+    prisma.user.findUnique.mockResolvedValue(
+      actor(['ACCESS_READ', 'ACCESS_CREATE', 'ACCESS_EXECUTE']),
+    );
+    await expect(
+      service.decide('actor', 'process', {
+        approved: true,
+        note: 'Justified use of a resource from another department',
+      }),
+    ).rejects.toThrow(ForbiddenException);
+    expect(prisma.processApproval.create).not.toHaveBeenCalled();
+    expect(prisma.accessOperation.update).not.toHaveBeenCalled();
+  });
+
+  it('closes an approved unresolved Discord revocation with attributed manual evidence instead of a retry loop', async () => {
+    const token = env.ACCESS_DISCORD_BOT_TOKEN;
+    env.ACCESS_DISCORD_BOT_TOKEN = 'test';
+    try {
+      const provider = new ConnectorsService({
+        request: jest.fn().mockResolvedValue([]),
+      } as unknown as ProviderHttp);
+      const outcome = await provider.execute({
+        provider: 'DISCORD',
+        action: 'REVOKE',
+        providerUserId: '@departed.person',
+        resourceSnapshot: {
+          remoteId: '223456789012345678',
+          containerId: '323456789012345678',
+        },
+      } as unknown as AccessOperation);
+      expect(outcome.status).toBe('AWAITING_MANUAL');
+      prisma.lifecycleProcess.findFirst.mockResolvedValue({
+        ...process(),
+        status: 'APPROVED',
+        operations: [
+          {
+            ...process().operations[0],
+            status: outcome.status,
+            providerUserId: '@departed.person',
+            updatedAt: new Date(),
+          },
+        ],
+      });
+      prisma.accessOperation.updateMany.mockResolvedValue({ count: 1 });
+      prisma.accessOperation.count.mockResolvedValue(0);
+      await service.confirm('actor', 'process', 'operation', {
+        outcome: 'SUCCEEDED',
+        note: 'Approved account and absence of guild membership checked manually',
+      });
+      expect(prisma.operationEvidence.create).toHaveBeenCalledWith({
+        data: {
+          operationId: 'operation',
+          performedById: 'actor',
+          outcome: 'SUCCEEDED',
+          note: 'Approved account and absence of guild membership checked manually',
+        },
+      });
+      const [[completed]] = prisma.lifecycleProcess.updateMany.mock.calls as [
+        { data: { status: string } },
+      ][];
+      expect(completed.data.status).toBe('COMPLETED');
+    } finally {
+      if (token === undefined) delete env.ACCESS_DISCORD_BOT_TOKEN;
+      else env.ACCESS_DISCORD_BOT_TOKEN = token;
+    }
   });
 
   it.each([

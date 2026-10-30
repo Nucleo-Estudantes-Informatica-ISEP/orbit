@@ -227,9 +227,14 @@ export class ConnectorsService {
       !/^\d+$/.test(operation.providerUserId || '')
     )
       return {
-        status: 'AWAITING_ACCOUNT',
+        status:
+          operation.action === 'REVOKE'
+            ? 'AWAITING_MANUAL'
+            : 'AWAITING_ACCOUNT',
         detail:
-          'Conta não encontrada. Discord: entrar primeiro no servidor com o username indicado; depois repetir a verificação.',
+          operation.action === 'REVOKE'
+            ? 'Conta não identificada. Confirmar manualmente a conta aprovada e a ausência/revogação do acesso; registar evidência. Uma pesquisa sem resultados não confirma que a pessoa saiu.'
+            : 'Conta não encontrada. Discord: entrar primeiro no servidor com o username indicado; depois repetir a verificação.',
         accountName: accountName || undefined,
       };
     if (operation.provider === 'DISCORD')
@@ -278,7 +283,10 @@ export class ConnectorsService {
     if (!member)
       return {
         status: op.action === 'REVOKE' ? 'SUCCEEDED' : 'AWAITING_ACCOUNT',
-        detail: 'Conta ainda fora do servidor',
+        detail:
+          op.action === 'REVOKE'
+            ? 'Conta aprovada não pertence ao servidor; cargo sem acesso.'
+            : 'Conta ainda fora do servidor',
       };
     if (member.user.bot) throw new ProviderError('DISCORD_BOT_EXCLUDED');
     const roles = await this.http.request<
@@ -286,6 +294,18 @@ export class ConnectorsService {
     >(`${base}/roles`, auth);
     const role = roles?.find((value) => value.id === resource.remoteId);
     this.assertDiscordRole(resource, role, guild);
+    const present = member.roles.includes(resource.remoteId);
+    if (
+      op.action === 'GRANT' &&
+      !present &&
+      (BigInt(role!.permissions) & privilegedDiscordPermissions) !== 0n &&
+      process.env.ACCESS_DISCORD_PRIVILEGED_GRANTS_ENABLED !== 'true'
+    )
+      return {
+        status: 'AWAITING_MANUAL',
+        detail:
+          'Automação de concessões administrativas desativada. Um responsável deve executar a ação aprovada e registar evidência, ou ativar a opção de automação privilegiada e repetir.',
+      };
     const bot = await this.http.request<{ id: string }>(
       'https://discord.com/api/v10/users/@me',
       auth,
@@ -305,7 +325,6 @@ export class ConnectorsService {
       Math.max(...botRoles.map((value) => value.position)) <= role!.position
     )
       throw new ProviderError('DISCORD_ROLE_HIERARCHY');
-    const present = member.roles.includes(resource.remoteId);
     if (op.action === 'VERIFY')
       return {
         status: present ? 'SUCCEEDED' : 'AWAITING_MANUAL',

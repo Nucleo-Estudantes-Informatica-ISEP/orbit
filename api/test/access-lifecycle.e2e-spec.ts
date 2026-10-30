@@ -211,6 +211,72 @@ describe('Access lifecycle persistence and concurrency (PostgreSQL)', () => {
     );
   });
 
+  it('keeps a cross-department exception unexecuted until independent approval freezes the exact resource and reason', async () => {
+    await prisma.accessResource.update({
+      where: { id: resourceId },
+      data: { departmentIds: [otherDepartmentId] },
+    });
+    const previousDryRun = globalThis.process.env.ACCESS_EXECUTOR_DRY_RUN;
+    processEnvDryRun(false);
+    const worker = new LifecycleWorker(
+      prisma,
+      connectors as unknown as ConnectorsService,
+      lifecycle,
+    );
+    connectors.execute.mockClear();
+    try {
+      const request = await createProcess();
+      await prisma.accessOperation.updateMany({
+        where: { processId: request.id },
+        data: { automatic: true, status: 'PENDING' },
+      });
+      await worker.tick();
+      expect(connectors.execute).not.toHaveBeenCalled();
+      await lifecycle.submit(requesterId, request.id);
+      await worker.tick();
+      expect(connectors.execute).not.toHaveBeenCalled();
+      await expect(
+        lifecycle.decide(requesterId, request.id, {
+          approved: true,
+          note: 'Own exception approval',
+        }),
+      ).rejects.toThrow('próprio pedido');
+      await lifecycle.decide(approverId, request.id, {
+        approved: true,
+        note: 'Reviewed the specific cross-department exception',
+      });
+      const decision = await prisma.processApproval.findFirstOrThrow({
+        where: { processId: request.id },
+      });
+      expect(decision.decidedById).toBe(approverId);
+      expect(decision.snapshot).toMatchObject({
+        targetDepartmentIds: [departmentId],
+        operations: [
+          {
+            exceptionReason: 'Explicit approved resource selection',
+            resourceSnapshot: {
+              id: resourceId,
+              departmentIds: [otherDepartmentId],
+            },
+          },
+        ],
+      });
+      await worker.tick();
+      expect(connectors.execute).toHaveBeenCalledTimes(1);
+      expect((await lifecycle.get(approverId, request.id)).status).toBe(
+        'COMPLETED',
+      );
+    } finally {
+      await prisma.accessResource.update({
+        where: { id: resourceId },
+        data: { departmentIds: [] },
+      });
+      if (previousDryRun === undefined)
+        delete globalThis.process.env.ACCESS_EXECUTOR_DRY_RUN;
+      else globalThis.process.env.ACCESS_EXECUTOR_DRY_RUN = previousDryRun;
+    }
+  });
+
   it('searches the human account label case-insensitively without exposing another department', async () => {
     const process = await createProcess();
     await prisma.accessOperation.updateMany({
