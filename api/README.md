@@ -6,6 +6,8 @@ External access lifecycle routes live under `/access-lifecycle`. See [configurat
 
 Forms searches share a 30-second in-memory cache; request creation revalidates the response directly with Google. Forms Cargo answers are ignored, while the independent manual registry preserves positions. Execution/retry uses the stable Discord/GitHub ID frozen at creation and never resolves an approved username to a different account. Unresolved usernames require manual evidence or a new request; sensitive automatic requests require a stable ID before submission and approval. Descriptive resource edits can proceed during a Discord outage when the destination, provider/type and security flags are unchanged.
 
+Access initialization is atomic: catalogue, ADMIN/bootstrap permissions and its explicit AuditLog completion marker commit together, so a failed run can be retried. Older catalogues without a marker are adopted conservatively; existing UI configuration/permissions are preserved. Bootstrap env is initialization-only, with explicit counts for skipped entries and no secret values in logs. See the [release checklist](../docs/access-lifecycle.md#preparação-da-release) before promoting: confirm executor disabled, dry-run enabled and privileged grants explicitly disabled. A follow-up migration records system reconciliation events for eligible automatic stock resources without rewriting the applied migration or attributing changes to an administrator.
+
 ## Local setup
 
 ```bash

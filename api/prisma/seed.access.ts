@@ -1,20 +1,37 @@
 import { createHash } from 'node:crypto';
-import { AccessProvider, PrismaClient, SystemPermission } from '@prisma/client';
 import {
-  applyAccessBootstrap,
+  AccessProvider,
+  Prisma,
+  PrismaClient,
+  SystemPermission,
+} from '@prisma/client';
+import {
+  AccessBootstrap,
+  applyAccessBootstrapTransaction,
   readAccessBootstrap,
   initialAccessBootstrap,
 } from '../src/access-lifecycle/bootstrap.config';
 
-const prisma = new PrismaClient();
 const idFor = (key: string) => {
   const hex = createHash('sha256').update(`orbit:access:${key}`).digest('hex');
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 };
+export const accessSeedMarkerId = idFor('initialization:v1');
 
-async function main() {
-  const bootstrap = readAccessBootstrap(process.env);
-  const firstInitialization = (await prisma.accessResource.count()) === 0;
+async function initializeAccessDefaults(
+  prisma: Prisma.TransactionClient,
+  bootstrap: AccessBootstrap,
+) {
+  // Serialize overlapping seed runs. A failure rolls back the entire catalogue,
+  // ADMIN grant, bootstrap and marker; a retry never sees this run's partial rows.
+  await prisma.$queryRaw`SELECT pg_advisory_xact_lock(1869769058, 113)::text`;
+  const marker = await prisma.auditLog.findUnique({
+    where: { id: accessSeedMarkerId },
+  });
+  // Preserve installations seeded before markers existed. Row counts are only
+  // used for this one-time legacy adoption, never as the completion marker.
+  const legacy = !marker && (await prisma.accessResource.count()) > 0;
+  const firstInitialization = !marker && !legacy;
   const createdKeys = new Set<string>();
   const departments = await prisma.department.findMany();
   const normalized = (name: string) =>
@@ -328,19 +345,62 @@ async function main() {
         ],
       },
     });
-  await applyAccessBootstrap(
-    prisma,
-    resources,
-    initialAccessBootstrap(bootstrap, createdKeys, firstInitialization),
+  const selected = initialAccessBootstrap(
+    bootstrap,
+    createdKeys,
+    firstInitialization,
   );
-  console.log(
+  await applyAccessBootstrapTransaction(prisma, resources, selected);
+  if (!marker)
+    await prisma.auditLog.create({
+      data: {
+        id: accessSeedMarkerId,
+        action: legacy
+          ? 'ACCESS_DEFAULTS_LEGACY_ADOPTED'
+          : 'ACCESS_DEFAULTS_INITIALIZED',
+        entity: 'AccessDefaults',
+        entityId: 'v1',
+      },
+    });
+  return {
+    legacy,
+    skippedResources:
+      Object.keys(bootstrap.resources).length -
+      Object.keys(selected.resources).length,
+    skippedRoles: selected.rolePermissions
+      ? 0
+      : Object.keys(bootstrap.rolePermissions || {}).length,
+  };
+}
+
+export async function seedAccessDefaults(
+  client: PrismaClient,
+  bootstrap: AccessBootstrap = readAccessBootstrap(process.env),
+  report: (message: string) => void = console.log,
+) {
+  const summary = await client.$transaction(
+    (tx) => initializeAccessDefaults(tx, bootstrap),
+    { maxWait: 10_000, timeout: 60_000 },
+  );
+  if (summary.legacy)
+    report(
+      'Access seed adopted an existing catalogue without reapplying role permissions; review any unfinished legacy setup in administration.',
+    );
+  if (summary.skippedResources || summary.skippedRoles)
+    report(
+      `Access bootstrap skipped ${summary.skippedResources} existing resource entries and ${summary.skippedRoles} role entries; UI configuration is authoritative. Change these entries in administration, not bootstrap env. No values logged.`,
+    );
+  report(
     'Access policies initialized. Unconfigured resources retain manual instructions; automatic changes require configured destinations. Existing policies are preserved. No member or user accounts created.',
   );
 }
 
-main()
-  .catch(() => {
-    console.error('Access policy seed failed');
-    process.exitCode = 1;
-  })
-  .finally(() => prisma.$disconnect());
+if (require.main === module) {
+  const prisma = new PrismaClient();
+  seedAccessDefaults(prisma)
+    .catch(() => {
+      console.error('Access policy seed failed');
+      process.exitCode = 1;
+    })
+    .finally(() => prisma.$disconnect());
+}
