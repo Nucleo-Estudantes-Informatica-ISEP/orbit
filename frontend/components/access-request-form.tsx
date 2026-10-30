@@ -367,7 +367,11 @@ export function AccessRequestForm({
                     : ["GRANT", "REVOKE", "VERIFY"]
                 ).map((action) => (
                   <option key={action} value={action}>
-                    {t(`access.actions.${action}`)}
+                    {t(
+                      kind === "ALUMNI_TRANSITION" && action === "GRANT"
+                        ? "access.keepAccess"
+                        : `access.actions.${action}`,
+                    )}
                   </option>
                 ))}
               </select>

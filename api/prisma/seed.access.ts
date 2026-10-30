@@ -173,6 +173,8 @@ async function main() {
     'WhatsApp · Alumínios',
     'WHATSAPP',
     'WHATSAPP_GROUP',
+    false,
+    'Na transição Alumni, manter contacto no WhatsApp: convidar/adicionar o número ao grupo Alumínios e confirmar adesão. Se faltar link, contactar o administrador do grupo; o passo continua manual e visível. Só remover este contacto num pedido explícito aprovado.',
   );
   await add(
     'email',

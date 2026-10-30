@@ -852,7 +852,7 @@ describe('LifecycleService', () => {
     expect(prisma.lifecycleProcess.create).not.toHaveBeenCalled();
   });
 
-  it('rejects grants in a total offboarding and revocations without verified identity', async () => {
+  it('rejects grants in offboarding and revocations without an account', async () => {
     await expect(
       service.create('actor', { ...createDto(), kind: 'OFFBOARD' }),
     ).rejects.toThrow('ALUMNI_TRANSITION');
@@ -863,6 +863,150 @@ describe('LifecycleService', () => {
         selectedOperations: [{ resourceId: 'resource', action: 'REVOKE' }],
       }),
     ).rejects.toThrow('ID remoto');
+  });
+
+  it.each([
+    ['ONBOARD', 'GRANT'],
+    ['OFFBOARD', 'REVOKE'],
+  ] as const)(
+    'supports a partial department change with %s without adding unselected operations',
+    async (kind, action) => {
+      const resources = ['resource', 'unselected'].map((id) => ({
+        id,
+        provider: 'FIGMA',
+        name: id,
+        remoteId: 'team',
+        resourceType: 'FIGMA_TEAM',
+        automatic: false,
+        sensitive: false,
+        departmentIds: [],
+      }));
+      prisma.accessPolicy.findMany.mockResolvedValue([
+        {
+          enabled: true,
+          departmentIds: ['it'],
+          positions: ['MEMBER'],
+          resourceIds: ['resource', 'unselected'],
+        },
+      ]);
+      prisma.accessResource.findMany.mockImplementation(
+        ({ where }: { where: { id: { in: string[] } } }) =>
+          Promise.resolve(
+            resources.filter((resource) => where.id.in.includes(resource.id)),
+          ),
+      );
+      await service.create('actor', {
+        ...createDto(),
+        kind,
+        selectedOperations: [
+          {
+            resourceId: 'resource',
+            action,
+            providerUserId: 'person@example.com',
+          },
+        ],
+      });
+      const [[saved]] = prisma.lifecycleProcess.create.mock.calls as [
+        {
+          data: {
+            kind: string;
+            operations: {
+              create: { action: string; resourceSnapshot: { id: string } }[];
+            };
+          };
+        },
+      ][];
+      expect(saved.data.kind).toBe(kind);
+      expect(
+        saved.data.operations.create.map((operation) => ({
+          action: operation.action,
+          resourceId: operation.resourceSnapshot.id,
+        })),
+      ).toEqual([{ action, resourceId: 'resource' }]);
+    },
+  );
+
+  it('allows approved Alumni retention of GitHub and Drive alongside removal of an old department role', async () => {
+    const resources = [
+      {
+        id: 'github',
+        provider: 'GITHUB',
+        remoteId: 'org',
+        resourceType: 'GITHUB_ORG',
+      },
+      {
+        id: 'drive',
+        provider: 'GOOGLE_DRIVE',
+        remoteId: 'folder',
+        resourceType: 'DRIVE_FOLDER',
+      },
+      {
+        id: 'old-department',
+        provider: 'DISCORD',
+        remoteId: 'role',
+        resourceType: 'DISCORD_ROLE',
+        containerId: 'guild',
+      },
+    ].map((resource) => ({
+      ...resource,
+      name: resource.id,
+      automatic: true,
+      sensitive: false,
+      departmentIds: [],
+    }));
+    prisma.accessResource.findMany.mockImplementation(
+      ({ where }: { where: { id: { in: string[] } } }) =>
+        Promise.resolve(
+          resources.filter((resource) => where.id.in.includes(resource.id)),
+        ),
+    );
+    connectors.resolveIdentity.mockResolvedValue({
+      providerUserId: '123456789012345678',
+    });
+    await service.create('actor', {
+      ...createDto(),
+      kind: 'ALUMNI_TRANSITION',
+      targetPositions: ['MEMBER', 'ALUMNI'],
+      selectedOperations: [
+        {
+          resourceId: 'github',
+          action: 'GRANT',
+          accountUsername: 'person',
+          exceptionReason: 'Continued contribution to approved projects',
+        },
+        {
+          resourceId: 'drive',
+          action: 'GRANT',
+          accountEmail: 'person@example.com',
+          exceptionReason: 'Continued access to approved documents',
+        },
+        {
+          resourceId: 'old-department',
+          action: 'REVOKE',
+          accountUsername: 'person',
+          exceptionReason: 'The previous department access ends',
+        },
+      ],
+    });
+    const [[saved]] = prisma.lifecycleProcess.create.mock.calls as [
+      {
+        data: {
+          kind: string;
+          operations: { create: { provider: string; action: string }[] };
+        };
+      },
+    ][];
+    expect(saved.data.kind).toBe('ALUMNI_TRANSITION');
+    expect(
+      saved.data.operations.create.map(({ provider, action }) => ({
+        provider,
+        action,
+      })),
+    ).toEqual([
+      { provider: 'GITHUB', action: 'GRANT' },
+      { provider: 'GOOGLE_DRIVE', action: 'GRANT' },
+      { provider: 'DISCORD', action: 'REVOKE' },
+    ]);
   });
 
   it.each([{ positions: [] }, { positions: ['ALUMNI'] }])(

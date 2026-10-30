@@ -2,6 +2,14 @@
 
 O Orbit coordena onboarding, offboarding, alterações parciais e transições Alumni em `/dashboard/access`. Cada processo guarda a pessoa-alvo e os dados necessários como snapshot. Os operadores são os `User` existentes; este fluxo não cria contas Orbit nem desativa contas, identidades AuthNEI, mailboxes, documentos ou repositórios.
 
+## Tipos de processo
+
+- **Onboarding:** entrada de novos membros, inicialmente sem acessos, ou concessão de novas plataformas numa troca de departamento. O formulário de boas-vindas destina-se apenas à entrada de membros normais. O processo concede apenas os acessos selecionados e não revoga outros.
+- **Offboarding:** saída do núcleo ou remoção de acessos que deixaram de ser necessários numa troca de departamento. Revoga apenas os acessos selecionados; uma saída completa exige rever todos os projetos/plataformas relevantes, sem presumir que o inventário parcial é exaustivo.
+- **Transição Alumni:** saída especial aprovada que mantém o contacto por WhatsApp e Discord por predefinição. A política inicial inclui Discord Alumni e WhatsApp Alumínios. Outros acessos, como GitHub ou Drive, podem ser conservados escolhendo **Manter / conceder** no recurso e obtendo aprovação; os restantes podem ser removidos no mesmo pedido. As políticas continuam editáveis. Um destino WhatsApp ainda sem link mantém um passo manual visível para contactar o administrador do grupo e confirmar adesão.
+
+Numa troca de departamento, os responsáveis confirmam que acessos continuam justificados antes de remover qualquer um. Pode usar-se onboarding para acrescentar e offboarding para retirar, ou **Alterar acessos** para combinar operações explicitamente selecionadas. Nenhum destes processos altera automaticamente o departamento da conta Orbit.
+
 ## Recolha de dados: respostas Forms e registo Sheets
 
 Existem duas origens independentes, disponíveis em onboarding, offboarding, alterações de acesso e transições Alumni: **Respostas do Forms**, lidas diretamente pela Google Forms API e preferidas quando configuradas, e **Registo de membros (Sheets)**, a folha preenchida manualmente. O Sheets não é presumido como destino das respostas do Forms. A escolha fica explícita na pesquisa, no pedido e no histórico; não há fusão ou substituição silenciosa entre as origens. Introdução manual com referência continua disponível.
@@ -78,6 +86,8 @@ npm run access:seed
 ```
 
 Na imagem de produção: `node dist/prisma/seed.access.js`. O seed usa IDs determinísticos, não cria utilizadores e preserva recursos/políticas existentes (`upsert` sem updates). As políticas são editadas e versionadas na administração da app; alterações não modificam processos existentes. Recursos novos ficam visíveis; destinos ainda não configurados mantêm instruções manuais e não executam chamadas automáticas. A migração operacional ativa os quatro passos de stock ainda inalterados e, numa alteração intencional única, define `automatic=true` nos cinco IDs de stock Discord/Drive listados no SQL que estejam ativos e configurados. Esta última alteração aplica-se também a versões superiores a 1 e substitui uma escolha manual anterior nesses cinco recursos, conforme o requisito de automatizar os cargos/pastas configurados. Não altera políticas, recursos personalizados ou snapshots. Revisões posteriores continuam editáveis na BD e o seed não repõe essas flags.
+
+A migração de contacto Alumni repõe também o passo WhatsApp Alumínios em instalações antigas onde o recurso de stock continua desativado, sem destino e na versão inicial. O passo permanece manual e visível sem link. Recursos configurados, versões posteriores editadas por administradores, políticas e snapshots não são alterados.
 
 Na primeira inicialização, instalações com configuração já recolhida podem definir `ACCESS_BOOTSTRAP_RESOURCES` e `ACCESS_BOOTSTRAP_ROLE_PERMISSIONS` antes de executar o seed. Exemplo sem credenciais nem convites privados:
 
