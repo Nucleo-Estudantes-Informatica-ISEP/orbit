@@ -2,7 +2,7 @@
 
 Sistema interno da **NEI-ISEP** (Núcleo de Estudantes de Informática do ISEP) que combina **ERP + HRM + Recrutamento + Gestão de Projetos + Inventário + Planos + Dívidas** numa plataforma web unificada.
 
-[Gestão de acessos externos](docs/access-lifecycle.md): onboarding/offboarding com escolha entre respostas reais do Google Forms e registo manual independente no Sheets, aprovação da Presidência, conectores Discord/GitHub/Drive e execução manual de Figma/WhatsApp/email/Coda/Freedcamp. Usa usernames/emails normais, com resolução de IDs pelo Orbit e políticas editáveis. [Forms de exemplo separado](docs/forms-member-example.md). Configuração e ativação do executor são explícitas; não cria contas Orbit para membros.
+[Gestão de acessos externos](docs/access-lifecycle.md): onboarding/offboarding com escolha entre respostas reais do Google Forms e registo manual independente no Sheets, aprovação da Presidência, conectores Discord/GitHub/Drive e execução manual de Figma/WhatsApp/email/Coda/Freedcamp. Usa usernames/emails normais, com resolução de IDs pelo Orbit e políticas editáveis. O [script de boas-vindas](docs/forms-member-example.md) cria apenas um formulário e Sheets novos para membros a entrar, sem perguntar cargo ou email NEI. Configuração e ativação do executor são explícitas; não cria contas Orbit para membros.
 
 ---
 

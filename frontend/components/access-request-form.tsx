@@ -19,6 +19,7 @@ import {
   cleanOperation,
   intakeAccount,
   availableIntakeSources,
+  intakePositions,
   positions,
 } from "@/lib/access-lifecycle";
 import type {
@@ -144,9 +145,7 @@ export function AccessRequestForm({
     setName(response.name);
     setEmail(response.email);
     setDepartments(response.departmentIds);
-    setTargetPositions(
-      response.positions.filter((position) => positions.includes(position)),
-    );
+    setTargetPositions(intakePositions(kind, response));
     setOperations([]);
     setResponses([]);
     setSearchState("idle");
@@ -698,7 +697,11 @@ export function AccessRequestForm({
                 aria-label={t("access.kind")}
                 value={kind}
                 onChange={(event) => {
-                  setKind(event.target.value);
+                  const nextKind = event.target.value;
+                  setKind(nextKind);
+                  if (intake?.source === "FORMS" && !intake.positions.length) {
+                    setTargetPositions(intakePositions(nextKind, intake));
+                  }
                   setOperations([]);
                 }}
               >

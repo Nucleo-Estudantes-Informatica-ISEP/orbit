@@ -1,45 +1,40 @@
-# Forms de exemplo, separado dos originais
+# Formulário de boas-vindas para novos membros
 
-O [script Apps Script](examples/orbit-member-form.gs) cria um **Google Forms novo, não publicado**, e um **Sheets novo** na conta que o executar. Não contém IDs de ficheiros originais, não substitui partilhas/configuração da app e não edita respostas existentes. O trigger só aceita respostas do formulário que este projeto criou e só escreve na folha nova registada pelo script.
+O [script Apps Script](examples/orbit-member-form.gs) cria uma **cópia nova do formulário de boas-vindas** e um **Sheets novo ligado às respostas**, na conta Google que o executar. Não elimina ficheiros, não procura cópias anteriores e não altera os originais nem a configuração do Orbit. O formulário fica fechado para revisão.
 
-## Dados pedidos
+## Dados e condições
 
-| Campo normal | Condição |
+Todos são membros normais a entrar. Não existe pergunta de cargo, Presidência, Coordenação ou Alumni. Não se menciona nem pede um endereço email NEI: a caixa é definida e criada manualmente pelos responsáveis no Orbit/cPanel.
+
+Mantêm-se os títulos de identificação do modelo: Nome completo, Número Mecanográfico, Email Institucional (ISEP), Email Pessoal, Número de telemóvel, Instagram Handle e Discord Handle. Instagram fica opcional. Conservam-se a pergunta do polo, os guias/opções de tamanhos e a pergunta sobre câmara fotográfica. O tamanho só é pedido na compra, salvo se a opção pedirTamanhoNoAluguer for ativada no código.
+
+| Conta | Quando é pedida |
 | --- | --- |
-| Nome e Apelido, Nº Telemóvel, E-Mail Pessoal, Cargo, Departamento | Todos os perfis; o telefone permite gerir os grupos WhatsApp |
-| Username Discord | Todos; opcional enquanto a pessoa ainda não tiver conta. Username da conta, sem ID nem nome de apresentação |
-| Email Google | Perfis ativos. Se for igual ao email pessoal, a pessoa pode deixar vazio: o texto declara explicitamente essa equivalência |
-| Username GitHub | Informática ou Coordenação/Co-coordenação de qualquer departamento |
-| Email Figma | Informática ou Marketing |
-| Email Coda | Relações Externas |
-| Email Freedcamp | Marketing |
-| E-mail NEI existente/pretendido | Coordenação, Direção e Presidência; opcional, apenas se existir ou tiver sido pedido |
+| Email Google | Todos; email real da conta usada no Drive, mesmo que coincida com o pessoal |
+| Username GitHub | Infraestruturas Informáticas; nos restantes departamentos, se necessário |
+| Email Figma | Infraestruturas Informáticas e Marketing; nos restantes, se necessário |
+| Email Coda | Relações Externas; nos restantes, se necessário |
+| Email Freedcamp | Marketing; nos restantes, se necessário |
 
-Para os emails de teams, deixar vazio declara explicitamente que se usa o email pessoal. A normalização só preenche esses emails quando a secção do serviço se aplica. Isto não é uma suposição feita pelo importador para folhas antigas. Se a pessoa ainda não tem uma conta, deve criá-la ou pedir ajuda ao responsável. O conector pode aguardar entrada/aceitação, sem inventar identidades.
+Departamento é obrigatório. Qualquer departamento pode indicar outros serviços necessários através de perguntas Sim/Não; só nesse caso aparece o campo da conta. Cada conta é pedida uma vez por percurso. Não se inferem emails de outras contas a partir de campos vazios. Os acessos continuam sujeitos às políticas editáveis e à aprovação no Orbit; este script só recolhe dados.
 
-Alumni não preenche Google/GitHub/Figma/Coda/Freedcamp. A Coordenação de Informática só vê GitHub uma vez. O Forms usa departamento principal, como a folha atual; vínculos adicionais são confirmados no Orbit por um operador autorizado. As secções refletem as políticas iniciais; se forem alteradas na app, ajustar também o exemplo antes de o adotar. Pedidos de ferramentas adicionais podem ser tratados pelo operador no catálogo completo com justificação e aprovação.
+## Executar na conta certa
 
-Não se pedem IDs numéricos, IDs de permissões Google, passwords, tokens, códigos MFA, data de nascimento, ano, LinkedIn ou email ISEP. Aprovação, motivo e escolha das operações pertencem ao operador no Orbit, sem exigir que o membro conheça a configuração técnica.
+1. Iniciar sessão no navegador com a conta Google que deve ser proprietária dos novos ficheiros. Essa conta precisa de acesso ao formulário usado como modelo em originalId.
+2. Criar [um projeto Apps Script novo](https://script.google.com/home/projects/create), colar todo o [script](examples/orbit-member-form.gs), guardar e executar **criarFormularioBoasVindasNEI**.
+3. Autorizar a execução e acompanhar os logs por etapa. O script só consulta o ficheiro original para o copiar; todas as alterações são feitas na cópia nova.
+4. Abrir os links finais. Rever prazo, preços e guias herdados do modelo, percursos e perguntas antes de publicar. Uma nova execução cria outro formulário e outro Sheets; nada é eliminado ou substituído.
 
-## Cabeçalhos preservados
+A cópia do Forms é partilhada para colaboração com a conta de serviço configurada em contaServico. O novo Sheets é partilhado apenas para leitura. O script não cria nem instala triggers de submissão.
 
-A folha normalizada nova chama-se `Membros`. A linha A:L mantém, na mesma ordem:
+## Configurar o Orbit depois da execução
 
-`Nome e Apelido`, `Nº Telemóvel`, `E-Mail Pessoal`, `Data de Nascimento`, `E-Mail ISEP`, `E-mail NEI`, `Ano`, `Departamento`, `Cargo`, `Título`, `ID Discord`, `Perfil LinkedIn `.
+O ID e os URLs só existem depois de os ficheiros serem criados. O resultado inclui editarFormulario, preencherFormulario, respostasNovas, respostasSheetId e configurarNoOrbitDepoisDeRever, com os valores reais de **ACCESS_FORMS_ID**, **ACCESS_FORMS_URL** e **ACCESS_FORMS_FIELDS**. O mapeamento cobre nome, email pessoal, telefone, departamento, Discord, GitHub, Google, Figma, Coda e Freedcamp. Usa títulos de perguntas e suporta as secções condicionais repetidas.
 
-As colunas sem dados necessários ficam vazias. O cabeçalho histórico `ID Discord` passa a conter o username normal. A coluna M:Q acrescenta apenas `Email Google`, `Username GitHub`, `Email Figma`, `Email Coda`, `Email Freedcamp`. O script conserva respostas brutas na folha de respostas do Forms e normaliza as secções condicionais na cópia `Membros`; títulos repetidos não obrigam a renomear cabeçalhos. As respostas não são publicadas.
+O novo Sheets é o destino das respostas deste Forms. A integração principal lê diretamente as respostas através da Forms API; não é preciso configurar esse Sheets como uma segunda origem nem normalizar colunas. **ACCESS_SHEETS_ID, ACCESS_SHEETS_RANGE e os mapeamentos atuais continuam a apontar para o registo manual Membros**, que serve de origem independente para onboarding e offboarding. Os seus cabeçalhos, incluindo Cargo e E-mail NEI, não são alterados pelo script.
 
-## Criar na própria conta Google
+No onboarding com uma resposta Forms sem Cargo, a UI seleciona Membro. Para offboarding, alterações de acesso ou transições Alumni, os responsáveis confirmam os cargos de origem no Orbit; não são inferidos a partir deste formulário de boas-vindas.
 
-1. No navegador normal, com a conta pretendida iniciada, abrir [um projeto Apps Script novo](https://script.google.com/home/projects/create).
-2. Colar o conteúdo de [orbit-member-form.gs](examples/orbit-member-form.gs) no projeto novo e guardar. Não associar o projeto ao Forms/Sheets original.
-3. Selecionar `createOrbitMemberExample`, executar e autorizar a criação do Forms/Sheets e o trigger desse exemplo. As permissões pertencem à conta Google em que se iniciou sessão; não usar a service account da app como proprietária do exemplo.
-4. Abrir os links devolvidos no registo de execução. Rever o formulário no editor e no modo de pré-visualização; só publicar quando se pretender aceitar respostas de teste. Uma nova execução cria outro exemplo, sem substituir ficheiros anteriores.
+Validação local: node --test docs/examples/orbit-member-form.test.cjs. Os testes simulam 320 combinações de departamento, polo e acessos adicionais, verificam ausência de perguntas de cargo/email NEI, preservação do modelo e partilha/configuração só dos ficheiros novos. A execução na Google ainda é necessária para validar autorização, layout e publicação.
 
-O login Google rejeitou o browser automatizado desta sessão com “Este navegador ou esta aplicação podem não ser seguros”. Por isso, fornecer o script pronto não significa que os ficheiros já estejam criados na conta do utilizador; a execução deve ser concluída no navegador normal.
-
-Se o exemplo for adotado mais tarde, partilhar **a folha nova** apenas com a service account já usada pelo Orbit e usar o intervalo `Membros!A1:Q5000` no ambiente de teste. Os aliases do importador reconhecem os novos cabeçalhos, mesmo mantendo o mapeamento existente das colunas antigas. Não apontar produção para o exemplo sem decidir explicitamente essa adoção; não é necessário alterar os originais para o testar.
-
-Validação local: `node --test docs/examples/orbit-member-form.test.cjs`. Cobre 30 combinações de perfis, preservação dos cabeçalhos, cópia apenas para a folha criada, respostas duplicadas e rejeição de eventos de outros Forms. A execução real na Google continua necessária para validar consentimento, layout e trigger.
-
-Referências: [FormApp](https://developers.google.com/apps-script/reference/forms/form-app), [navegação em listas](https://developers.google.com/apps-script/reference/forms/list-item), [navegação antes de page breaks](https://developers.google.com/apps-script/reference/forms/page-break-item).
+Referências: [Form](https://developers.google.com/apps-script/reference/forms/form), [navegação em listas](https://developers.google.com/apps-script/reference/forms/list-item), [navegação antes de page breaks](https://developers.google.com/apps-script/reference/forms/page-break-item).

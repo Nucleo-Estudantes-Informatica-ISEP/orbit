@@ -10,6 +10,42 @@ import {
   restoreAccessDefaults,
   hasOriginPosition,
 } from "../lib/access-request.ts";
+import { intakePositions } from "../lib/access-lifecycle.ts";
+
+test("welcome Forms without a declared position default to Member for onboarding", () => {
+  const response = { source: "FORMS", positions: [] };
+  assert.deepEqual(intakePositions("ONBOARD", response), ["MEMBER"]);
+  assert.deepEqual(response.positions, []);
+});
+
+test("welcome defaults do not infer an origin position for offboarding or other processes", () => {
+  for (const kind of ["OFFBOARD", "CHANGE_ACCESS", "ALUMNI_TRANSITION"]) {
+    assert.deepEqual(intakePositions(kind, { source: "FORMS", positions: [] }), []);
+  }
+  assert.deepEqual(
+    intakePositions("ONBOARD", { source: "SHEETS", positions: [] }),
+    [],
+  );
+  assert.deepEqual(intakePositions("ONBOARD", { positions: [] }), []);
+});
+
+test("declared positions remain authoritative, including unknown values that require review", () => {
+  assert.deepEqual(
+    intakePositions("ONBOARD", { source: "FORMS", positions: ["BOARD"] }),
+    ["BOARD"],
+  );
+  assert.deepEqual(
+    intakePositions("ONBOARD", {
+      source: "SHEETS",
+      positions: ["MEMBER", "COORDINATOR"],
+    }),
+    ["MEMBER", "COORDINATOR"],
+  );
+  assert.deepEqual(
+    intakePositions("ONBOARD", { source: "FORMS", positions: ["Unknown"] }),
+    [],
+  );
+});
 
 test("an Alumni destination alone is not an origin position", () => {
   assert.equal(hasOriginPosition([]), false);

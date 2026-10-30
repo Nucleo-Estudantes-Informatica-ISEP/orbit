@@ -90,6 +90,20 @@ export interface IntakeResponse {
   positions: string[];
   accounts: Record<string, string>;
 }
+export function intakePositions(
+  kind: string,
+  response: Pick<IntakeResponse, "source" | "positions">,
+): string[] {
+  if (
+    kind === "ONBOARD" &&
+    response.source === "FORMS" &&
+    response.positions.length === 0
+  ) {
+    return ["MEMBER"];
+  }
+  return response.positions.filter((position) => positions.includes(position));
+}
+
 export interface SelectedOperation {
   accountUsername?: string;
   resourceId: string;
