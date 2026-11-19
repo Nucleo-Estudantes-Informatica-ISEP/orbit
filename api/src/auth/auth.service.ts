@@ -42,13 +42,10 @@ export class AuthService {
   ) {}
 
   private fingerprintOpaqueToken(token: string) {
-    // Tokens are 384-bit random values, not passwords; a fast keyed lookup
-    // fingerprint is intentional so the database can enforce uniqueness.
+    const key = authSecrets().fingerprint;
+    // Reset and refresh tokens contain 256 and 384 random bits respectively.
     // codeql[js/insufficient-password-hash]
-    return crypto
-      .createHmac('sha256', authSecrets().fingerprint)
-      .update(token)
-      .digest('hex');
+    return crypto.createHmac('sha256', key).update(token).digest('hex');
   }
 
   private async buildUserPayload(
