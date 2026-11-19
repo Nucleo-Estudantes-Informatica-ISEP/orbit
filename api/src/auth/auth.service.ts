@@ -8,11 +8,30 @@ import { PrismaService } from '../prisma.service';
 import { MailService } from '../mail/mail.service';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
+import type { Prisma } from '@prisma/client';
+import { authSecrets } from '../config/auth.config';
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 const ACCESS_TOKEN_TTL = '15m';
 const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const ROTATION_RACE_GRACE_MS = 10_000;
+const dummyPasswordHash = bcrypt.hashSync(crypto.randomUUID(), 10);
+export const passwordRecoveryResponse = {
+  message:
+    'Se existir uma conta associada a este email, será enviado um link para repor a palavra-passe.',
+};
+
+export function assertBcryptPasswordLength(password: string) {
+  if (Buffer.byteLength(password, 'utf8') > 72) {
+    throw new BadRequestException(
+      'A palavra-passe excede o limite de 72 bytes.',
+    );
+  }
+}
+
+export async function lockMember(tx: Prisma.TransactionClient, userId: string) {
+  await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${userId} FOR UPDATE`;
+}
 
 @Injectable()
 export class AuthService {
@@ -23,16 +42,20 @@ export class AuthService {
   ) {}
 
   private fingerprintOpaqueToken(token: string) {
-    const secret =
-      process.env.REFRESH_TOKEN_SECRET || process.env.JWT_SECRET || 'secret';
     // Tokens are 384-bit random values, not passwords; a fast keyed lookup
     // fingerprint is intentional so the database can enforce uniqueness.
     // codeql[js/insufficient-password-hash]
-    return crypto.createHmac('sha256', secret).update(token).digest('hex');
+    return crypto
+      .createHmac('sha256', authSecrets().fingerprint)
+      .update(token)
+      .digest('hex');
   }
 
-  private async buildUserPayload(userId: string) {
-    const user = await this.prisma.user.findUnique({
+  private async buildUserPayload(
+    userId: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    const user = await tx.user.findUnique({
       where: { id: userId },
       include: {
         userRoles: {
@@ -76,6 +99,7 @@ export class AuthService {
 
   private signAccessToken(payload: {
     sub: string;
+    sid: string;
     email: string;
     roles: string[];
     permissions: string[];
@@ -88,10 +112,11 @@ export class AuthService {
 
   private async createRefreshSession(
     userId: string,
-    familyId = crypto.randomUUID(),
+    familyId: string,
+    tx: Prisma.TransactionClient,
   ) {
     const refreshToken = crypto.randomBytes(48).toString('base64url');
-    await this.prisma.authSession.create({
+    await tx.authSession.create({
       data: {
         userId,
         familyId,
@@ -102,39 +127,47 @@ export class AuthService {
     return refreshToken;
   }
 
-  private async signTokens(payload: {
-    sub: string;
-    email: string;
-    roles: string[];
-    permissions: string[];
-  }) {
-    return {
-      access_token: this.signAccessToken(payload),
-      refresh_token: await this.createRefreshSession(payload.sub),
-    };
-  }
-
   async authenticate(email: string, password: string) {
     const user = await this.prisma.user.findUnique({ where: { email } });
-    if (!user) throw new UnauthorizedException();
-    if (user.status !== 'ACTIVE') {
-      throw new UnauthorizedException('Account is inactive');
-    }
-    const ok = await bcrypt.compare(password, user.password);
-    if (!ok) throw new UnauthorizedException();
+    const ok = await bcrypt.compare(
+      password,
+      user?.password ?? dummyPasswordHash,
+    );
+    if (!user || user.status !== 'ACTIVE' || !ok)
+      throw new UnauthorizedException();
 
-    const profile = await this.buildUserPayload(user.id);
-    const tokens = await this.signTokens({
-      sub: user.id,
-      email: user.email,
-      roles: profile.roles,
-      permissions: profile.permissions,
+    return this.prisma.$transaction(async (tx) => {
+      await lockMember(tx, user.id);
+      const current = await tx.user.findUnique({ where: { id: user.id } });
+      if (
+        !current ||
+        current.email !== email ||
+        current.password !== user.password
+      ) {
+        throw new UnauthorizedException();
+      }
+      const profile = await this.buildUserPayload(user.id, tx);
+      const familyId = crypto.randomUUID();
+      await tx.auditLog.create({
+        data: {
+          performedById: user.id,
+          action: 'LOGIN',
+          entity: 'User',
+          entityId: user.id,
+        },
+      });
+      return {
+        user: profile,
+        access_token: this.signAccessToken({
+          sub: user.id,
+          sid: familyId,
+          email: profile.email,
+          roles: profile.roles,
+          permissions: profile.permissions,
+        }),
+        refresh_token: await this.createRefreshSession(user.id, familyId, tx),
+      };
     });
-
-    return {
-      user: profile,
-      ...tokens,
-    };
   }
 
   async refreshToken(refreshToken: string) {
@@ -142,11 +175,16 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    const now = new Date();
     const nextToken = crypto.randomBytes(48).toString('base64url');
+    const tokenHash = this.fingerprintOpaqueToken(refreshToken);
     const rotation = await this.prisma.$transaction(async (tx) => {
+      const session = await tx.authSession.findUnique({ where: { tokenHash } });
+      if (!session) return null;
+      await lockMember(tx, session.userId);
+
+      const now = new Date();
       const current = await tx.authSession.findUnique({
-        where: { tokenHash: this.fingerprintOpaqueToken(refreshToken) },
+        where: { tokenHash },
       });
 
       if (!current) return null;
@@ -218,6 +256,7 @@ export class AuthService {
 
       const access_token = this.signAccessToken({
         sub: profile.id,
+        sid: rotation.familyId,
         email: profile.email,
         roles: profile.roles,
         permissions: profile.permissions,
@@ -240,16 +279,27 @@ export class AuthService {
 
   async logout(refreshToken: string) {
     if (typeof refreshToken === 'string' && refreshToken) {
-      const session = await this.prisma.authSession.findUnique({
-        where: { tokenHash: this.fingerprintOpaqueToken(refreshToken) },
-        select: { familyId: true },
-      });
-      if (session) {
-        await this.prisma.authSession.updateMany({
+      await this.prisma.$transaction(async (tx) => {
+        const session = await tx.authSession.findUnique({
+          where: { tokenHash: this.fingerprintOpaqueToken(refreshToken) },
+        });
+        if (!session) return;
+        await lockMember(tx, session.userId);
+        const revoked = await tx.authSession.updateMany({
           where: { familyId: session.familyId, revokedAt: null },
           data: { revokedAt: new Date() },
         });
-      }
+        if (revoked.count) {
+          await tx.auditLog.create({
+            data: {
+              performedById: session.userId,
+              action: 'LOGOUT',
+              entity: 'User',
+              entityId: session.userId,
+            },
+          });
+        }
+      });
     }
     return { message: 'Sessão terminada.' };
   }
@@ -280,20 +330,29 @@ export class AuthService {
       throw new BadRequestException('Current password is incorrect');
     }
 
+    assertBcryptPasswordLength(newPassword);
     const password = await bcrypt.hash(newPassword, 10);
-    await this.prisma.$transaction([
-      this.prisma.user.update({
-        where: { id: userId },
+    await this.prisma.$transaction(async (tx) => {
+      await lockMember(tx, userId);
+      const updated = await tx.user.updateMany({
+        where: { id: userId, status: 'ACTIVE', password: user.password },
         data: { password },
-      }),
-      this.prisma.passwordResetToken.updateMany({
+      });
+      if (!updated.count) throw new UnauthorizedException('Credential changed');
+      await tx.passwordResetToken.updateMany({
         where: { userId, usedAt: null },
         data: { usedAt: new Date() },
-      }),
-      this.prisma.authSession.deleteMany({
-        where: { userId },
-      }),
-    ]);
+      });
+      await tx.authSession.deleteMany({ where: { userId } });
+      await tx.auditLog.create({
+        data: {
+          performedById: userId,
+          action: 'CHANGE_PASSWORD',
+          entity: 'User',
+          entityId: userId,
+        },
+      });
+    });
 
     this.mailService.sendPasswordChanged(user.email, user.name).catch(() => {});
 
@@ -301,37 +360,37 @@ export class AuthService {
   }
 
   async requestPasswordReset(email: string) {
-    const genericResponse = {
-      message:
-        'Se existir uma conta associada a este email, será enviado um link para repor a palavra-passe.',
-    };
-
     const user = await this.prisma.user.findUnique({ where: { email } });
-    // Do not reveal whether the account exists (prevents user enumeration).
-    if (!user || user.status !== 'ACTIVE') return genericResponse;
+    if (!user || user.status !== 'ACTIVE') return;
 
-    // Invalidate any previous outstanding tokens for this user.
-    await this.prisma.passwordResetToken.deleteMany({
-      where: { userId: user.id, usedAt: null },
-    });
+    const origin = new URL(process.env.APP_URL || 'http://localhost:3090');
+    if (process.env.NODE_ENV === 'production' && origin.protocol !== 'https:') {
+      throw new Error('Password recovery requires an HTTPS APP_URL.');
+    }
 
     const rawToken = crypto.randomBytes(32).toString('hex');
-    await this.prisma.passwordResetToken.create({
-      data: {
-        userId: user.id,
-        tokenHash: this.fingerprintOpaqueToken(rawToken),
-        expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
-      },
+    const issued = await this.prisma.$transaction(async (tx) => {
+      await lockMember(tx, user.id);
+      const current = await tx.user.findUnique({ where: { id: user.id } });
+      if (!current || current.status !== 'ACTIVE' || current.email !== email) {
+        return false;
+      }
+      await tx.passwordResetToken.deleteMany({
+        where: { userId: user.id, usedAt: null },
+      });
+      await tx.passwordResetToken.create({
+        data: {
+          userId: user.id,
+          tokenHash: this.fingerprintOpaqueToken(rawToken),
+          expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
+        },
+      });
+      return true;
     });
-
-    const appUrl = (process.env.APP_URL || 'http://localhost:3090').replace(
-      /\/$/,
-      '',
-    );
-    const resetUrl = `${appUrl}/reset-password?token=${rawToken}`;
-    await this.mailService.sendPasswordReset(user.email, resetUrl);
-
-    return genericResponse;
+    if (!issued) return;
+    const resetUrl = new URL('/reset-password', origin);
+    resetUrl.hash = new URLSearchParams({ token: rawToken }).toString();
+    await this.mailService.sendPasswordReset(user.email, resetUrl.href);
   }
 
   async resetPassword(token: string, newPassword: string) {
@@ -345,22 +404,47 @@ export class AuthService {
       );
     }
 
+    assertBcryptPasswordLength(newPassword);
     const hashed = await bcrypt.hash(newPassword, 10);
 
-    await this.prisma.$transaction([
-      this.prisma.user.update({
-        where: { id: record.userId },
+    await this.prisma.$transaction(async (tx) => {
+      await lockMember(tx, record.userId);
+      const now = new Date();
+      const active = await tx.user.findFirst({
+        where: { id: record.userId, status: 'ACTIVE' },
+        select: { id: true },
+      });
+      if (!active)
+        throw new BadRequestException(
+          'O link de reposição é inválido ou expirou.',
+        );
+      const consumed = await tx.passwordResetToken.updateMany({
+        where: { id: record.id, usedAt: null, expiresAt: { gt: now } },
+        data: { usedAt: now },
+      });
+      if (!consumed.count) {
+        throw new BadRequestException(
+          'O link de reposição é inválido ou expirou.',
+        );
+      }
+      await tx.user.update({
+        where: { id: record.userId, status: 'ACTIVE' },
         data: { password: hashed },
-      }),
-      // Consume this token and clear any other outstanding ones for the user.
-      this.prisma.passwordResetToken.updateMany({
+      });
+      await tx.passwordResetToken.updateMany({
         where: { userId: record.userId, usedAt: null },
-        data: { usedAt: new Date() },
-      }),
-      this.prisma.authSession.deleteMany({
-        where: { userId: record.userId },
-      }),
-    ]);
+        data: { usedAt: now },
+      });
+      await tx.authSession.deleteMany({ where: { userId: record.userId } });
+      await tx.auditLog.create({
+        data: {
+          performedById: record.userId,
+          action: 'RESET_PASSWORD',
+          entity: 'User',
+          entityId: record.userId,
+        },
+      });
+    });
 
     return { message: 'Palavra-passe reposta com sucesso.' };
   }

@@ -8,9 +8,11 @@ import {
   Req,
   Res,
   UseGuards,
+  applyDecorators,
 } from '@nestjs/common';
-import { AuthService } from './auth.service';
+import { AuthService, passwordRecoveryResponse } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { AuthRequestGuard } from './auth-request.guard';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ChangeOwnPasswordDto } from './dto/change-own-password.dto';
@@ -20,8 +22,10 @@ import {
   ApiBearerAuth,
   ApiCreatedResponse,
   ApiCookieAuth,
+  ApiForbiddenResponse,
   ApiOkResponse,
   ApiTags,
+  ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { LoginDto } from '../contracts/request.dto';
@@ -44,6 +48,14 @@ const REFRESH_COOKIE_RESPONSE_HEADERS = {
     schema: { type: 'string' },
   },
 };
+
+function AuthRequest() {
+  return applyDecorators(
+    UseGuards(AuthRequestGuard),
+    ApiForbiddenResponse({ type: ErrorResponseDto }),
+    ApiTooManyRequestsResponse({ type: ErrorResponseDto }),
+  );
+}
 
 function readRefreshCookie(request: Request): string {
   const cookies = request.headers.cookie?.split(';') ?? [];
@@ -76,6 +88,7 @@ export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Post('login')
+  @AuthRequest()
   @ApiCreatedResponse({
     type: AuthTokensResponseDto,
     headers: REFRESH_COOKIE_RESPONSE_HEADERS,
@@ -95,6 +108,7 @@ export class AuthController {
   }
 
   @Post('refresh')
+  @AuthRequest()
   @ApiCookieAuth(REFRESH_COOKIE)
   @ApiCreatedResponse({
     type: AuthTokensResponseDto,
@@ -113,6 +127,7 @@ export class AuthController {
   }
 
   @Post('logout')
+  @AuthRequest()
   @HttpCode(200)
   @ApiCookieAuth(REFRESH_COOKIE)
   @ApiOkResponse({
@@ -134,14 +149,17 @@ export class AuthController {
   }
 
   @Post('forgot-password')
+  @AuthRequest()
   @HttpCode(200)
   @ApiOkResponse({ type: MessageResponseDto })
   @ApiBadRequestResponse({ type: ErrorResponseDto })
-  async forgotPassword(@Body() dto: ForgotPasswordDto) {
-    return this.authService.requestPasswordReset(dto.email);
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    void this.authService.requestPasswordReset(dto.email).catch(() => {});
+    return passwordRecoveryResponse;
   }
 
   @Post('reset-password')
+  @AuthRequest()
   @HttpCode(200)
   @ApiOkResponse({ type: MessageResponseDto })
   @ApiBadRequestResponse({ type: ErrorResponseDto })

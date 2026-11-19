@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { API_BASE, apiFetch, clearStoredSession, fetchFileBlob, getFileUrl, resolveFileUrl } from '../lib/api.ts';
+import { API_BASE, apiFetch, clearStoredSession, fetchFileBlob, getBrowserSession, getFileUrl, resolveFileUrl, revokeStoredSession, storeSession } from '../lib/api.ts';
 
 test('authenticated files', async (t) => {
   const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
@@ -35,9 +35,9 @@ test('authenticated files', async (t) => {
     }
   });
   const reset = () => {
-    storage.set('auth_token', 'expired');
-    storage.set('auth_user', '{}');
+    clearStoredSession();
     storage.set('auth_session', 'session-marker');
+    storeSession({ access_token: 'expired', user: { id: 'user-1' } });
     redirects.length = 0;
   };
 
@@ -45,10 +45,11 @@ test('authenticated files', async (t) => {
     reset();
     const key = 'folder/CV & photo.png';
     const url = getFileUrl(key);
-    storage.set('auth_token', 'replacement');
+    storeSession({ access_token: 'replacement', user: { id: 'user-1' } });
     assert.equal(getFileUrl(key), url);
     assert.equal(new URL(url, window.location.origin).searchParams.get('key'), key);
     assert.equal(resolveFileUrl(`${API_BASE}/files/cv.pdf?token=old#page=1`), '/file?key=cv.pdf');
+    assert.equal(resolveFileUrl('/api/files/CV%20folder/cv.pdf?token=old'), '/file?key=CV%20folder%2Fcv.pdf');
     assert.equal(resolveFileUrl('cv.pdf'), '/file?key=cv.pdf');
     assert.equal(resolveFileUrl('https://external.test/cv.pdf'), 'https://external.test/cv.pdf');
     assert.equal(resolveFileUrl(null), undefined);
@@ -86,7 +87,7 @@ test('authenticated files', async (t) => {
     assert.equal(refreshes, 1);
     assert.equal(fileRequests.length, 4);
     assert.equal(fileRequests.at(-1).url, `${API_BASE}/files/folder/CV%20%26%20file.pdf`);
-    assert.equal(storage.get('auth_token'), 'fresh');
+    assert.equal(getBrowserSession().access_token, 'fresh');
     assert.equal(storage.get('auth_session'), 'session-marker');
   });
 
@@ -103,7 +104,7 @@ test('authenticated files', async (t) => {
     const fetch = t.mock.method(globalThis, 'fetch', async () => new Response(null, { status: 404 }));
     await assert.rejects(fetchFileBlob('missing.pdf'), /HTTP 404/);
     assert.equal(fetch.mock.callCount(), 1);
-    assert.equal(storage.size, 3);
+    assert.equal(storage.size, 1);
     assert.deepEqual(redirects, []);
   });
 
@@ -118,7 +119,7 @@ test('authenticated files', async (t) => {
         );
         await assert.rejects(apiFetch('/rejected'), (error) => error.status === status);
         assert.equal(fetch.mock.callCount(), 1);
-        assert.equal(storage.size, 3);
+        assert.equal(storage.size, 1);
         assert.deepEqual(redirects, []);
       });
     }
@@ -139,11 +140,23 @@ test('authenticated files', async (t) => {
           return refreshFailure;
         });
         await assert.rejects(apiFetch('/recoverable'));
-        assert.equal(storage.get('auth_token'), 'expired');
+        assert.equal(getBrowserSession().access_token, 'expired');
         assert.equal(storage.get('auth_session'), 'session-marker');
         assert.deepEqual(redirects, []);
       });
     }
+  });
+
+  await t.test('logout failure preserves the session until revocation can be retried', async (t) => {
+    reset();
+    const fetch = t.mock.method(globalThis, 'fetch', async () => new Response(null, { status: 503 }));
+    await assert.rejects(revokeStoredSession(), (error) => error.status === 503);
+    assert.equal(getBrowserSession().access_token, 'expired');
+    assert.equal(storage.size, 1);
+    fetch.mock.mockImplementation(async () => new Response(null, { status: 200 }));
+    await revokeStoredSession();
+    assert.equal(getBrowserSession(), null);
+    assert.equal(storage.size, 0);
   });
 
   await t.test('logout wins over an in-flight refresh response', async (t) => {

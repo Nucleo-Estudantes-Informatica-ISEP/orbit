@@ -1,20 +1,22 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
-import { MinioService } from '../files/minio.service';
+import { requireOwnedAttachments } from '../files/file-access';
 import type { Prisma } from '@prisma/client';
 
 export type CreateIncidentInput = Omit<
   Prisma.IncidentUncheckedCreateInput,
-  'occurredAt' | 'createdById'
+  'occurredAt' | 'createdById' | 'fileKeys'
 > & {
   occurredAt?: Date | string;
+  fileKeys?: string[];
 };
 
 export type UpdateIncidentInput = Omit<
   Prisma.IncidentUncheckedUpdateInput,
-  'occurredAt' | 'createdById'
+  'occurredAt' | 'createdById' | 'fileKeys'
 > & {
   occurredAt?: Date | string;
+  fileKeys?: string[];
 };
 
 export interface CreateIncidentCommentInput {
@@ -23,10 +25,7 @@ export interface CreateIncidentCommentInput {
 
 @Injectable()
 export class IncidentsService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly minio: MinioService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   private readonly include = {
     createdBy: { select: { id: true, name: true } },
@@ -46,9 +45,12 @@ export class IncidentsService {
     ) {
       rest.occurredAt = new Date(rest.occurredAt);
     }
-    return this.prisma.incident.create({
-      data: { ...rest, createdById: actorId },
-      include: this.include,
+    return this.prisma.$transaction(async (tx) => {
+      await requireOwnedAttachments(tx, actorId, data.fileKeys ?? []);
+      return tx.incident.create({
+        data: { ...rest, createdById: actorId },
+        include: this.include,
+      });
     });
   }
 
@@ -69,7 +71,7 @@ export class IncidentsService {
     return d;
   }
 
-  async update(id: string, data: UpdateIncidentInput) {
+  async update(id: string, data: UpdateIncidentInput, actorId: string) {
     const rest = data;
     if (
       rest.occurredAt &&
@@ -78,10 +80,24 @@ export class IncidentsService {
     ) {
       rest.occurredAt = new Date(rest.occurredAt);
     }
-    return this.prisma.incident.update({
-      where: { id },
-      data: { ...rest },
-      include: this.include,
+    return this.prisma.$transaction(async (tx) => {
+      if (data.fileKeys !== undefined) {
+        const previous = await tx.incident.findUnique({
+          where: { id },
+          select: { fileKeys: true },
+        });
+        await requireOwnedAttachments(
+          tx,
+          actorId,
+          data.fileKeys ?? [],
+          previous?.fileKeys ?? [],
+        );
+      }
+      return tx.incident.update({
+        where: { id },
+        data: { ...rest },
+        include: this.include,
+      });
     });
   }
 
@@ -111,13 +127,6 @@ export class IncidentsService {
   async remove(id: string) {
     const d = await this.prisma.incident.findUnique({ where: { id } });
     if (!d) throw new NotFoundException('Incidente não encontrado');
-    if (d.fileKeys?.length) {
-      await Promise.all(
-        d.fileKeys.map((key: string) =>
-          this.minio.deleteObject(key).catch(() => {}),
-        ),
-      );
-    }
     return this.prisma.incident.delete({ where: { id } });
   }
 }

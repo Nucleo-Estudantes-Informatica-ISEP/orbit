@@ -8,14 +8,13 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { MailService } from '../mail/mail.service';
 import * as bcrypt from 'bcryptjs';
-import { type Prisma, SystemPermission } from '@prisma/client';
-
-const CRITICAL_PERMISSIONS: SystemPermission[] = [
-  'USERS_CREATE',
-  'USERS_UPDATE',
-  'ROLES_CREATE',
-  'ROLES_UPDATE',
-];
+import type { Prisma } from '@prisma/client';
+import { randomBytes } from 'node:crypto';
+import { assertBcryptPasswordLength, AuthService } from '../auth/auth.service';
+import {
+  assertDelegation,
+  securityMutation,
+} from '../auth/security-administration';
 
 const userSelect = {
   id: true,
@@ -53,53 +52,69 @@ export class UsersService {
   constructor(
     private prisma: PrismaService,
     private mailService: MailService,
+    private authService: AuthService,
   ) {}
 
-  async create(dto: CreateUserDto) {
-    const hashed = await bcrypt.hash(dto.password, 10);
-    const createdUser = await this.prisma.user.create({
-      data: {
-        name: dto.name,
-        email: dto.email,
-        password: hashed,
-        departmentId: dto.departmentId,
-        ...(dto.status ? { status: dto.status } : {}),
-      },
-      select: userSelect,
+  private async resolveRoles(tx: Prisma.TransactionClient, names: string[]) {
+    const uniqueNames = [...new Set(names)];
+    const roles = await tx.role.findMany({
+      where: { name: { in: uniqueNames } },
     });
-
-    this.mailService
-      .sendWelcomeEmail(dto.email, dto.name, dto.password)
-      .catch(() => {});
-
-    if (dto.roles?.length) {
-      const roles = await this.prisma.role.findMany({
-        where: {
-          name: {
-            in: dto.roles,
-          },
-        },
-      });
-
-      for (const role of roles) {
-        await this.prisma.userRole.create({
-          data: {
-            userId: createdUser.id,
-            roleId: role.id,
-          },
-        });
-      }
-
-      return this.findOne(createdUser.id);
+    if (roles.length !== uniqueNames.length) {
+      throw new NotFoundException('Role not found');
     }
-
-    return createdUser;
+    return roles;
   }
 
-  async findAll() {
-    return this.prisma.user.findMany({
-      select: userSelect,
-    });
+  async create(dto: CreateUserDto, actorId: string) {
+    const password = await bcrypt.hash(
+      randomBytes(32).toString('base64url'),
+      10,
+    );
+    const user = await securityMutation(
+      this.prisma,
+      actorId,
+      'USERS_CREATE',
+      async (tx, permissions) => {
+        const roles = dto.roles?.length
+          ? await this.resolveRoles(tx, dto.roles)
+          : [];
+        if (roles.length) {
+          assertDelegation(permissions, [
+            'ROLES_ASSIGN',
+            ...roles.flatMap((role) => role.permissions),
+          ]);
+        }
+        const created = await tx.user.create({
+          data: {
+            name: dto.name,
+            email: dto.email,
+            password,
+            departmentId: dto.departmentId,
+            status: dto.status,
+            userRoles: { create: roles.map(({ id: roleId }) => ({ roleId })) },
+          },
+          select: userSelect,
+        });
+        await tx.auditLog.create({
+          data: {
+            performedById: actorId,
+            action: 'CREATE',
+            entity: 'User',
+            entityId: created.id,
+          },
+        });
+        return created;
+      },
+    );
+    if (user.status === 'ACTIVE') {
+      void this.authService.requestPasswordReset(user.email).catch(() => {});
+    }
+    return user;
+  }
+
+  findAll() {
+    return this.prisma.user.findMany({ select: userSelect });
   }
 
   async findOne(id: string) {
@@ -111,124 +126,138 @@ export class UsersService {
     return user;
   }
 
-  async update(id: string, dto: UpdateUserDto) {
-    const updateData: Prisma.UserUncheckedUpdateInput = {};
-
-    if (dto.name) updateData.name = dto.name;
-    if (dto.email) updateData.email = dto.email;
-    if (dto.status) updateData.status = dto.status;
-    if (dto.departmentId) updateData.departmentId = dto.departmentId;
-    if (dto.password) updateData.password = await bcrypt.hash(dto.password, 10);
-
-    const updatedUser = dto.password
-      ? await this.prisma.$transaction(async (tx) => {
-          const user = await tx.user.update({
-            where: { id },
-            data: updateData,
-            select: userSelect,
-          });
-          await tx.authSession.deleteMany({ where: { userId: id } });
-          return user;
-        })
-      : await this.prisma.user.update({
+  async update(id: string, dto: UpdateUserDto, actorId: string) {
+    if (dto.password) assertBcryptPasswordLength(dto.password);
+    const password = dto.password && (await bcrypt.hash(dto.password, 10));
+    const updated = await securityMutation(
+      this.prisma,
+      actorId,
+      'USERS_UPDATE',
+      async (tx, permissions) => {
+        const previous = await tx.user.findUnique({
           where: { id },
-          data: updateData,
+          select: userSelect,
+        });
+        if (!previous) throw new NotFoundException('User not found');
+        assertDelegation(
+          permissions,
+          previous.userRoles.flatMap(({ role }) => role.permissions),
+        );
+
+        const credentialChanged = Boolean(
+          password || (dto.email && dto.email !== previous.email),
+        );
+        if (credentialChanged)
+          assertDelegation(permissions, ['USERS_MANAGE_CREDENTIALS']);
+
+        const currentRoles = new Set(
+          previous.userRoles.map(({ role }) => role.name),
+        );
+        const nextRoles = dto.roles && new Set(dto.roles);
+        const roleChanged =
+          nextRoles &&
+          (nextRoles.size !== currentRoles.size ||
+            [...nextRoles].some((name) => !currentRoles.has(name)));
+        const roles =
+          roleChanged && dto.roles
+            ? await this.resolveRoles(tx, dto.roles)
+            : undefined;
+        if (roles) {
+          assertDelegation(permissions, [
+            'ROLES_ASSIGN',
+            ...roles.flatMap((role) => role.permissions),
+          ]);
+        }
+
+        const user = await tx.user.update({
+          where: { id },
+          data: {
+            name: dto.name,
+            email: dto.email,
+            status: dto.status,
+            departmentId: dto.departmentId,
+            password: password || undefined,
+            userRoles: roles && {
+              deleteMany: {},
+              create: roles.map(({ id: roleId }) => ({ roleId })),
+            },
+          },
           select: userSelect,
         });
 
-    if (dto.password) {
-      this.mailService
-        .sendPasswordChanged(updatedUser.email, updatedUser.name)
+        const statusChanged = previous.status !== user.status;
+        if (credentialChanged || statusChanged) {
+          await tx.authSession.deleteMany({ where: { userId: id } });
+          await tx.passwordResetToken.updateMany({
+            where: { userId: id, usedAt: null },
+            data: { usedAt: new Date() },
+          });
+        }
+        const actions = [
+          'UPDATE',
+          ...(credentialChanged ? ['UPDATE_CREDENTIALS'] : []),
+          ...(statusChanged ? ['UPDATE_STATUS'] : []),
+          ...(roleChanged ? ['ASSIGN_ROLES'] : []),
+        ];
+        await tx.auditLog.createMany({
+          data: actions.map((action) => ({
+            performedById: actorId,
+            action,
+            entity: 'User',
+            entityId: id,
+          })),
+        });
+        return user;
+      },
+    );
+    if (password) {
+      void this.mailService
+        .sendPasswordChanged(updated.email, updated.name)
         .catch(() => {});
     }
-
-    // Update roles if provided
-    if (dto.roles && Array.isArray(dto.roles)) {
-      // Delete existing roles
-      await this.prisma.userRole.deleteMany({
-        where: { userId: id },
-      });
-
-      // Create new roles
-      const roles = await this.prisma.role.findMany({
-        where: {
-          name: {
-            in: dto.roles,
-          },
-        },
-      });
-
-      for (const role of roles) {
-        await this.prisma.userRole.create({
-          data: {
-            userId: id,
-            roleId: role.id,
-          },
-        });
-      }
-
-      // Fetch updated user with new roles
-      return this.findOne(id);
-    }
-
-    return updatedUser;
+    return updated;
   }
 
-  async remove(id: string, requestingUserId: string) {
-    if (id === requestingUserId) {
+  remove(id: string, actorId: string) {
+    if (id === actorId)
       throw new ForbiddenException('Não te podes apagar a ti próprio.');
-    }
 
-    const target = await this.prisma.user.findUnique({
-      where: { id },
-      include: {
-        userRoles: {
-          include: { role: { select: { permissions: true } } },
-        },
-      },
-    });
-    if (!target) throw new NotFoundException('User not found');
-
-    const targetPermissions = new Set(
-      target.userRoles.flatMap((ur) => ur.role.permissions),
-    );
-    if (targetPermissions.has('CAN_BE_DELETED')) {
-      throw new ForbiddenException('Este utilizador não pode ser apagado.');
-    }
-
-    const hasCritical = CRITICAL_PERMISSIONS.some((p) =>
-      targetPermissions.has(p),
-    );
-
-    if (hasCritical) {
-      const criticalUsers = await this.prisma.user.findMany({
-        where: { status: 'ACTIVE' },
-        include: {
-          userRoles: {
-            include: { role: { select: { permissions: true } } },
-          },
-        },
-      });
-
-      const countWithCritical = criticalUsers.filter((u) =>
-        CRITICAL_PERMISSIONS.some((p) =>
-          u.userRoles.some((ur) => ur.role.permissions.includes(p)),
-        ),
-      ).length;
-
-      if (countWithCritical <= 1) {
-        throw new ForbiddenException(
-          'Não é possível apagar o último utilizador com permissões críticas.',
+    return securityMutation(
+      this.prisma,
+      actorId,
+      'USERS_DELETE',
+      async (tx, permissions) => {
+        const target = await tx.user.findUnique({
+          where: { id },
+          select: userSelect,
+        });
+        if (!target) throw new NotFoundException('User not found');
+        const targetPermissions = target.userRoles.flatMap(
+          ({ role }) => role.permissions,
         );
-      }
-    }
-
-    await this.prisma.plan.updateMany({
-      where: { createdById: id },
-      data: { createdById: requestingUserId },
-    });
-
-    return this.prisma.user.delete({ where: { id } });
+        assertDelegation(permissions, targetPermissions);
+        if (targetPermissions.includes('CAN_BE_DELETED')) {
+          throw new ForbiddenException('Este utilizador não pode ser apagado.');
+        }
+        await tx.plan.updateMany({
+          where: { createdById: id },
+          data: { createdById: actorId },
+        });
+        const removed = await tx.user.delete({
+          where: { id },
+          select: userSelect,
+        });
+        await tx.auditLog.create({
+          data: {
+            performedById: actorId,
+            action: 'DELETE',
+            entity: 'User',
+            entityId: id,
+          },
+        });
+        return removed;
+      },
+    );
   }
 
   async getStats() {

@@ -1,12 +1,35 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Res, UseGuards } from '@nestjs/common';
+import { CurrentUser } from '../auth/current-user.decorator';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { RecruitmentService } from './recruitment.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
 import type { Response } from 'express';
-import { ApiCreatedResponse, ApiOkResponse, ApiProduces, ApiTags } from '@nestjs/swagger';
-import { CreateCandidateDto, IdParamDto, UpdateCandidateDto } from '../contracts/request.dto';
-import { CandidateResponseDto, DeletedCountResponseDto } from '../contracts/response.dto';
+import {
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiProduces,
+  ApiTags,
+} from '@nestjs/swagger';
+import {
+  CreateCandidateDto,
+  IdParamDto,
+  UpdateCandidateDto,
+} from '../contracts/request.dto';
+import {
+  CandidateResponseDto,
+  DeletedCountResponseDto,
+} from '../contracts/response.dto';
 import { ApiProtectedController } from '../contracts/openapi.decorators';
 
 @ApiTags('candidates')
@@ -19,8 +42,11 @@ export class RecruitmentController {
   @Post()
   @Permissions('RECRUITMENT_CREATE')
   @ApiCreatedResponse({ type: CandidateResponseDto })
-  create(@Body() body: CreateCandidateDto) {
-    return this.svc.create(body);
+  create(
+    @Body() body: CreateCandidateDto,
+    @CurrentUser('userId') actorId: string,
+  ) {
+    return this.svc.create(body, actorId);
   }
 
   @Get()
@@ -68,8 +94,12 @@ export class RecruitmentController {
   @Put(':id')
   @Permissions('RECRUITMENT_UPDATE')
   @ApiOkResponse({ type: CandidateResponseDto })
-  update(@Param() params: IdParamDto, @Body() body: UpdateCandidateDto) {
-    return this.svc.update(params.id, body);
+  update(
+    @Param() params: IdParamDto,
+    @Body() body: UpdateCandidateDto,
+    @CurrentUser('userId') actorId: string,
+  ) {
+    return this.svc.update(params.id, body, actorId);
   }
 
   @Delete()

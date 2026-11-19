@@ -1,6 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
-import { MinioService } from '../files/minio.service';
+import {
+  attachmentKey,
+  requireOwnedAttachments,
+  safeStoredAttachment,
+} from '../files/file-access';
 import PDFDocument from 'pdfkit';
 import type { Prisma, RecruitmentStage } from '@prisma/client';
 
@@ -34,12 +38,13 @@ type CandidateWithRelations = Prisma.CandidateGetPayload<{
   };
 }>;
 
+function safeCandidate<T extends { cvUrl: string | null }>(row: T): T {
+  return { ...row, cvUrl: safeStoredAttachment(row.cvUrl) ?? null };
+}
+
 @Injectable()
 export class RecruitmentService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly minio: MinioService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   private include = {
     departmentChoices: {
@@ -52,28 +57,37 @@ export class RecruitmentService {
     },
   };
 
-  create(data: CreateCandidateInput) {
+  create(data: CreateCandidateInput, actorId: string) {
     const { departmentChoices, ...createData } = data;
-    return this.prisma.candidate.create({
-      data: {
-        ...createData,
-        departmentChoices: departmentChoices?.length
-          ? {
-              create: departmentChoices.map(
-                (dc: { departmentId: string; priority: number }) => ({
-                  departmentId: dc.departmentId,
-                  priority: dc.priority,
-                }),
-              ),
-            }
-          : undefined,
-      },
-      include: this.include,
+    const key = attachmentKey(data.cvUrl);
+    return this.prisma.$transaction(async (tx) => {
+      await requireOwnedAttachments(tx, actorId, [key]);
+      return safeCandidate(
+        await tx.candidate.create({
+          data: {
+            ...createData,
+            cvUrl: key ?? data.cvUrl,
+            departmentChoices: departmentChoices?.length
+              ? {
+                  create: departmentChoices.map(
+                    (dc: { departmentId: string; priority: number }) => ({
+                      departmentId: dc.departmentId,
+                      priority: dc.priority,
+                    }),
+                  ),
+                }
+              : undefined,
+          },
+          include: this.include,
+        }),
+      );
     });
   }
 
-  findAll() {
-    return this.prisma.candidate.findMany({ include: this.include });
+  async findAll() {
+    return (
+      await this.prisma.candidate.findMany({ include: this.include })
+    ).map(safeCandidate);
   }
 
   async findOne(id: string) {
@@ -82,61 +96,60 @@ export class RecruitmentService {
       include: this.include,
     });
     if (!c) throw new NotFoundException('Candidate not found');
-    return c;
+    return safeCandidate(c);
   }
 
-  async update(id: string, data: UpdateCandidateInput) {
-    const { departmentChoices, ...updateData } = data;
-    if (departmentChoices) {
-      await this.prisma.candidateDepartmentChoice.deleteMany({
-        where: { candidateId: id },
-      });
-      if (departmentChoices.length) {
-        await this.prisma.candidateDepartmentChoice.createMany({
-          data: departmentChoices.map(
-            (dc: { departmentId: string; priority: number }) => ({
-              candidateId: id,
-              departmentId: dc.departmentId,
-              priority: dc.priority,
-            }),
-          ),
+  async update(id: string, data: UpdateCandidateInput, actorId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const { departmentChoices, ...updateData } = data;
+      const key = attachmentKey(data.cvUrl);
+      if (data.cvUrl !== undefined) {
+        const previous = await tx.candidate.findUnique({
+          where: { id },
+          select: { cvUrl: true },
         });
+        await requireOwnedAttachments(
+          tx,
+          actorId,
+          [key],
+          [attachmentKey(previous?.cvUrl)],
+        );
       }
-    }
-    return this.prisma.candidate.update({
-      where: { id },
-      data: updateData,
-      include: this.include,
+      if (departmentChoices) {
+        await tx.candidateDepartmentChoice.deleteMany({
+          where: { candidateId: id },
+        });
+        if (departmentChoices.length) {
+          await tx.candidateDepartmentChoice.createMany({
+            data: departmentChoices.map(
+              (dc: { departmentId: string; priority: number }) => ({
+                candidateId: id,
+                departmentId: dc.departmentId,
+                priority: dc.priority,
+              }),
+            ),
+          });
+        }
+      }
+      return safeCandidate(
+        await tx.candidate.update({
+          where: { id },
+          data: { ...updateData, cvUrl: key ?? data.cvUrl },
+          include: this.include,
+        }),
+      );
     });
   }
 
   async remove(id: string) {
     const c = await this.prisma.candidate.findUnique({ where: { id } });
     if (!c) throw new NotFoundException('Candidate not found');
-    const key = this.minio.extractKey(c.cvUrl);
-    if (key) {
-      await this.minio.deleteObject(key).catch(() => {});
-    }
-    return this.prisma.candidate.delete({ where: { id } });
+    return safeCandidate(await this.prisma.candidate.delete({ where: { id } }));
   }
 
   async clearAll() {
-    const candidates = await this.prisma.candidate.findMany({
-      select: { cvUrl: true },
-    });
-    if (candidates.length === 0) return { deleted: 0 };
-    const keys = candidates
-      .map((c) => this.minio.extractKey(c.cvUrl))
-      .filter((k): k is string => k !== null);
-    if (keys.length) {
-      await Promise.all(
-        keys.map((key) => this.minio.deleteObject(key).catch(() => {})),
-      );
-    }
-    await this.prisma.candidateDepartmentChoice.deleteMany();
-    await this.prisma.recruitmentComment.deleteMany();
-    await this.prisma.candidate.deleteMany();
-    return { deleted: candidates.length };
+    const { count } = await this.prisma.candidate.deleteMany();
+    return { deleted: count };
   }
 
   async exportOne(id: string): Promise<Buffer> {
@@ -145,7 +158,7 @@ export class RecruitmentService {
       include: this.include,
     });
     if (!c) throw new NotFoundException('Candidate not found');
-    return this.generatePdf(c);
+    return this.generatePdf(safeCandidate(c));
   }
 
   async exportAll(): Promise<Buffer> {
@@ -153,7 +166,7 @@ export class RecruitmentService {
       include: this.include,
       orderBy: { createdAt: 'desc' },
     });
-    return this.generatePdf(candidates);
+    return this.generatePdf(candidates.map(safeCandidate));
   }
 
   private stageLabel(stage: string): string {
@@ -278,7 +291,11 @@ export class RecruitmentService {
             .fillColor('#000')
             .text('Curriculum Vitae:');
           doc.fontSize(10).font('Helvetica').fillColor('#2563eb');
-          doc.text(c.cvUrl, { indent: 10, link: c.cvUrl, underline: true });
+          doc.text(c.cvUrl, {
+            indent: 10,
+            link: /^https?:\/\//i.test(c.cvUrl) ? c.cvUrl : undefined,
+            underline: true,
+          });
         }
 
         if (c.comments && c.comments.length > 0) {

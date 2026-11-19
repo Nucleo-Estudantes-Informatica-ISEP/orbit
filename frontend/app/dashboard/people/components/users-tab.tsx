@@ -56,6 +56,8 @@ export default function UsersTab() {
   const canCreateUsers = usePermission('USERS_CREATE');
   const canUpdateUsers = usePermission('USERS_UPDATE');
   const canDeleteUsers = usePermission('USERS_DELETE');
+  const canAssignRoles = usePermission('ROLES_ASSIGN');
+  const canManageCredentials = usePermission('USERS_MANAGE_CREDENTIALS');
 
   const { page, pageSize, setPage, setPageSize, paginate } = usePagination(10);
 
@@ -272,6 +274,8 @@ export default function UsersTab() {
         onSave={handleSaveUser}
         roles={roles}
         departments={departments}
+        canAssignRoles={canAssignRoles}
+        canManageCredentials={canManageCredentials}
       />
 
       {canDeleteUsers && (

@@ -1,5 +1,4 @@
 import { AnnouncementsController } from '../announcements/announcements.controller';
-import { AuditLogsController } from '../audit-logs/audit-logs.controller';
 import { DebtsController } from '../debts/debts.controller';
 import { EventsController } from '../events/events.controller';
 import { IncidentsController } from '../incidents/incidents.controller';
@@ -118,16 +117,6 @@ describe('server-owned actor identity', () => {
           }),
         body: { description: 'Debt', value: 10, type: 'OUTCOME' },
         actorField: 'createdById',
-      },
-      {
-        invoke: (service) =>
-          new AuditLogsController(service as never).create(actorId, {
-            action: 'CREATE',
-            entity: 'Project',
-            entityId: targetId,
-          }),
-        body: { action: 'CREATE', entity: 'Project', entityId: targetId },
-        actorField: 'performedById',
       },
     ];
 

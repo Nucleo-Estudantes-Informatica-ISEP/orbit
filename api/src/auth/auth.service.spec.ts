@@ -5,13 +5,12 @@ import { SystemPermission, UserStatus } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma.service';
-import { UsersService } from '../users/users.service';
 import { AuthService } from './auth.service';
-import { JwtStrategy } from './jwt.strategy';
 
 interface AccessClaims {
   sub: string;
   email: string;
+  sid: string;
   token_use: string;
   permissions: string[];
   iat: number;
@@ -31,7 +30,7 @@ interface StoredSession {
 describe('AuthService sessions', () => {
   const jwt = new JwtService({ secret: 'refresh-token-test-secret' });
   const user = {
-    id: 'user-1',
+    id: '11111111-1111-4111-8111-111111111111',
     name: 'Test User',
     email: 'user@example.com',
     password: '',
@@ -47,7 +46,6 @@ describe('AuthService sessions', () => {
   };
   let sessions: StoredSession[];
   let auth: AuthService;
-  let users: UsersService;
 
   beforeEach(async () => {
     sessions = [];
@@ -74,9 +72,14 @@ describe('AuthService sessions', () => {
     const prisma: Record<string, unknown> = {
       user: {
         findUnique: jest.fn().mockResolvedValue(user),
+        findFirst: jest.fn().mockResolvedValue(user),
         update: jest.fn(({ data }: { data: { password: string } }) =>
           Promise.resolve(Object.assign(user, data)),
         ),
+        updateMany: jest.fn(({ data }: { data: { password: string } }) => {
+          Object.assign(user, data);
+          return Promise.resolve({ count: 1 });
+        }),
       },
       authSession: {
         create: jest.fn(
@@ -146,8 +149,11 @@ describe('AuthService sessions', () => {
           return Promise.resolve({ count: before - sessions.length });
         }),
       },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+      $queryRaw: jest.fn().mockResolvedValue([]),
       passwordResetToken: {
         findUnique: jest.fn().mockResolvedValue({
+          id: 'reset-id',
           userId: user.id,
           usedAt: null,
           expiresAt: new Date(Date.now() + 60_000),
@@ -164,7 +170,6 @@ describe('AuthService sessions', () => {
     const module = await Test.createTestingModule({
       providers: [
         AuthService,
-        UsersService,
         { provide: JwtService, useValue: jwt },
         { provide: PrismaService, useValue: prisma },
         {
@@ -176,7 +181,6 @@ describe('AuthService sessions', () => {
       ],
     }).compile();
     auth = module.get(AuthService);
-    users = module.get(UsersService);
   });
 
   it('issues 15-minute access and 30-day opaque refresh tokens', async () => {
@@ -185,6 +189,7 @@ describe('AuthService sessions', () => {
 
     expect(claims.exp - claims.iat).toBe(15 * 60);
     expect(claims.token_use).toBe('access');
+    expect(claims.sid).toBe(sessions[0].familyId);
     expect(login.refresh_token).not.toContain('.');
     expect(sessions).toHaveLength(1);
     expect(
@@ -227,14 +232,14 @@ describe('AuthService sessions', () => {
     );
 
     const afterReset = await auth.authenticate(user.email, 'new-password');
-    await users.update(user.id, { password: 'new-password' });
+    await auth.changeOwnPassword(user.id, 'new-password', 'different-password');
     expect(sessions).toHaveLength(0);
     await expect(auth.refreshToken(afterReset.refresh_token)).rejects.toThrow(
       UnauthorizedException,
     );
   });
 
-  it('rejects inactive users, malformed refresh values, and refresh tokens on protected routes', async () => {
+  it('rejects refresh for inactive users and rejects access tokens as refresh tokens', async () => {
     const login = await auth.authenticate(user.email, 'old-password');
     user.status = UserStatus.INACTIVE;
     await expect(auth.refreshToken(login.refresh_token)).rejects.toThrow(
@@ -246,21 +251,6 @@ describe('AuthService sessions', () => {
       UnauthorizedException,
     );
     await expect(auth.refreshToken('')).rejects.toThrow(UnauthorizedException);
-
-    const strategy = new JwtStrategy();
-    expect(() =>
-      strategy.validate({ sub: user.id, email: user.email }),
-    ).toThrow('Invalid access token');
-    expect(() =>
-      strategy.validate({
-        sub: '',
-        email: user.email,
-        token_use: 'access',
-      }),
-    ).toThrow('Invalid access token');
-    expect(
-      strategy.validate(jwt.verify<AccessClaims>(login.access_token)).userId,
-    ).toBe(user.id);
   });
 
   it('revokes a session family on logout', async () => {

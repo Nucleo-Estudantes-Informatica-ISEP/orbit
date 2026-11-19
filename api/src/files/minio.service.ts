@@ -1,35 +1,73 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
-import * as Minio from 'minio';
-import type { BucketItem } from 'minio';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import {
+  CreateBucketCommand,
+  DeleteObjectCommand,
+  GetObjectCommand,
+  HeadBucketCommand,
+  HeadObjectCommand,
+  PutObjectCommand,
+  S3Client,
+  S3ServiceException,
+  paginateListObjectsV2,
+} from '@aws-sdk/client-s3';
+import { Readable } from 'node:stream';
 
 @Injectable()
 export class MinioService implements OnModuleInit {
   private readonly logger = new Logger(MinioService.name);
-  private client: Minio.Client;
+  private readonly client: S3Client;
   private readonly bucket: string;
 
   constructor() {
-    this.bucket = process.env.MINIO_BUCKET ?? 'orbit';
-    this.client = new Minio.Client({
-      endPoint: process.env.MINIO_ENDPOINT ?? 'minio',
-      port: parseInt(process.env.MINIO_PORT ?? '9000', 10),
-      useSSL: process.env.MINIO_USE_SSL === 'true',
-      accessKey: process.env.MINIO_ACCESS_KEY ?? 'minioadmin',
-      secretKey: process.env.MINIO_SECRET_KEY ?? 'minioadmin',
+    const { MINIO_BUCKET, MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY } =
+      process.env;
+    if (
+      process.env.NODE_ENV === 'production' &&
+      (!MINIO_BUCKET ||
+        !MINIO_ENDPOINT ||
+        !MINIO_ACCESS_KEY ||
+        !MINIO_SECRET_KEY ||
+        MINIO_ACCESS_KEY === 'minioadmin' ||
+        MINIO_SECRET_KEY === 'minioadmin')
+    ) {
+      throw new Error(
+        'Production requires an explicitly configured S3 endpoint, bucket and restricted identity.',
+      );
+    }
+    this.bucket = MINIO_BUCKET ?? 'orbit';
+    const protocol = process.env.MINIO_USE_SSL === 'true' ? 'https' : 'http';
+    const port = process.env.MINIO_PORT ?? '9000';
+    this.client = new S3Client({
+      region: process.env.MINIO_REGION ?? 'us-east-1',
+      endpoint: `${protocol}://${MINIO_ENDPOINT ?? 'minio'}:${port}`,
+      forcePathStyle: true,
+      requestChecksumCalculation: 'WHEN_REQUIRED',
+      responseChecksumValidation: 'WHEN_REQUIRED',
+      credentials: {
+        accessKeyId: MINIO_ACCESS_KEY ?? 'minioadmin',
+        secretAccessKey: MINIO_SECRET_KEY ?? 'minioadmin',
+      },
     });
   }
 
   async onModuleInit() {
+    const input = { Bucket: this.bucket };
     try {
-      const exists = await this.client.bucketExists(this.bucket);
-      if (!exists) {
-        await this.client.makeBucket(this.bucket, 'us-east-1');
-        this.logger.log(`Bucket "${this.bucket}" created.`);
-      } else {
-        this.logger.log(`Bucket "${this.bucket}" already exists.`);
+      await this.client.send(new HeadBucketCommand(input));
+    } catch (error) {
+      if (process.env.NODE_ENV === 'production') {
+        // SDK failures can contain signed request or provider details.
+        // eslint-disable-next-line preserve-caught-error
+        throw new Error('Orbit storage bucket is unavailable');
       }
-    } catch (err) {
-      this.logger.error('MinIO init failed — is MinIO running?', err);
+      if (
+        error instanceof S3ServiceException &&
+        error.$metadata.httpStatusCode === 404
+      ) {
+        await this.client.send(new CreateBucketCommand(input));
+      } else {
+        this.logger.warn('Development object store is unavailable.');
+      }
     }
   }
 
@@ -38,50 +76,56 @@ export class MinioService implements OnModuleInit {
     buffer: Buffer,
     mimeType: string,
     size: number,
-  ): Promise<string> {
-    await this.client.putObject(this.bucket, objectKey, buffer, size, {
-      'Content-Type': mimeType,
-    });
-    return objectKey;
+  ) {
+    await this.client.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: objectKey,
+        Body: buffer,
+        ContentType: mimeType,
+        ContentLength: size,
+      }),
+    );
   }
 
-  async getObject(objectKey: string): Promise<NodeJS.ReadableStream> {
-    return this.client.getObject(this.bucket, objectKey);
+  async getObject(objectKey: string) {
+    const { Body } = await this.client.send(
+      new GetObjectCommand({ Bucket: this.bucket, Key: objectKey }),
+    );
+    if (!(Body instanceof Readable))
+      throw new Error('Object storage returned no readable body');
+    return Body;
   }
 
-  async deleteObject(objectKey: string): Promise<void> {
-    await this.client.removeObject(this.bucket, objectKey);
+  async deleteObject(objectKey: string) {
+    await this.client.send(
+      new DeleteObjectCommand({ Bucket: this.bucket, Key: objectKey }),
+    );
   }
 
-  async getObjectStat(objectKey: string): Promise<Minio.BucketItemStat> {
-    return this.client.statObject(this.bucket, objectKey);
+  async getObjectStat(objectKey: string) {
+    const object = await this.client.send(
+      new HeadObjectCommand({ Bucket: this.bucket, Key: objectKey }),
+    );
+    return { size: object.ContentLength, contentType: object.ContentType };
   }
 
-  /** Extract a MinIO object key from a stored URL or return the value itself
-   *  if it's already a plain key. Returns null for external URLs. */
-  extractKey(value: string | null | undefined): string | null {
-    if (!value) return null;
-    const filesIdx = value.indexOf('/files/');
-    if (filesIdx >= 0) {
-      const key = value
-        .slice(filesIdx + 7)
-        .split('?')[0]
-        .split('#')[0];
-      return key || null;
+  async listObjects() {
+    const objects: { name: string; size: number; lastModified: Date }[] = [];
+    for await (const page of paginateListObjectsV2(
+      { client: this.client },
+      { Bucket: this.bucket },
+    )) {
+      for (const object of page.Contents ?? []) {
+        if (object.Key && object.LastModified) {
+          objects.push({
+            name: object.Key,
+            size: object.Size ?? 0,
+            lastModified: object.LastModified,
+          });
+        }
+      }
     }
-    if (!/^https?:\/\//i.test(value)) return value;
-    return null;
-  }
-
-  async listObjects(): Promise<BucketItem[]> {
-    return new Promise((resolve, reject) => {
-      const items: BucketItem[] = [];
-      const stream = this.client.listObjectsV2(this.bucket, '', true);
-      stream.on('data', (item: BucketItem) => {
-        if (item.name) items.push(item);
-      });
-      stream.on('end', () => resolve(items));
-      stream.on('error', reject);
-    });
+    return objects;
   }
 }
