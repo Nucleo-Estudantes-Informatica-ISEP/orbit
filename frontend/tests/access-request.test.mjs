@@ -10,6 +10,45 @@ import {
   restoreAccessDefaults,
   hasOriginPosition,
 } from "../lib/access-request.ts";
+import { intakePositions } from "../lib/access-lifecycle.ts";
+
+test("welcome Forms without a declared position default to Member for onboarding", () => {
+  const response = { source: "FORMS", positions: [] };
+  assert.deepEqual(intakePositions("ONBOARD", response), ["MEMBER"]);
+  assert.deepEqual(response.positions, []);
+});
+
+test("welcome defaults do not infer an origin position for offboarding or other processes", () => {
+  for (const kind of ["OFFBOARD", "CHANGE_ACCESS", "ALUMNI_TRANSITION"]) {
+    assert.deepEqual(intakePositions(kind, { source: "FORMS", positions: [] }), []);
+  }
+  assert.deepEqual(
+    intakePositions("ONBOARD", { source: "SHEETS", positions: [] }),
+    [],
+  );
+  assert.deepEqual(intakePositions("ONBOARD", { positions: [] }), []);
+});
+
+test("respondent positions cannot elevate welcome defaults; the manual registry preserves positions", () => {
+  assert.deepEqual(
+    intakePositions("ONBOARD", { source: "FORMS", positions: ["BOARD"] }),
+    ["MEMBER"],
+  );
+  assert.deepEqual(
+    intakePositions("ONBOARD", {
+      source: "SHEETS",
+      positions: ["MEMBER", "COORDINATOR"],
+    }),
+    ["MEMBER", "COORDINATOR"],
+  );
+  assert.deepEqual(
+    intakePositions("ONBOARD", { source: "FORMS", positions: ["Unknown"] }),
+    ["MEMBER"],
+  );
+  for (const kind of ["OFFBOARD", "CHANGE_ACCESS", "ALUMNI_TRANSITION"]) {
+    assert.deepEqual(intakePositions(kind, { source: "FORMS", positions: ["PRESIDENCY"] }), []);
+  }
+});
 
 test("an Alumni destination alone is not an origin position", () => {
   assert.equal(hasOriginPosition([]), false);
@@ -17,7 +56,7 @@ test("an Alumni destination alone is not an origin position", () => {
   assert.equal(hasOriginPosition(["MEMBER", "ALUMNI"]), true);
 });
 
-test("reusing a first Drive grant clears the email from the numeric permission ID field", () => {
+test("reusing a Drive grant uses its normal email for every action", () => {
   const resource = { id: "drive", provider: "GOOGLE_DRIVE", enabled: true };
   const [operation] = reuseAccessOperations(
     [
@@ -31,7 +70,7 @@ test("reusing a first Drive grant clears the email from the numeric permission I
     [resource],
   );
   assert.equal(operation.action, "VERIFY");
-  assert.equal(operation.providerUserId, undefined);
+  assert.equal(operation.providerUserId, "person@example.com");
   assert.equal(operation.accountEmail, "person@example.com");
   assert.equal(operation.verificationNote, undefined);
 });
@@ -93,7 +132,14 @@ test("restoring a recommendation retains entered identity and evidence while res
     },
   ];
   const restored = restoreAccessDefaults([current], defaults, resources);
-  assert.deepEqual(restored, [{ ...current, action: "GRANT" }]);
+  assert.deepEqual(restored, [
+    {
+      ...current,
+      action: "GRANT",
+      providerUserId: "person@example.com",
+      verificationNote: undefined,
+    },
+  ]);
   assert.deepEqual(
     restoreAccessDefaults(restored, defaults, resources),
     restored,
@@ -117,7 +163,7 @@ test("a first Drive grant binds the displayed email to the verified principal", 
   assert.equal(next.verificationNote, undefined);
 });
 
-test("editing a Drive confirmation email preserves an existing numeric permission ID", () => {
+test("editing the Google email replaces the old principal and clears verification", () => {
   const next = changeAccountEmail(
     {
       resourceId: "drive",
@@ -128,11 +174,11 @@ test("editing a Drive confirmation email preserves an existing numeric permissio
     "GOOGLE_DRIVE",
     "person@example.com",
   );
-  assert.equal(next.providerUserId, "123456");
+  assert.equal(next.providerUserId, "person@example.com");
   assert.equal(next.verificationNote, undefined);
 });
 
-test("changing a Drive grant to revocation does not pass an email as a permission ID", () => {
+test("changing a Drive grant to revocation preserves the approved email", () => {
   const next = changeAccessAction(
     {
       resourceId: "drive",
@@ -144,9 +190,9 @@ test("changing a Drive grant to revocation does not pass an email as a permissio
     "GOOGLE_DRIVE",
     "REVOKE",
   );
-  assert.equal(next.providerUserId, undefined);
+  assert.equal(next.providerUserId, "person@example.com");
   assert.equal(next.accountEmail, "person@example.com");
-  assert.equal(next.verificationNote, undefined);
+  assert.equal(next.verificationNote, "Verified Google account");
 });
 
 test("a real Drive permission ID survives a switch between grant and revocation", () => {
@@ -286,4 +332,22 @@ test("an Alumni policy from another department does not turn a revocation into a
     ]),
     "REVOKE",
   );
+});
+
+test("a reused resolved GitHub/Discord operation displays its original username", () => {
+  for (const provider of ["DISCORD", "GITHUB"]) {
+    const resource = { id: "role", provider, enabled: true };
+    const [operation] = reuseAccessOperations(
+      [
+        {
+          resourceSnapshot: resource,
+          providerUserId: "123456",
+          result: { remoteId: "123456", accountName: "person.name" },
+        },
+      ],
+      [resource],
+    );
+    assert.equal(operation.accountUsername, "person.name");
+    assert.equal(operation.action, "VERIFY");
+  }
 });

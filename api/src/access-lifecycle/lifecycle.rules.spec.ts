@@ -45,16 +45,14 @@ describe('access lifecycle security rules', () => {
       assertDecision('one', 'two', 'PENDING_APPROVAL'),
     ).not.toThrow();
   });
-  it('never treats an email alone or unverified identity as a valid revocation target', () => {
-    expect(() => assertOperationIdentity('REVOKE', '', 'checked')).toThrow(
-      BadRequestException,
-    );
-    expect(() => assertOperationIdentity('REVOKE', 'remote-id', '')).toThrow(
+  it('requires a revocation account while the provider verifies its identity', () => {
+    expect(() => assertOperationIdentity('REVOKE', '')).toThrow(
       BadRequestException,
     );
     expect(() =>
-      assertOperationIdentity('REVOKE', 'remote-id', 'Checked on provider'),
+      assertOperationIdentity('REVOKE', 'person@example.com'),
     ).not.toThrow();
+    expect(() => assertOperationIdentity('REVOKE', 'remote-id')).not.toThrow();
   });
   it('applies department and position selectors together', () => {
     const policy = { departmentIds: ['it'], positions: ['COORDINATOR'] };

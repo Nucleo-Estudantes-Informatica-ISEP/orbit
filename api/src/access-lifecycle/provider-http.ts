@@ -67,7 +67,7 @@ export class ProviderHttp {
     return `${unsigned}.${createSign('RSA-SHA256').update(unsigned).sign(key.replace(/\\n/g, '\n'), 'base64url')}`;
   }
 
-  async google(scope: 'sheets' | 'drive') {
+  async google(scope: 'sheets' | 'drive' | 'forms') {
     const cached = this.googleCache.get(scope);
     if (cached && cached.until > Date.now()) return `Bearer ${cached.token}`;
     const email = process.env.ACCESS_GOOGLE_CLIENT_EMAIL;
@@ -80,7 +80,9 @@ export class ProviderHttp {
         scope:
           scope === 'sheets'
             ? 'https://www.googleapis.com/auth/spreadsheets.readonly'
-            : 'https://www.googleapis.com/auth/drive',
+            : scope === 'forms'
+              ? 'https://www.googleapis.com/auth/forms.body.readonly https://www.googleapis.com/auth/forms.responses.readonly'
+              : 'https://www.googleapis.com/auth/drive',
         aud: 'https://oauth2.googleapis.com/token',
         iat: now,
         exp: now + 3600,

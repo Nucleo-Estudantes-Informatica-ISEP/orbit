@@ -13,6 +13,8 @@ describe('Access lifecycle HTTP validation', () => {
   const service = {
     create: jest.fn().mockResolvedValue({ id: actorId }),
     decide: jest.fn().mockResolvedValue({ id: actorId }),
+    list: jest.fn().mockResolvedValue([]),
+    intakeResponses: jest.fn().mockResolvedValue([]),
   };
   const valid = {
     kind: 'ONBOARD',
@@ -55,6 +57,35 @@ describe('Access lifecycle HTTP validation', () => {
     expect(service.create).toHaveBeenCalledWith(
       actorId,
       expect.objectContaining({ targetEmail: 'person@example.com' }),
+    );
+  });
+  it('rejects remote-account filters shorter than three characters', async () => {
+    await request(app.getHttpServer())
+      .get('/access-lifecycle/processes?providerUserId=ab')
+      .expect(400);
+    expect(service.list).not.toHaveBeenCalled();
+    await request(app.getHttpServer())
+      .get('/access-lifecycle/processes?providerUserId=person')
+      .expect(200);
+    expect(service.list).toHaveBeenCalledWith(
+      actorId,
+      expect.objectContaining({ providerUserId: 'person' }),
+    );
+  });
+  it('validates the origin selector on intake and process creation', async () => {
+    await request(app.getHttpServer())
+      .get('/access-lifecycle/intake?query=person&intakeSource=OTHER')
+      .expect(400);
+    await request(app.getHttpServer())
+      .post('/access-lifecycle/processes')
+      .send({ ...valid, intakeSource: 'OTHER' })
+      .expect(400);
+    await request(app.getHttpServer())
+      .get('/access-lifecycle/intake?query=person&intakeSource=FORMS')
+      .expect(200);
+    expect(service.intakeResponses).toHaveBeenCalledWith(
+      actorId,
+      expect.objectContaining({ intakeSource: 'FORMS' }),
     );
   });
   it('rejects forged requester, approver and nested verification flags', async () => {
