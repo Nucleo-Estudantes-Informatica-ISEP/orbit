@@ -56,8 +56,12 @@ export class PlansController {
   @Put(':id')
   @Permissions('PLANS_UPDATE')
   @ApiOkResponse({ type: PlanResponseDto })
-  update(@Param() params: IdParamDto, @Body() dto: UpdatePlanDto) {
-    return this.svc.update(params.id, dto);
+  update(
+    @Param() params: IdParamDto,
+    @Body() dto: UpdatePlanDto,
+    @CurrentUser('userId') actorId: string,
+  ) {
+    return this.svc.update(params.id, dto, actorId);
   }
 
   @Put(':id/approve')

@@ -9,15 +9,22 @@ export function getProductionAdminSeedConfig(
 ): ProductionAdminSeedConfig {
   const email = env.ADMIN_EMAIL?.trim().toLowerCase();
   if (!email || !email.includes('@')) {
-    throw new Error('ADMIN_EMAIL must be explicitly configured for the production seed.');
+    throw new Error(
+      'ADMIN_EMAIL must be explicitly configured for the production seed.',
+    );
   }
 
   const password = env.ADMIN_PASSWORD;
   if (!password) {
-    throw new Error('ADMIN_PASSWORD must be explicitly configured for the production seed.');
+    throw new Error(
+      'ADMIN_PASSWORD must be explicitly configured for the production seed.',
+    );
   }
   if (password.length < 16) {
     throw new Error('ADMIN_PASSWORD must contain at least 16 characters.');
+  }
+  if (Buffer.byteLength(password, 'utf8') > 72) {
+    throw new Error('ADMIN_PASSWORD must fit within bcrypt’s 72-byte limit.');
   }
 
   return {

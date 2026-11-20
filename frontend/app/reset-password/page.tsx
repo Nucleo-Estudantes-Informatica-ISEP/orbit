@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useSyncExternalStore } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,11 +13,17 @@ import { api } from "@/lib/api";
 import { OrbitLogo } from '@/components/orbit-logo';
 import { useLocale } from "@/lib/locale-context";
 
+function subscribeToHash(callback: () => void) {
+  window.addEventListener("hashchange", callback);
+  return () => window.removeEventListener("hashchange", callback);
+}
+
 function ResetPasswordPage() {
   const { t } = useLocale();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const token = searchParams.get("token") ?? "";
+  const hash = useSyncExternalStore(subscribeToHash, () => window.location.hash, () => "");
+  const token = new URLSearchParams(hash.slice(1)).get("token") ?? searchParams.get("token") ?? "";
 
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -42,7 +48,7 @@ function ResetPasswordPage() {
     try {
       await api.post("/auth/reset-password", { token, password });
       setSuccess(true);
-      setTimeout(() => router.push("/login"), 2500);
+      setTimeout(() => router.replace("/login"), 2500);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('resetPassword.error'));
     } finally {

@@ -63,8 +63,12 @@ export class IncidentsController {
   @Put(':id')
   @Permissions('INCIDENTS_UPDATE')
   @ApiOkResponse({ type: IncidentResponseDto })
-  update(@Param() params: IdParamDto, @Body() body: UpdateIncidentDto) {
-    return this.svc.update(params.id, body);
+  update(
+    @Param() params: IdParamDto,
+    @Body() body: UpdateIncidentDto,
+    @CurrentUser('userId') actorId: string,
+  ) {
+    return this.svc.update(params.id, body, actorId);
   }
 
   @Post(':id/comments')

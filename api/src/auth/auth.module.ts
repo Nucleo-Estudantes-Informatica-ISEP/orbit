@@ -5,20 +5,32 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { RolesGuard } from './roles.guard';
-import { UsersModule } from '../users/users.module';
 import { MailModule } from '../mail/mail.module';
 import { PrismaService } from '../prisma.service';
 import { Reflector } from '@nestjs/core';
+import { accessTokenOptions, authSecrets } from '../config/auth.config';
+import { AuthRequestGuard } from './auth-request.guard';
 
 @Module({
   imports: [
     PassportModule,
-    JwtModule.register({ secret: process.env.JWT_SECRET || 'secret' }),
-    UsersModule,
+    JwtModule.registerAsync({
+      useFactory: () => ({
+        secret: authSecrets().signing,
+        signOptions: accessTokenOptions,
+      }),
+    }),
     MailModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, PrismaService, RolesGuard, Reflector],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    PrismaService,
+    RolesGuard,
+    Reflector,
+    AuthRequestGuard,
+  ],
   exports: [AuthService],
 })
 export class AuthModule {}

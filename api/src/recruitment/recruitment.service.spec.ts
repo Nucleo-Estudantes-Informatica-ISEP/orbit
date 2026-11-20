@@ -1,5 +1,4 @@
 import type { PrismaService } from '../prisma.service';
-import type { MinioService } from '../files/minio.service';
 import { RecruitmentService } from './recruitment.service';
 
 it('exports individual and bulk candidate PDFs with standard fonts and links', async () => {
@@ -27,10 +26,7 @@ it('exports individual and bulk candidate PDFs with standard fonts and links', a
       findMany: jest.fn().mockResolvedValue([candidate, candidate]),
     },
   };
-  const service = new RecruitmentService(
-    prisma as unknown as PrismaService,
-    {} as MinioService,
-  );
+  const service = new RecruitmentService(prisma as unknown as PrismaService);
 
   for (const pdf of await Promise.all([
     service.exportOne('candidate-id'),

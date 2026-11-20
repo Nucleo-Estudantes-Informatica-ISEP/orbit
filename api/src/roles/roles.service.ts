@@ -1,7 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { CreateRoleDto } from './create-role.dto';
-import type { SystemPermission } from '@prisma/client';
+import {
+  assertDelegation,
+  securityMutation,
+} from '../auth/security-administration';
 
 const roleSelect = {
   id: true,
@@ -21,15 +28,25 @@ const roleSelect = {
 export class RolesService {
   constructor(private prisma: PrismaService) {}
 
-  create(dto: CreateRoleDto) {
-    return this.prisma.role.create({
-      data: {
-        name: dto.name,
-        description: dto.description,
-        permissions: (dto.permissions ?? []) as SystemPermission[],
+  create(dto: CreateRoleDto, actorId: string) {
+    return securityMutation(
+      this.prisma,
+      actorId,
+      'ROLES_CREATE',
+      async (tx, permissions) => {
+        assertDelegation(permissions, dto.permissions ?? []);
+        const role = await tx.role.create({ data: dto, select: roleSelect });
+        await tx.auditLog.create({
+          data: {
+            performedById: actorId,
+            action: 'CREATE',
+            entity: 'Role',
+            entityId: role.id,
+          },
+        });
+        return role;
       },
-      select: roleSelect,
-    });
+    );
   }
 
   findAll() {
@@ -48,22 +65,77 @@ export class RolesService {
     return role;
   }
 
-  update(id: string, dto: Partial<CreateRoleDto>) {
-    return this.prisma.role.update({
-      where: { id },
-      data: {
-        name: dto.name,
-        description: dto.description,
-        permissions: dto.permissions
-          ? (dto.permissions as SystemPermission[])
-          : undefined,
+  update(id: string, dto: Partial<CreateRoleDto>, actorId: string) {
+    return securityMutation(
+      this.prisma,
+      actorId,
+      'ROLES_UPDATE',
+      async (tx, permissions) => {
+        const current = await tx.role.findUnique({
+          where: { id },
+          select: roleSelect,
+        });
+        if (!current) throw new NotFoundException('Role not found');
+        assertDelegation(permissions, [
+          ...current.permissions,
+          ...(dto.permissions ?? []),
+        ]);
+        if (
+          current.userRoles.length &&
+          dto.permissions &&
+          (new Set(dto.permissions).size !==
+            new Set(current.permissions).size ||
+            dto.permissions.some(
+              (permission) => !current.permissions.includes(permission),
+            ))
+        ) {
+          assertDelegation(permissions, ['ROLES_ASSIGN']);
+        }
+        const role = await tx.role.update({
+          where: { id },
+          data: dto,
+          select: roleSelect,
+        });
+        await tx.auditLog.create({
+          data: {
+            performedById: actorId,
+            action: dto.permissions ? 'UPDATE_PERMISSIONS' : 'UPDATE',
+            entity: 'Role',
+            entityId: id,
+          },
+        });
+        return role;
       },
-      select: roleSelect,
-    });
+    );
   }
 
-  remove(id: string) {
-    return this.prisma.role.delete({ where: { id } });
+  remove(id: string, actorId: string) {
+    return securityMutation(
+      this.prisma,
+      actorId,
+      'ROLES_DELETE',
+      async (tx, permissions) => {
+        const current = await tx.role.findUnique({
+          where: { id },
+          select: roleSelect,
+        });
+        if (!current) throw new NotFoundException('Role not found');
+        assertDelegation(permissions, current.permissions);
+        const role = await tx.role.delete({
+          where: { id },
+          select: roleSelect,
+        });
+        await tx.auditLog.create({
+          data: {
+            performedById: actorId,
+            action: 'DELETE',
+            entity: 'Role',
+            entityId: id,
+          },
+        });
+        return role;
+      },
+    );
   }
 
   async getUserCount(id: string) {
@@ -76,38 +148,53 @@ export class RolesService {
     return { count: role.userRoles.length };
   }
 
-  async transferAndDelete(id: string, destinationRoleId: string) {
-    // Verify destination role exists
-    const destinationRole = await this.prisma.role.findUnique({
-      where: { id: destinationRoleId },
-    });
+  transferAndDelete(id: string, destinationRoleId: string, actorId: string) {
+    if (id === destinationRoleId)
+      throw new BadRequestException('Choose a different destination role');
 
-    if (!destinationRole)
-      throw new NotFoundException('Destination role not found');
+    return securityMutation(
+      this.prisma,
+      actorId,
+      'ROLES_DELETE',
+      async (tx, permissions) => {
+        const [source, destination] = await Promise.all([
+          tx.role.findUnique({ where: { id }, select: roleSelect }),
+          tx.role.findUnique({
+            where: { id: destinationRoleId },
+            select: roleSelect,
+          }),
+        ]);
+        if (!source || !destination)
+          throw new NotFoundException('Role not found');
+        assertDelegation(permissions, [
+          'ROLES_ASSIGN',
+          ...source.permissions,
+          ...destination.permissions,
+        ]);
 
-    // Get all user-role associations for the role being deleted
-    const userRoles = await this.prisma.userRole.findMany({
-      where: { roleId: id },
-    });
-
-    // Transfer users to destination role
-    if (userRoles.length > 0) {
-      // Delete existing associations with the source role
-      await this.prisma.userRole.deleteMany({
-        where: { roleId: id },
-      });
-
-      // Create new associations with the destination role
-      await this.prisma.userRole.createMany({
-        data: userRoles.map((ur) => ({
-          userId: ur.userId,
-          roleId: destinationRoleId,
-        })),
-        skipDuplicates: true, // In case user already has the destination role
-      });
-    }
-
-    // Delete the role
-    return this.prisma.role.delete({ where: { id } });
+        if (source.userRoles.length) {
+          await tx.userRole.createMany({
+            data: source.userRoles.map(({ userId }) => ({
+              userId,
+              roleId: destinationRoleId,
+            })),
+            skipDuplicates: true,
+          });
+        }
+        const role = await tx.role.delete({
+          where: { id },
+          select: roleSelect,
+        });
+        await tx.auditLog.create({
+          data: {
+            performedById: actorId,
+            action: 'TRANSFER_AND_DELETE',
+            entity: 'Role',
+            entityId: id,
+          },
+        });
+        return role;
+      },
+    );
   }
 }

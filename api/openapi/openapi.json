@@ -816,26 +816,6 @@
         ],
         "type": "object"
       },
-      "CreateAuditLogDto": {
-        "additionalProperties": false,
-        "properties": {
-          "action": {
-            "type": "string"
-          },
-          "entity": {
-            "type": "string"
-          },
-          "entityId": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "action",
-          "entity",
-          "entityId"
-        ],
-        "type": "object"
-      },
       "CreateBoardDto": {
         "additionalProperties": false,
         "properties": {
@@ -1427,7 +1407,9 @@
                 "INCIDENTS_READ",
                 "INCIDENTS_UPDATE",
                 "INCIDENTS_DELETE",
-                "CAN_BE_DELETED"
+                "CAN_BE_DELETED",
+                "USERS_MANAGE_CREDENTIALS",
+                "ROLES_ASSIGN"
               ],
               "type": "string"
             },
@@ -1505,10 +1487,6 @@
           "name": {
             "type": "string"
           },
-          "password": {
-            "minLength": 8,
-            "type": "string"
-          },
           "roles": {
             "items": {
               "type": "string"
@@ -1527,7 +1505,6 @@
         "required": [
           "name",
           "email",
-          "password",
           "departmentId"
         ],
         "type": "object"
@@ -3561,7 +3538,9 @@
                 "INCIDENTS_READ",
                 "INCIDENTS_UPDATE",
                 "INCIDENTS_DELETE",
-                "CAN_BE_DELETED"
+                "CAN_BE_DELETED",
+                "USERS_MANAGE_CREDENTIALS",
+                "ROLES_ASSIGN"
               ],
               "type": "string"
             },
@@ -6445,90 +6424,6 @@
         "tags": [
           "audit-logs"
         ]
-      },
-      "post": {
-        "operationId": "AuditLogs_create",
-        "parameters": [],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateAuditLogDto"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AuditLogResponseDto"
-                }
-              }
-            },
-            "description": ""
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
-                }
-              }
-            },
-            "description": ""
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
-                }
-              }
-            },
-            "description": ""
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
-                }
-              }
-            },
-            "description": ""
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
-                }
-              }
-            },
-            "description": ""
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
-                }
-              }
-            },
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "audit-logs"
-        ]
       }
     },
     "/auth/change-password": {
@@ -6621,6 +6516,26 @@
               }
             },
             "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
           }
         },
         "tags": [
@@ -6680,6 +6595,26 @@
               }
             },
             "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
           }
         },
         "tags": [
@@ -6709,6 +6644,26 @@
                 }
               }
             }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
           }
         },
         "security": [
@@ -6843,6 +6798,26 @@
               }
             },
             "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
           }
         },
         "security": [
@@ -6881,6 +6856,26 @@
             "description": ""
           },
           "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "429": {
             "content": {
               "application/json": {
                 "schema": {
@@ -9215,6 +9210,19 @@
         "parameters": [
           {
             "in": "query",
+            "name": "filter",
+            "required": false,
+            "schema": {
+              "enum": [
+                "ALL",
+                "UPCOMING",
+                "PAST"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
             "name": "page",
             "required": false,
             "schema": {
@@ -9230,19 +9238,6 @@
               "maximum": 1000,
               "minimum": 1,
               "type": "number"
-            }
-          },
-          {
-            "in": "query",
-            "name": "filter",
-            "required": false,
-            "schema": {
-              "enum": [
-                "ALL",
-                "UPCOMING",
-                "PAST"
-              ],
-              "type": "string"
             }
           }
         ],
@@ -10020,6 +10015,16 @@
             "description": ""
           },
           "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "413": {
             "content": {
               "application/json": {
                 "schema": {
@@ -12699,6 +12704,22 @@
         "parameters": [
           {
             "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
             "name": "page",
             "required": false,
             "schema": {
@@ -12714,22 +12735,6 @@
               "maximum": 1000,
               "minimum": 1,
               "type": "number"
-            }
-          },
-          {
-            "in": "query",
-            "name": "category",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "search",
-            "required": false,
-            "schema": {
-              "type": "string"
             }
           }
         ],

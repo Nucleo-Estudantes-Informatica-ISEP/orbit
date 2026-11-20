@@ -54,8 +54,12 @@ export class InventoryController {
   @Put(':id')
   @Permissions('INVENTORY_UPDATE')
   @ApiOkResponse({ type: InventoryItemResponseDto })
-  update(@Param() params: IdParamDto, @Body() dto: UpdateInventoryItemDto) {
-    return this.svc.update(params.id, dto);
+  update(
+    @Param() params: IdParamDto,
+    @Body() dto: UpdateInventoryItemDto,
+    @CurrentUser('userId') actorId: string,
+  ) {
+    return this.svc.update(params.id, dto, actorId);
   }
 
   @Delete(':id')

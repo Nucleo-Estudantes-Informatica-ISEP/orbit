@@ -133,6 +133,8 @@ enum SystemPermission {
   INCIDENTS_UPDATE
   INCIDENTS_DELETE
   CAN_BE_DELETED
+  USERS_MANAGE_CREDENTIALS
+  ROLES_ASSIGN
 }
 
 enum IncidentPriority {
@@ -212,8 +214,20 @@ model User {
   incidentCommentsCreated IncidentComment[]    @relation("IncidentCommentCreatedBy")
   passwordResetTokens     PasswordResetToken[]
   authSessions            AuthSession[]
+  uploadedFiles           UploadedFile[]
   createdAt               DateTime             @default(now())
   updatedAt               DateTime             @updatedAt
+}
+
+model UploadedFile {
+  key          String    @id
+  uploadedById String?
+  uploadedBy   User?     @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  /// Legacy attachment marker retained for rollback. Live references control access.
+  attached     Boolean   @default(false)
+  deletedAt    DateTime?
+
+  @@index([uploadedById])
 }
 
 enum AccessProvider {

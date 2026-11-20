@@ -43,16 +43,18 @@ interface EditUserDialogProps {
   onSave: (user: Partial<User> & { password?: string }) => Promise<void>;
   roles: RoleOption[];
   departments: DepartmentOption[];
+  canAssignRoles: boolean;
+  canManageCredentials: boolean;
 }
 
-export function EditUserDialog({ user, open, onOpenChange, onSave, roles, departments }: EditUserDialogProps) {
+export function EditUserDialog({ user, open, onOpenChange, onSave, roles, departments, canAssignRoles, canManageCredentials }: EditUserDialogProps) {
   const { t } = useLocale();
   const isAddMode = !user;
 
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    role: 'USER',
+    role: '',
     departmentId: '',
     password: '',
     confirmPassword: '',
@@ -69,7 +71,7 @@ export function EditUserDialog({ user, open, onOpenChange, onSave, roles, depart
       setFormData({
         name: user?.name || '',
         email: user?.email || '',
-        role: user?.roles?.[0] || 'USER',
+        role: user?.roles?.[0] ?? '',
         departmentId: user?.departmentId || '',
         password: '',
         confirmPassword: '',
@@ -97,11 +99,6 @@ export function EditUserDialog({ user, open, onOpenChange, onSave, roles, depart
       return;
     }
 
-    if (isAddMode && !formData.password) {
-      setError(t('people.passwordRequired'));
-      return;
-    }
-
     if (formData.password && formData.password.length < 8) {
       setError(t('people.passwordLength'));
       return;
@@ -117,11 +114,11 @@ export function EditUserDialog({ user, open, onOpenChange, onSave, roles, depart
       await onSave({
         id: user?.id,
         name: formData.name,
-        email: formData.email,
-        roles: [formData.role],
+        email: isAddMode || canManageCredentials ? formData.email : undefined,
+        roles: canAssignRoles && formData.role && formData.role !== user?.roles[0] ? [formData.role] : undefined,
         departmentId: formData.departmentId,
         active: formData.active,
-        password: formData.password || undefined,
+        password: !isAddMode && canManageCredentials ? formData.password || undefined : undefined,
       });
       // Fecho automático tratado fora ou através do onOpenChange local
     } catch (err) {
@@ -173,27 +170,23 @@ export function EditUserDialog({ user, open, onOpenChange, onSave, roles, depart
               value={formData.email}
               onChange={(e) => handleChange('email', e.target.value)}
               placeholder="user@example.com"
-              disabled={isLoading || (!isAddMode && false)} // Depende de deixares editar o email
+              disabled={isLoading || (!isAddMode && !canManageCredentials)}
               className="bg-background border-border/50 focus-visible:ring-primary/50"
             />
           </div>
 
           <div className="grid gap-2">
             <Label htmlFor="role" className="text-foreground">{t('people.role')}</Label>
-            <Select value={formData.role} onValueChange={(value) => handleChange('role', value)} disabled={isLoading}>
+            <Select value={formData.role} onValueChange={(value) => handleChange('role', value)} disabled={isLoading || !canAssignRoles}>
               <SelectTrigger id="role" className="bg-background border-border/50 focus-visible:ring-primary/50">
                 <SelectValue placeholder={t('people.selectRole')} />
               </SelectTrigger>
               <SelectContent>
-                {roles.length > 0 ? (
-                  roles.map((role) => (
-                    <SelectItem key={role.id} value={role.name}>
-                      {role.name}
-                    </SelectItem>
-                  ))
-                ) : (
-                  <SelectItem value="USER">USER</SelectItem>
-                )}
+                {roles.map((role) => (
+                  <SelectItem key={role.id} value={role.name}>
+                    {role.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -218,22 +211,24 @@ export function EditUserDialog({ user, open, onOpenChange, onSave, roles, depart
             </Select>
           </div>
 
+          {!isAddMode && canManageCredentials && (
           <div className="grid gap-2 mt-2">
             <Label htmlFor="password" className="text-foreground">
-              {isAddMode ? t('common.password') : t('people.newPasswordOptional')}
+              {t('people.newPasswordOptional')}
             </Label>
             <Input
               id="password"
               type="password"
               value={formData.password}
               onChange={(e) => handleChange('password', e.target.value)}
-              placeholder={isAddMode ? t('people.passwordSecurePlaceholder') : t('people.keepCurrentPassword')}
+              placeholder={t('people.keepCurrentPassword')}
               disabled={isLoading}
               className="bg-background border-border/50 focus-visible:ring-primary/50"
             />
           </div>
+          )}
 
-          {formData.password && (
+          {!isAddMode && canManageCredentials && formData.password && (
             <div className="grid gap-2">
               <Label htmlFor="confirmPassword" className="text-foreground">{t('common.confirmPassword')}</Label>
               <Input

@@ -2,46 +2,68 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import type { AuthenticatedUser } from './authenticated-request';
+import { PrismaService } from '../prisma.service';
+import { accessTokenOptions, authSecrets } from '../config/auth.config';
+import { isUUID } from 'class-validator';
 
 interface JwtPayload {
   sub: string;
-  email?: string;
-  roles?: unknown;
-  permissions?: unknown;
+  sid?: string;
+  exp?: number;
   token_use?: unknown;
-}
-
-function stringArray(value: unknown): string[] {
-  return Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === 'string')
-    : [];
 }
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor() {
+  constructor(private readonly prisma: PrismaService) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: process.env.JWT_SECRET || 'secret',
+      secretOrKey: authSecrets().signing,
+      algorithms: [accessTokenOptions.algorithm],
+      issuer: accessTokenOptions.issuer,
+      audience: accessTokenOptions.audience,
     });
   }
 
-  validate(payload: JwtPayload): AuthenticatedUser {
-    // Refresh tokens must never be accepted as bearer access tokens.
+  async validate(payload: JwtPayload): Promise<AuthenticatedUser> {
     if (
       payload.token_use !== 'access' ||
-      typeof payload.sub !== 'string' ||
-      !payload.sub ||
-      typeof payload.email !== 'string'
+      !isUUID(payload.sub) ||
+      !isUUID(payload.sid) ||
+      !Number.isFinite(payload.exp)
     ) {
       throw new UnauthorizedException('Invalid access token');
     }
+    const user = await this.prisma.user.findFirst({
+      where: {
+        id: payload.sub,
+        status: 'ACTIVE',
+        authSessions: {
+          some: {
+            familyId: payload.sid,
+            revokedAt: null,
+            expiresAt: { gt: new Date() },
+          },
+        },
+      },
+      select: {
+        id: true,
+        email: true,
+        userRoles: {
+          select: { role: { select: { name: true, permissions: true } } },
+        },
+      },
+    });
+    if (!user) throw new UnauthorizedException('Session is no longer active');
+
     return {
-      userId: payload.sub,
-      email: payload.email,
-      roles: stringArray(payload.roles),
-      permissions: stringArray(payload.permissions),
+      userId: user.id,
+      email: user.email,
+      roles: user.userRoles.map(({ role }) => role.name),
+      permissions: [
+        ...new Set(user.userRoles.flatMap(({ role }) => role.permissions)),
+      ],
     };
   }
 }
