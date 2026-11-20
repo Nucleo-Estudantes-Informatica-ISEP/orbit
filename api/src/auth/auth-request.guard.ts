@@ -12,12 +12,12 @@ import { browserOrigins } from '../config/auth.config';
 const minute = 60_000;
 const maxBuckets = 10_000;
 
+type Buckets = Map<string, { count: number; expires: number }>;
+
 @Injectable()
 export class AuthRequestGuard implements CanActivate {
-  private readonly buckets = new Map<
-    string,
-    { count: number; expires: number }
-  >();
+  private readonly ipBuckets: Buckets = new Map();
+  private readonly accountBuckets: Buckets = new Map();
   private nextSweep = 0;
 
   canActivate(context: ExecutionContext) {
@@ -33,12 +33,16 @@ export class AuthRequestGuard implements CanActivate {
 
     const action = context.getHandler().name;
     const now = Date.now();
-    this.consume(
-      `${action}:ip:${request.ip ?? request.socket.remoteAddress}`,
-      120,
-      minute,
-      now,
-    );
+    if (now >= this.nextSweep) {
+      for (const buckets of [this.ipBuckets, this.accountBuckets]) {
+        for (const [key, bucket] of buckets) {
+          if (bucket.expires <= now) buckets.delete(key);
+        }
+      }
+      this.nextSweep = now + minute;
+    }
+    const ip = request.ip ?? request.socket.remoteAddress;
+    this.consume(this.ipBuckets, `${action}:${ip}`, 120, minute, now);
     const body: unknown = request.body;
     if (
       (action === 'login' || action === 'forgotPassword') &&
@@ -50,7 +54,12 @@ export class AuthRequestGuard implements CanActivate {
     ) {
       const recovery = action === 'forgotPassword';
       this.consume(
-        `${action}:email:${body.email.trim().toLowerCase()}`,
+        this.accountBuckets,
+        JSON.stringify([
+          action,
+          recovery ? null : ip,
+          body.email.trim().toLowerCase(),
+        ]),
         recovery ? 5 : 12,
         15 * minute,
         now,
@@ -59,18 +68,25 @@ export class AuthRequestGuard implements CanActivate {
     return true;
   }
 
-  private consume(key: string, limit: number, window: number, now: number) {
-    if (now >= this.nextSweep) {
-      for (const [bucketKey, bucket] of this.buckets) {
-        if (bucket.expires <= now) this.buckets.delete(bucketKey);
+  private consume(
+    buckets: Buckets,
+    key: string,
+    limit: number,
+    window: number,
+    now: number,
+  ) {
+    const bucket = buckets.get(key);
+    if (!bucket || bucket.expires <= now) {
+      buckets.delete(key);
+      if (buckets.size >= maxBuckets) {
+        const oldest = buckets.keys().next();
+        if (!oldest.done) buckets.delete(oldest.value);
       }
-      this.nextSweep = now + minute;
+      buckets.set(key, { count: 1, expires: now + window });
+      return;
     }
-    const bucket = this.buckets.get(key);
-    if (bucket && bucket.expires > now) {
-      if (bucket.count++ < limit) return;
-    } else if (bucket || this.buckets.size < maxBuckets) {
-      this.buckets.set(key, { count: 1, expires: now + window });
+    if (bucket.count < limit) {
+      bucket.count++;
       return;
     }
     throw new HttpException(

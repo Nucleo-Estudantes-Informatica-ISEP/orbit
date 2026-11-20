@@ -223,6 +223,7 @@ model UploadedFile {
   key          String    @id
   uploadedById String?
   uploadedBy   User?     @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  /// Legacy attachment marker retained for rollback. Live references control access.
   attached     Boolean   @default(false)
   deletedAt    DateTime?
 

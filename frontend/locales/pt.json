@@ -15,7 +15,7 @@
   "nav.files": "Ficheiros",
   "nav.settings": "Definições",
   "nav.logout": "Terminar sessão",
-  "nav.logoutFailed": "Não foi possível terminar a sessão. Tenta novamente.",
+  "nav.logoutFailed": "Sessão terminada neste dispositivo. O servidor não confirmou a revogação da sessão.",
   "nav.general": "Geral",
   "nav.content": "Conteúdo",
   "nav.operations": "Operações",

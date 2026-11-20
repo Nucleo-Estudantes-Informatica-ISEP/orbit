@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
@@ -49,6 +50,8 @@ const userSelect = {
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     private prisma: PrismaService,
     private mailService: MailService,
@@ -108,7 +111,9 @@ export class UsersService {
       },
     );
     if (user.status === 'ACTIVE') {
-      void this.authService.requestPasswordReset(user.email).catch(() => {});
+      void this.authService.requestPasswordReset(user.email).catch(() => {
+        this.logger.error('Password setup or recovery request failed');
+      });
     }
     return user;
   }

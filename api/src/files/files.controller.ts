@@ -48,6 +48,9 @@ import {
   validFileKey,
 } from './file-access';
 import { pipeline } from 'node:stream/promises';
+import type { Prisma } from '@prisma/client';
+
+type FileInventory = Awaited<ReturnType<MinioService['listObjects']>>;
 
 const maxFileSize = 10 * 1024 * 1024;
 const INLINE_TYPES = new Set([
@@ -87,6 +90,13 @@ function mimeFromExt(ext: string): string {
 @ApiProtectedController()
 @Controller('files')
 export class FilesController {
+  private visibleInventory?: {
+    inventory: FileInventory;
+    snapshot: string;
+    actorKey: string;
+    files: FileInventory;
+  };
+
   constructor(
     private readonly minioService: MinioService,
     private readonly prisma: PrismaService,
@@ -102,16 +112,48 @@ export class FilesController {
   ) {
     const page = query.page ?? 1;
     const pageSize = Math.min(100, query.pageSize ?? 20);
-    const all = (await this.minioService.listObjects()).filter(
-      (f) => f.name && f.lastModified,
-    ) as { name: string; size: number; lastModified: Date }[];
+    const inventory = await this.minioService.listObjects();
+    const actorKey = JSON.stringify([
+      actor.userId,
+      [...actor.permissions].sort(),
+    ]);
+    const visible = await this.prisma.$transaction(
+      async (tx) => {
+        // A cached view is valid only when PostgreSQL sees the same committed
+        // state. Repeatable read gives every permission query that snapshot.
+        const [{ snapshot }] = await tx.$queryRaw<
+          { snapshot: string }[]
+        >`SELECT pg_current_snapshot()::text AS snapshot`;
+        const cached = this.visibleInventory;
+        if (
+          cached?.inventory === inventory &&
+          cached.snapshot === snapshot &&
+          cached.actorKey === actorKey
+        ) {
+          return cached.files;
+        }
+        const files = await this.filterInventory(tx, inventory, actor);
+        this.visibleInventory = { inventory, snapshot, actorKey, files };
+        return files;
+      },
+      { isolationLevel: 'RepeatableRead' },
+    );
+    const items = visible.slice((page - 1) * pageSize, page * pageSize);
+    return { items, total: visible.length, page, pageSize };
+  }
+
+  private async filterInventory(
+    tx: Prisma.TransactionClient,
+    all: FileInventory,
+    actor: AuthenticatedUser,
+  ) {
     const visible: typeof all = [];
     for (let start = 0; start < all.length; start += 50) {
       const batch = all.slice(start, start + 50);
       const keys = batch.map((object) => object.name);
       const [files, permissions] = await Promise.all([
-        this.prisma.uploadedFile.findMany({ where: { key: { in: keys } } }),
-        attachmentPermissions(this.prisma, keys),
+        tx.uploadedFile.findMany({ where: { key: { in: keys } } }),
+        attachmentPermissions(tx, keys),
       ]);
       const byKey = new Map(files.map((file) => [file.key, file]));
       visible.push(
@@ -120,12 +162,9 @@ export class FilesController {
         ),
       );
     }
-    const sorted = visible.sort(
+    return visible.sort(
       (a, b) => b.lastModified.getTime() - a.lastModified.getTime(),
     );
-    const total = sorted.length;
-    const items = sorted.slice((page - 1) * pageSize, page * pageSize);
-    return { items, total, page, pageSize };
   }
 
   @Post('upload')

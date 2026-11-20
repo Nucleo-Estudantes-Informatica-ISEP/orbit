@@ -84,24 +84,27 @@ export async function requireOwnedAttachments(
     await lockFile(tx, key);
   }
   const rows = await tx.uploadedFile.findMany({ where: { key: { in: keys } } });
+  const newKeys = keys.filter((key) => !previous.has(key));
+  for (let start = 0; start < newKeys.length; start += 50) {
+    const references = await attachmentPermissions(
+      tx,
+      newKeys.slice(start, start + 50),
+    );
+    if (references.size) {
+      throw new ForbiddenException(
+        'Only your own uploads that are no longer attached can be attached',
+      );
+    }
+  }
   const owned = new Map(rows.map((row) => [row.key, row]));
-  const newlyAttached: string[] = [];
   for (const key of keys) {
     const file = owned.get(key);
     if (
       file?.deletedAt ||
-      (!previous.has(key) &&
-        (!file || file.uploadedById !== actorId || file.attached))
+      (!previous.has(key) && (!file || file.uploadedById !== actorId))
     ) {
       throw new ForbiddenException('Only your own uploads can be attached');
     }
-    if (!previous.has(key)) newlyAttached.push(key);
-  }
-  if (newlyAttached.length) {
-    await tx.uploadedFile.updateMany({
-      where: { key: { in: newlyAttached } },
-      data: { attached: true },
-    });
   }
 }
 
@@ -177,9 +180,7 @@ export async function attachmentPermissions(
 
 export function canReadFile(
   actor: AuthenticatedUser,
-  file:
-    | { uploadedById: string | null; attached: boolean; deletedAt: Date | null }
-    | undefined,
+  file: { uploadedById: string | null; deletedAt: Date | null } | undefined,
   required: Set<SystemPermission> | undefined,
 ) {
   if (file?.deletedAt) return false;
@@ -188,6 +189,6 @@ export function canReadFile(
       actor.permissions.includes(permission),
     );
   return file
-    ? !file.attached && file.uploadedById === actor.userId
+    ? file.uploadedById === actor.userId
     : actor.permissions.includes('FILES_VIEW');
 }

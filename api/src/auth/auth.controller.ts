@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Logger,
   Get,
   HttpCode,
   Post,
@@ -85,6 +86,8 @@ function setRefreshCookie(response: Response, token: string) {
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(private authService: AuthService) {}
 
   @Post('login')
@@ -154,7 +157,9 @@ export class AuthController {
   @ApiOkResponse({ type: MessageResponseDto })
   @ApiBadRequestResponse({ type: ErrorResponseDto })
   forgotPassword(@Body() dto: ForgotPasswordDto) {
-    void this.authService.requestPasswordReset(dto.email).catch(() => {});
+    void this.authService.requestPasswordReset(dto.email).catch(() => {
+      this.logger.error('Password setup or recovery request failed');
+    });
     return passwordRecoveryResponse;
   }
 

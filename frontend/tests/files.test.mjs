@@ -147,12 +147,12 @@ test('authenticated files', async (t) => {
     }
   });
 
-  await t.test('logout failure preserves the session until revocation can be retried', async (t) => {
+  await t.test('logout failure still clears the local session', async (t) => {
     reset();
     const fetch = t.mock.method(globalThis, 'fetch', async () => new Response(null, { status: 503 }));
     await assert.rejects(revokeStoredSession(), (error) => error.status === 503);
-    assert.equal(getBrowserSession().access_token, 'expired');
-    assert.equal(storage.size, 1);
+    assert.equal(getBrowserSession(), null);
+    assert.equal(storage.size, 0);
     fetch.mock.mockImplementation(async () => new Response(null, { status: 200 }));
     await revokeStoredSession();
     assert.equal(getBrowserSession(), null);

@@ -144,6 +144,7 @@ jobs:
 
       - name: Validate Coolify compose model and pre-pull
         env:
+          AUTH_TRUST_PROXY_HOPS: "1"
           SERVICE_USER_POSTGRES: postgres
           SERVICE_PASSWORD_POSTGRES: postgres
           SERVICE_BASE64_64_JWT: ci-only-jwt-secret

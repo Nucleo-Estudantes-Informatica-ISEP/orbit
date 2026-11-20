@@ -12,11 +12,15 @@ import {
 } from '@aws-sdk/client-s3';
 import { Readable } from 'node:stream';
 
+const inventoryTtl = 15_000;
+type ObjectSummary = { name: string; size: number; lastModified: Date };
+
 @Injectable()
 export class MinioService implements OnModuleInit {
   private readonly logger = new Logger(MinioService.name);
   private readonly client: S3Client;
   private readonly bucket: string;
+  private inventory?: { objects: Promise<ObjectSummary[]>; expires: number };
 
   constructor() {
     const { MINIO_BUCKET, MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY } =
@@ -86,6 +90,7 @@ export class MinioService implements OnModuleInit {
         ContentLength: size,
       }),
     );
+    this.inventory = undefined;
   }
 
   async getObject(objectKey: string) {
@@ -101,6 +106,7 @@ export class MinioService implements OnModuleInit {
     await this.client.send(
       new DeleteObjectCommand({ Bucket: this.bucket, Key: objectKey }),
     );
+    this.inventory = undefined;
   }
 
   async getObjectStat(objectKey: string) {
@@ -110,8 +116,30 @@ export class MinioService implements OnModuleInit {
     return { size: object.ContentLength, contentType: object.ContentType };
   }
 
-  async listObjects() {
-    const objects: { name: string; size: number; lastModified: Date }[] = [];
+  listObjects() {
+    if (this.inventory && Date.now() < this.inventory.expires) {
+      return this.inventory.objects;
+    }
+
+    const inventory = {
+      objects: this.loadInventory().catch((error: unknown) => {
+        if (this.inventory === inventory) this.inventory = undefined;
+        throw error;
+      }),
+      expires: Number.POSITIVE_INFINITY,
+    };
+    this.inventory = inventory;
+    void inventory.objects.then(
+      () => {
+        inventory.expires = Date.now() + inventoryTtl;
+      },
+      () => {},
+    );
+    return inventory.objects;
+  }
+
+  private async loadInventory() {
+    const objects: ObjectSummary[] = [];
     for await (const page of paginateListObjectsV2(
       { client: this.client },
       { Bucket: this.bucket },

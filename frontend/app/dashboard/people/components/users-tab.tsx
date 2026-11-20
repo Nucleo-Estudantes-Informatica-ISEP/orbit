@@ -126,13 +126,12 @@ export default function UsersTab() {
     const payload = {
       name: updatedData.name,
       email: updatedData.email,
-      password: updatedData.password,
       departmentId: updatedData.departmentId,
       roles: updatedData.roles,
       status: updatedData.active === false ? 'INACTIVE' : 'ACTIVE',
     };
     if (isEditing) {
-      await api.put(`/users/${selectedUser.id}`, payload);
+      await api.put(`/users/${selectedUser.id}`, { ...payload, password: updatedData.password });
     } else {
       await api.post('/users', payload);
     }

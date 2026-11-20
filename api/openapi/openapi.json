@@ -1487,10 +1487,6 @@
           "name": {
             "type": "string"
           },
-          "password": {
-            "minLength": 8,
-            "type": "string"
-          },
           "roles": {
             "items": {
               "type": "string"

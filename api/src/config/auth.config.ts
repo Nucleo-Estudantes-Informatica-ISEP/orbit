@@ -31,7 +31,9 @@ export function authSecrets(env = process.env) {
 
 export function browserOrigins() {
   return (
-    process.env.CORS_ORIGIN?.split(',').map((origin) => origin.trim()) ??
+    process.env.CORS_ORIGIN?.split(',').map((origin) =>
+      origin.trim().replace(/\/+$/, ''),
+    ) ??
     (process.env.NODE_ENV === 'production'
       ? []
       : [

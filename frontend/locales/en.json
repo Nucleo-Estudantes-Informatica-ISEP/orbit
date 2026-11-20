@@ -15,7 +15,7 @@
   "nav.files": "Files",
   "nav.settings": "Settings",
   "nav.logout": "Logout",
-  "nav.logoutFailed": "Could not sign out. Please try again.",
+  "nav.logoutFailed": "Signed out on this device. The server could not confirm session revocation.",
   "nav.general": "General",
   "nav.content": "Content",
   "nav.operations": "Operations",

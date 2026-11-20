@@ -12,6 +12,10 @@ import { createValidationPipe } from '../src/validation';
 describe('File downloads (e2e)', () => {
   let app: INestApplication<App>;
   const minio = {
+    listObjects: jest.fn().mockResolvedValue([
+      { name: 'first.pdf', size: 4, lastModified: new Date(2) },
+      { name: 'second.pdf', size: 4, lastModified: new Date(1) },
+    ]),
     getObjectStat: jest.fn((key: string) =>
       Promise.resolve({
         size: 4,
@@ -28,7 +32,11 @@ describe('File downloads (e2e)', () => {
     deleteObject: jest.fn().mockResolvedValue(undefined),
   };
   const queries = {
-    uploadedFile: { findUnique: jest.fn().mockResolvedValue(null) },
+    uploadedFile: {
+      findUnique: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+    $queryRaw: jest.fn().mockResolvedValue([{ snapshot: 'initial' }]),
     debt: { findMany: jest.fn().mockResolvedValue([]) },
     incident: { findMany: jest.fn().mockResolvedValue([]) },
     inventoryItem: { findMany: jest.fn().mockResolvedValue([]) },
@@ -128,6 +136,42 @@ describe('File downloads (e2e)', () => {
       .delete('/files/attached.pdf')
       .expect(409);
     expect(minio.deleteObject).not.toHaveBeenCalled();
+  });
+
+  it('reuses visibility across pages and recomputes it after a database write', async () => {
+    prisma.uploadedFile.findMany.mockClear();
+    await request(app.getHttpServer())
+      .get('/files?pageSize=1')
+      .expect(200)
+      .expect(({ body }) =>
+        expect(body).toMatchObject({
+          total: 2,
+          items: [{ name: 'first.pdf' }],
+        }),
+      );
+    await request(app.getHttpServer())
+      .get('/files?page=2&pageSize=1')
+      .expect(200)
+      .expect(({ body }) =>
+        expect(body).toMatchObject({
+          total: 2,
+          items: [{ name: 'second.pdf' }],
+        }),
+      );
+    expect(prisma.uploadedFile.findMany).toHaveBeenCalledTimes(1);
+
+    prisma.$queryRaw.mockResolvedValueOnce([{ snapshot: 'after-write' }]);
+    prisma.debt.findMany.mockResolvedValueOnce([{ fileKeys: ['first.pdf'] }]);
+    await request(app.getHttpServer())
+      .get('/files?pageSize=1')
+      .expect(200)
+      .expect(({ body }) =>
+        expect(body).toMatchObject({
+          total: 1,
+          items: [{ name: 'second.pdf' }],
+        }),
+      );
+    expect(prisma.uploadedFile.findMany).toHaveBeenCalledTimes(2);
   });
 
   it('rejects over-limit files at the multipart boundary', async () => {

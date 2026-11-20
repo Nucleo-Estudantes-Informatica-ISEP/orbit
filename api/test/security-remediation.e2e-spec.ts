@@ -168,5 +168,10 @@ describe('resource-level security policies (e2e)', () => {
     } finally {
       await prisma.resource.delete({ where: { id } });
     }
+    await expect(
+      prisma.$transaction((tx) =>
+        requireOwnedAttachments(tx, editorId, [attachment]),
+      ),
+    ).resolves.toBeUndefined();
   });
 });

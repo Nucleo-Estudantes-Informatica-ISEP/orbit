@@ -145,9 +145,10 @@ export function DashboardSidebar({
   const handleLogout = async () => {
     try {
       await logout();
-      router.push('/login');
     } catch {
       toast.error(t('nav.logoutFailed'));
+    } finally {
+      router.push('/login');
     }
   };
 
