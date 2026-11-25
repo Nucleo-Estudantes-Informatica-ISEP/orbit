@@ -22,6 +22,16 @@
           "intakeConfigured": {
             "type": "boolean"
           },
+          "intakeSources": {
+            "items": {
+              "enum": [
+                "FORMS",
+                "SHEETS"
+              ],
+              "type": "string"
+            },
+            "type": "array"
+          },
           "permissions": {
             "items": {
               "type": "string"
@@ -49,6 +59,7 @@
           "departments",
           "permissions",
           "intakeConfigured",
+          "intakeSources",
           "executorEnabled",
           "dryRun"
         ],
@@ -1120,9 +1131,16 @@
         "additionalProperties": false,
         "properties": {
           "intakeKey": {
-            "description": "Hash of an existing Forms response in the configured Sheets range",
+            "description": "Hash of a response from the selected Forms or manual Sheets origin",
             "maxLength": 64,
             "minLength": 64,
+            "type": "string"
+          },
+          "intakeSource": {
+            "enum": [
+              "FORMS",
+              "SHEETS"
+            ],
             "type": "string"
           },
           "kind": {
@@ -1947,9 +1965,21 @@
               "type": "string"
             },
             "type": "array"
+          },
+          "source": {
+            "enum": [
+              "FORMS",
+              "SHEETS"
+            ],
+            "type": "string"
+          },
+          "submittedAt": {
+            "format": "date-time",
+            "type": "string"
           }
         },
         "required": [
+          "source",
           "key",
           "name",
           "email",
@@ -2650,6 +2680,12 @@
             "maxLength": 254,
             "type": "string"
           },
+          "accountUsername": {
+            "description": "Discord/GitHub username. Preferred for new clients; distinguishes numeric usernames from legacy providerUserId IDs.",
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
           "action": {
             "enum": [
               "GRANT",
@@ -2664,7 +2700,8 @@
             "type": "string"
           },
           "providerUserId": {
-            "maxLength": 200,
+            "description": "Discord/GitHub username or Google account email. Legacy numeric account/permission IDs remain accepted. Orbit resolves and verifies remote identities.",
+            "maxLength": 254,
             "minLength": 1,
             "type": "string"
           },
@@ -2673,6 +2710,7 @@
             "type": "string"
           },
           "verificationNote": {
+            "description": "Optional operator context. Automatic identity verification is performed by Orbit, not asserted by this text.",
             "maxLength": 1000,
             "minLength": 5,
             "type": "string"
@@ -3897,6 +3935,19 @@
         "operationId": "Lifecycle_intake",
         "parameters": [
           {
+            "description": "Intake origin; defaults to Forms when configured, otherwise Sheets.",
+            "in": "query",
+            "name": "intakeSource",
+            "required": false,
+            "schema": {
+              "enum": [
+                "FORMS",
+                "SHEETS"
+              ],
+              "type": "string"
+            }
+          },
+          {
             "in": "query",
             "name": "query",
             "required": false,
@@ -3940,11 +3991,13 @@
             }
           },
           {
+            "description": "Search external accounts by declared username/email or a legacy numeric ID.",
             "in": "query",
             "name": "providerUserId",
             "required": false,
             "schema": {
-              "maxLength": 200,
+              "maxLength": 254,
+              "minLength": 3,
               "type": "string"
             }
           },
@@ -4018,6 +4071,16 @@
             "description": ""
           },
           "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "503": {
             "content": {
               "application/json": {
                 "schema": {
@@ -4311,6 +4374,19 @@
         "operationId": "Lifecycle_list",
         "parameters": [
           {
+            "description": "Intake origin; defaults to Forms when configured, otherwise Sheets.",
+            "in": "query",
+            "name": "intakeSource",
+            "required": false,
+            "schema": {
+              "enum": [
+                "FORMS",
+                "SHEETS"
+              ],
+              "type": "string"
+            }
+          },
+          {
             "in": "query",
             "name": "query",
             "required": false,
@@ -4354,11 +4430,13 @@
             }
           },
           {
+            "description": "Search external accounts by declared username/email or a legacy numeric ID.",
             "in": "query",
             "name": "providerUserId",
             "required": false,
             "schema": {
-              "maxLength": 200,
+              "maxLength": 254,
+              "minLength": 3,
               "type": "string"
             }
           },
@@ -4516,6 +4594,16 @@
             "description": ""
           },
           "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "503": {
             "content": {
               "application/json": {
                 "schema": {
@@ -5357,6 +5445,16 @@
               }
             },
             "description": ""
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
           }
         },
         "security": [
@@ -5445,6 +5543,16 @@
             "description": ""
           },
           "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "503": {
             "content": {
               "application/json": {
                 "schema": {

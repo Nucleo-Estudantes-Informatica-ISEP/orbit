@@ -18,12 +18,15 @@ import { useLocale } from "@/lib/locale-context";
 import {
   cleanOperation,
   intakeAccount,
+  availableIntakeSources,
+  intakePositions,
   positions,
 } from "@/lib/access-lifecycle";
 import type {
   AccessConfiguration,
   AccessResource,
   IntakeResponse,
+  IntakeSource,
   LifecycleProcess,
   SelectedOperation,
 } from "@/lib/access-lifecycle";
@@ -49,6 +52,7 @@ type RequestPayload = {
   targetPositions: string[];
   reason: string;
   intakeKey?: string;
+  intakeSource?: IntakeSource;
   sourceNote?: string;
   selectedOperations: SelectedOperation[];
 };
@@ -80,7 +84,7 @@ export function AccessRequestForm({
   previous?: LifecycleProcess;
   onCreate: (payload: RequestPayload) => Promise<void>;
 }) {
-  const { t } = useLocale();
+  const { t, formatDate } = useLocale();
   const [step, setStep] = useState(0);
   const stepHeading = useRef<HTMLHeadingElement>(null);
   const stepBody = useRef<HTMLDivElement>(null);
@@ -88,8 +92,9 @@ export function AccessRequestForm({
     stepBody.current?.scrollTo({ top: 0 });
     stepHeading.current?.focus({ preventScroll: true });
   }, [step]);
-  const [source, setSource] = useState<"forms" | "manual">(
-    !previous && config.intakeConfigured ? "forms" : "manual",
+  const origins = availableIntakeSources(config);
+  const [source, setSource] = useState<IntakeSource | "manual">(
+    !previous ? origins[0] || "manual" : "manual",
   );
   const [intake, setIntake] = useState<IntakeResponse>();
   const [query, setQuery] = useState("");
@@ -122,12 +127,7 @@ export function AccessRequestForm({
     values.includes(value)
       ? values.filter((item) => item !== value)
       : [...values, value];
-  const resources = config.resources.filter(
-    (resource) =>
-      resource.enabled &&
-      (!resource.departmentIds.length ||
-        resource.departmentIds.some((id) => departments.includes(id))),
-  );
+  const resources = config.resources.filter((resource) => resource.enabled);
   const suggested = resources.filter((resource) =>
     recommendedIds.includes(resource.id),
   );
@@ -145,9 +145,7 @@ export function AccessRequestForm({
     setName(response.name);
     setEmail(response.email);
     setDepartments(response.departmentIds);
-    setTargetPositions(
-      response.positions.filter((position) => positions.includes(position)),
-    );
+    setTargetPositions(intakePositions(kind, response));
     setOperations([]);
     setResponses([]);
     setSearchState("idle");
@@ -155,14 +153,14 @@ export function AccessRequestForm({
   }
 
   async function search() {
-    if (query.trim().length < 3) return;
+    if (source === "manual" || query.trim().length < 3) return;
     const version = ++searchVersion.current;
     setSearchState("loading");
     setError("");
     setResponses([]);
     try {
       const rows = await api.get<IntakeResponse[]>(
-        `${root}/intake?query=${encodeURIComponent(query.trim())}`,
+        `${root}/intake?query=${encodeURIComponent(query.trim())}&intakeSource=${source}`,
       );
       if (version !== searchVersion.current) return;
       setResponses(rows);
@@ -185,7 +183,7 @@ export function AccessRequestForm({
       {
         resourceId: resource.id,
         action,
-        ...intakeAccount(resource, source === "forms" ? intake : undefined),
+        ...intakeAccount(resource, source !== "manual" ? intake : undefined),
       },
       resource.provider,
       action,
@@ -196,7 +194,7 @@ export function AccessRequestForm({
     event.preventDefault();
     setError("");
     if (step === 0) {
-      if (source === "forms" && !intake) return;
+      if (source !== "manual" && !intake) return;
       setStep(1);
       return;
     }
@@ -258,8 +256,8 @@ export function AccessRequestForm({
           targetDepartmentIds: departments,
           targetPositions: effectivePositions,
           reason,
-          ...(source === "forms" && intake
-            ? { intakeKey: intake.key }
+          ...(source !== "manual" && intake
+            ? { intakeKey: intake.key, intakeSource: source }
             : { sourceNote }),
           selectedOperations: operations.map(cleanOperation),
         });
@@ -281,19 +279,19 @@ export function AccessRequestForm({
     const op = operations.find((item) => item.resourceId === resource.id);
     const exception =
       resource.sensitive || !recommendedIds.includes(resource.id);
-    const isEmail = teamProviders.includes(resource.provider);
-    const googleGrant =
-      resource.provider === "GOOGLE_DRIVE" && op?.action === "GRANT";
-    const identityLabel = isEmail
-      ? "email"
-      : resource.provider === "WHATSAPP"
-        ? "phone"
-        : resource.provider === "GOOGLE_DRIVE"
-          ? "googlePermission"
-          : resource.provider === "GITHUB"
-            ? "githubId"
-            : "discordId";
-    const numericId = /^(DISCORD|GITHUB|GOOGLE_DRIVE)$/.test(resource.provider);
+    const isEmail =
+      teamProviders.includes(resource.provider) ||
+      resource.provider === "GOOGLE_DRIVE";
+    const identityLabel =
+      resource.provider === "GOOGLE_DRIVE"
+        ? "googleEmail"
+        : isEmail
+          ? "email"
+          : resource.provider === "WHATSAPP"
+            ? "phone"
+            : resource.provider === "GITHUB"
+              ? "githubId"
+              : "discordId";
     const instructions =
       resource.instructions ===
       "Configurar identificadores e instruções; confirmar execução na plataforma."
@@ -369,147 +367,69 @@ export function AccessRequestForm({
                     : ["GRANT", "REVOKE", "VERIFY"]
                 ).map((action) => (
                   <option key={action} value={action}>
-                    {t(`access.actions.${action}`)}
+                    {t(
+                      kind === "ALUMNI_TRANSITION" && action === "GRANT"
+                        ? "access.keepAccess"
+                        : `access.actions.${action}`,
+                    )}
                   </option>
                 ))}
               </select>
             </label>
-            {googleGrant ? (
-              <>
-                <label className="grid gap-1.5 text-sm">
-                  {t("access.identity.googleEmail")}
-                  <Input
-                    type="email"
-                    maxLength={200}
-                    value={op.accountEmail || ""}
-                    onChange={(event) =>
-                      updateOperation(
-                        changeAccountEmail(
+            <label className="grid gap-1.5 text-sm">
+              {t(`access.identity.${identityLabel}`)}
+              <Input
+                type={
+                  isEmail
+                    ? "email"
+                    : resource.provider === "WHATSAPP"
+                      ? "tel"
+                      : "text"
+                }
+                required={op.action === "REVOKE"}
+                maxLength={isEmail ? 254 : 200}
+                autoComplete="off"
+                value={
+                  isEmail
+                    ? op.accountEmail ||
+                      (op.providerUserId?.includes("@")
+                        ? op.providerUserId
+                        : "") ||
+                      ""
+                    : op.accountUsername || op.providerUserId || ""
+                }
+                onChange={(event) =>
+                  updateOperation(
+                    isEmail
+                      ? changeAccountEmail(
                           op,
                           resource.provider,
                           event.target.value,
-                        ),
-                      )
-                    }
-                  />
-                </label>
-                <details
-                  className="text-sm"
-                  open={/^\d+$/.test(op.providerUserId || "") || undefined}
-                >
-                  <summary className="cursor-pointer text-muted-foreground">
-                    {t("access.existingGooglePermission")}
-                  </summary>
-                  <label className="mt-3 grid gap-1.5">
-                    {t("access.identity.googlePermission")}
-                    <Input
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      value={
-                        /^\d+$/.test(op.providerUserId || "")
-                          ? op.providerUserId
-                          : ""
-                      }
-                      onChange={(event) =>
-                        updateOperation(
-                          changeRemoteIdentity(
-                            op,
-                            event.target.value || op.accountEmail || "",
-                          ),
                         )
-                      }
-                    />
-                  </label>
-                </details>
-              </>
-            ) : (
-              <>
-                <label className="grid gap-1.5 text-sm">
-                  {t(`access.identity.${identityLabel}`)}
-                  <Input
-                    type={
-                      isEmail
-                        ? "email"
-                        : resource.provider === "WHATSAPP"
-                          ? "tel"
-                          : "text"
-                    }
-                    inputMode={numericId ? "numeric" : undefined}
-                    pattern={numericId ? "[0-9]+" : undefined}
-                    required={op.action === "REVOKE"}
-                    maxLength={200}
-                    value={
-                      isEmail
-                        ? op.accountEmail || op.providerUserId || ""
-                        : op.providerUserId || ""
-                    }
-                    onChange={(event) =>
-                      updateOperation(
-                        isEmail
-                          ? changeAccountEmail(
-                              op,
-                              resource.provider,
-                              event.target.value,
-                            )
-                          : changeRemoteIdentity(op, event.target.value),
-                      )
-                    }
-                  />
-                </label>
-                {resource.provider === "GOOGLE_DRIVE" && (
-                  <details
-                    className="text-sm"
-                    open={Boolean(op.accountEmail) || undefined}
-                  >
-                    <summary className="cursor-pointer text-muted-foreground">
-                      {t("access.googleConfirmationEmail")}
-                    </summary>
-                    <label className="mt-3 grid gap-1.5">
-                      {t("access.identity.googleEmail")}
-                      <Input
-                        type="email"
-                        maxLength={254}
-                        value={op.accountEmail || ""}
-                        onChange={(event) =>
-                          updateOperation(
-                            changeAccountEmail(
-                              op,
-                              resource.provider,
-                              event.target.value,
-                            ),
-                          )
-                        }
-                      />
-                    </label>
-                  </details>
-                )}
-              </>
-            )}
-            <label className="grid gap-1.5 text-sm">
-              {t("access.verification")}
-              <Textarea
-                required={op.action === "REVOKE"}
-                minLength={5}
-                maxLength={1000}
-                rows={2}
-                placeholder={t(
-                  `access.verificationPlaceholder.${resource.provider}`,
-                )}
-                value={op.verificationNote || ""}
-                onChange={(event) =>
-                  updateOperation({
-                    ...op,
-                    verificationNote: event.target.value,
-                  })
+                      : changeRemoteIdentity(
+                          op,
+                          event.target.value,
+                          resource.provider,
+                        ),
+                  )
                 }
               />
             </label>
-            {resource.automatic &&
-              (!op.providerUserId?.trim() || !op.verificationNote?.trim()) && (
-                <p className="text-sm text-muted-foreground">
-                  {t("access.pendingIdentityHelp")}
-                </p>
-              )}
+            {resource.remoteId === "CONFIGURE_ME" && (
+              <p
+                role="status"
+                className="rounded-md border border-amber-500/50 p-3 text-sm"
+              >
+                {t("access.configurationRequired")}
+              </p>
+            )}
+            {["DISCORD", "GITHUB", "GOOGLE_DRIVE"].includes(
+              resource.provider,
+            ) && (
+              <p className="text-sm text-muted-foreground">
+                {t("access.automaticIdentityHelp")}
+              </p>
+            )}
             {exception && (
               <label className="grid gap-1.5 text-sm">
                 {t(
@@ -571,41 +491,51 @@ export function AccessRequestForm({
             <p className="text-sm text-muted-foreground">
               {t("access.personHelp")}
             </p>
-            {config.intakeConfigured && (
-              <div
-                className="flex flex-wrap gap-2"
-                role="group"
-                aria-label={t("access.personSource")}
-              >
-                {(["forms", "manual"] as const).map((value) => (
-                  <Button
-                    key={value}
-                    type="button"
-                    variant={source === value ? "default" : "outline"}
-                    aria-pressed={source === value}
-                    onClick={() => {
-                      setSource(value);
-                      setIntake(undefined);
-                      setOperations([]);
-                      setError("");
-                      searchVersion.current++;
-                      setResponses([]);
-                      setSearchState("idle");
-                    }}
-                  >
-                    {t(`access.sourceMode.${value}`)}
-                  </Button>
-                ))}
-              </div>
-            )}
-            {source === "forms" ? (
+            {config.intakeConfigured &&
+              !config.permissions.includes("ACCESS_ALL_DEPARTMENTS") && (
+                <p className="text-sm text-muted-foreground">
+                  {t("access.intakeScope")}
+                </p>
+              )}
+            <div
+              className="flex flex-wrap gap-2"
+              role="group"
+              aria-label={t("access.personSource")}
+            >
+              {(["FORMS", "SHEETS", "manual"] as const).map((value) => (
+                <Button
+                  key={value}
+                  type="button"
+                  variant={source === value ? "default" : "outline"}
+                  aria-pressed={source === value}
+                  disabled={value !== "manual" && !origins.includes(value)}
+                  title={
+                    value !== "manual" && !origins.includes(value)
+                      ? t("access.originUnavailable")
+                      : undefined
+                  }
+                  onClick={() => {
+                    setSource(value);
+                    setIntake(undefined);
+                    setOperations([]);
+                    setError("");
+                    searchVersion.current++;
+                    setResponses([]);
+                    setSearchState("idle");
+                  }}
+                >
+                  {t(`access.sourceMode.${value}`)}
+                </Button>
+              ))}
+            </div>
+            {source !== "manual" ? (
               <>
                 <div className="space-y-2 rounded-lg border p-4">
                   <label
                     htmlFor="intake-search"
                     className="text-sm font-medium"
                   >
-                    {t("access.intake")}
+                    {t(`access.intake.${source}`)}
                   </label>
                   <div className="flex gap-2">
                     <Input
@@ -663,6 +593,15 @@ export function AccessRequestForm({
                         <span className="text-muted-foreground">
                           {row.email}
                         </span>
+                        {row.submittedAt && (
+                          <span className="block text-xs text-muted-foreground">
+                            {t("access.submittedAt")}:{" "}
+                            {formatDate(row.submittedAt, {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                        )}
                       </button>
                     ))}
                   </div>
@@ -762,7 +701,11 @@ export function AccessRequestForm({
                 aria-label={t("access.kind")}
                 value={kind}
                 onChange={(event) => {
-                  setKind(event.target.value);
+                  const nextKind = event.target.value;
+                  setKind(nextKind);
+                  if (intake?.source === "FORMS") {
+                    setTargetPositions(intakePositions(nextKind, intake));
+                  }
                   setOperations([]);
                 }}
               >
@@ -959,7 +902,7 @@ export function AccessRequestForm({
           disabled={
             busy ||
             (step === 0 &&
-              source === "forms" &&
+              source !== "manual" &&
               (!intake || searchState === "loading")) ||
             (step === 1 &&
               (!departments.length ||

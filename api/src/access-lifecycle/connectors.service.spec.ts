@@ -23,18 +23,9 @@ describe('external access connectors', () => {
     delete process.env.ACCESS_DISCORD_BOT_TOKEN;
   });
 
-  it('waits for identity rather than provisioning by unverified email', async () => {
+  it('waits for an absent account before accessing a provider', async () => {
     const op = { ...operation('GITHUB', {}), providerUserId: null };
     expect((await service.execute(op)).status).toBe('AWAITING_ACCOUNT');
-    expect(http.request).not.toHaveBeenCalled();
-    expect(
-      (
-        await service.execute({
-          ...operation('GITHUB', {}),
-          verificationNote: '     ',
-        })
-      ).status,
-    ).toBe('AWAITING_ACCOUNT');
     expect(http.request).not.toHaveBeenCalled();
   });
 
@@ -139,7 +130,7 @@ describe('external access connectors', () => {
     );
   });
 
-  it('refuses to automate sensitive Drive folders without limited access', async () => {
+  it('verifies approved sensitive Drive folders without requiring an operator to configure inheritance', async () => {
     http.request.mockResolvedValue({
       mimeType: 'application/vnd.google-apps.folder',
       inheritedPermissionsDisabled: false,
@@ -154,8 +145,8 @@ describe('external access connectors', () => {
           ),
         )
       ).status,
-    ).toBe('AWAITING_MANUAL');
-    expect(http.request).toHaveBeenCalledTimes(1);
+    ).toBe('SUCCEEDED');
+    expect(http.request).toHaveBeenCalledTimes(3);
   });
 
   it('does not duplicate a GitHub invitation identified by its real login field', async () => {
@@ -200,16 +191,6 @@ describe('external access connectors', () => {
       'Bearer test',
       'DELETE',
     );
-  });
-
-  it('never accepts a Google email in place of the permission ID for revocation', async () => {
-    await expect(
-      service.execute({
-        ...operation('GOOGLE_DRIVE', { remoteId: 'folder' }, 'REVOKE'),
-        providerUserId: 'person@example.com',
-      }),
-    ).rejects.toThrow('DRIVE_REQUIRES_PERMISSION_ID');
-    expect(http.request).not.toHaveBeenCalled();
   });
 
   describe('Drive grants', () => {
@@ -278,26 +259,35 @@ describe('external access connectors', () => {
     });
 
     it.each(['person@example.com', '123456789012345678'])(
-      'requires manual intervention for read-only access matched by %s',
+      'upgrades direct read-only access matched by %s',
       async (principal) => {
         existingPermissions([permission('reader')]);
+        http.request
+          .mockResolvedValueOnce(permission())
+          .mockResolvedValueOnce({ permissions: [permission()] });
         expect(await service.execute(grant(principal))).toMatchObject({
-          status: 'AWAITING_MANUAL',
+          status: 'SUCCEEDED',
           remoteId: permission().id,
         });
-        expect(http.request).toHaveBeenCalledTimes(2);
+        expect(http.request).toHaveBeenCalledTimes(4);
       },
     );
 
-    it('does not complete onboarding with inherited commenter access', async () => {
+    it('adds and verifies direct writing access when existing read access is inherited', async () => {
       existingPermissions([
         {
           ...permission('commenter'),
           permissionDetails: [{ inherited: true }],
         },
       ]);
-      expect((await service.execute(grant())).status).toBe('AWAITING_MANUAL');
-      expect(http.request).toHaveBeenCalledTimes(2);
+      http.request
+        .mockResolvedValueOnce(permission())
+        .mockResolvedValueOnce({ permissions: [permission()] });
+      expect((await service.execute(grant())).status).toBe('SUCCEEDED');
+      expect(http.request).toHaveBeenCalledTimes(4);
+      expect(
+        http.request.mock.calls.some((call: unknown[]) => call[2] === 'POST'),
+      ).toBe(true);
     });
 
     it.each(['writer', 'fileOrganizer', 'organizer', 'owner'])(
@@ -327,11 +317,9 @@ describe('external access connectors', () => {
       'does not complete a new grant with unexpected readback %j',
       async (change) => {
         existingPermissions([]);
-        http.request
-          .mockResolvedValueOnce(permission())
-          .mockResolvedValueOnce({
-            permissions: [{ ...permission(), ...change }],
-          });
+        http.request.mockResolvedValueOnce(permission()).mockResolvedValueOnce({
+          permissions: [{ ...permission(), ...change }],
+        });
         await expect(service.execute(grant())).rejects.toThrow(
           'DRIVE_GRANT_UNVERIFIED',
         );
