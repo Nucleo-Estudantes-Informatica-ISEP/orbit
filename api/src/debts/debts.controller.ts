@@ -69,8 +69,12 @@ export class DebtsController {
   @Put(':id')
   @Permissions('DEBTS_UPDATE')
   @ApiOkResponse({ type: DebtResponseDto })
-  update(@Param() params: IdParamDto, @Body() body: UpdateDebtDto) {
-    return this.svc.update(params.id, body);
+  update(
+    @Param() params: IdParamDto,
+    @Body() body: UpdateDebtDto,
+    @CurrentUser('userId') actorId: string,
+  ) {
+    return this.svc.update(params.id, body, actorId);
   }
 
   @Delete(':id')

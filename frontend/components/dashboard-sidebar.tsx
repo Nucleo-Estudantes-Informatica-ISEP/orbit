@@ -43,6 +43,7 @@ import { usePermission } from '@/lib/use-permission';
 import { useLocale } from '@/lib/locale-context';
 import { cn } from '@/lib/utils';
 import { OrbitLogo } from '@/components/orbit-logo';
+import { toast } from 'sonner';
 
 interface SidebarProps {
   userName?: string;
@@ -141,9 +142,14 @@ export function DashboardSidebar({
     return () => window.clearTimeout(timeoutId);
   }, [pathname]);
 
-  const handleLogout = () => {
-    logout();
-    router.push('/login');
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch {
+      toast.error(t('nav.logoutFailed'));
+    } finally {
+      router.push('/login');
+    }
   };
 
   const isActive = (href: string) => {

@@ -33,8 +33,8 @@ export class UsersController {
   @Post()
   @Permissions('USERS_CREATE')
   @ApiCreatedResponse({ type: UserResponseDto })
-  create(@Body() dto: CreateUserDto) {
-    return this.usersService.create(dto);
+  create(@Body() dto: CreateUserDto, @CurrentUser('userId') actorId: string) {
+    return this.usersService.create(dto, actorId);
   }
 
   @Get()
@@ -61,8 +61,12 @@ export class UsersController {
   @Put(':id')
   @Permissions('USERS_UPDATE')
   @ApiOkResponse({ type: UserResponseDto })
-  update(@Param() params: IdParamDto, @Body() dto: UpdateUserDto) {
-    return this.usersService.update(params.id, dto);
+  update(
+    @Param() params: IdParamDto,
+    @Body() dto: UpdateUserDto,
+    @CurrentUser('userId') actorId: string,
+  ) {
+    return this.usersService.update(params.id, dto, actorId);
   }
 
   @Delete(':id')

@@ -211,6 +211,33 @@ describe('Access lifecycle persistence and concurrency (PostgreSQL)', () => {
     );
   });
 
+  it('searches the human account label case-insensitively without exposing another department', async () => {
+    const process = await createProcess();
+    await prisma.accessOperation.updateMany({
+      where: { processId: process.id },
+      data: {
+        providerUserId: '123456',
+        result: { accountName: 'Person-Account' },
+      },
+    });
+    expect(
+      (
+        await lifecycle.list(requesterId, {
+          providerUserId: 'person-account',
+          offset: 0,
+        })
+      ).some((value) => value.id === process.id),
+    ).toBe(true);
+    expect(
+      (
+        await lifecycle.list(outsiderId, {
+          providerUserId: 'person-account',
+          offset: 0,
+        })
+      ).some((value) => value.id === process.id),
+    ).toBe(false);
+  });
+
   function processEnvDryRun(value: boolean) {
     process.env.ACCESS_EXECUTOR_DRY_RUN = String(value);
   }

@@ -3,9 +3,6 @@ WORKDIR /app
 
 RUN apt-get update -y && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 
-ARG DATABASE_URL=postgresql://postgres:postgres@db:5432/orbit?schema=public
-ENV DATABASE_URL=${DATABASE_URL}
-
 # Install dependencies (including devDependencies) for build
 COPY package*.json ./
 RUN npm ci
@@ -18,7 +15,6 @@ RUN npm run build
 FROM node:26-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
-ENV DATABASE_URL=postgresql://postgres:postgres@db:5432/orbit?schema=public
 
 RUN apt-get update -y && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 

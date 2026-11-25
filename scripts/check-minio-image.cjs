@@ -3,7 +3,10 @@ const { execFileSync } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
 const { createRequire } = require('node:module');
 const { setTimeout: delay } = require('node:timers/promises');
-const { Client } = createRequire(require.resolve('../api/package.json'))('minio');
+const {
+  S3Client, CreateBucketCommand, DeleteBucketCommand, DeleteObjectCommand,
+  GetObjectCommand, HeadObjectCommand, ListBucketsCommand, PutObjectCommand, paginateListObjectsV2,
+} = createRequire(require.resolve('../api/package.json'))('@aws-sdk/client-s3');
 
 const image = process.argv[2];
 assert.ok(image, 'Provide the task-owned MinIO image to test');
@@ -25,12 +28,14 @@ async function ready() {
   const deadline = Date.now() + 30000;
   while (Date.now() < deadline) {
     try {
-      docker('exec', container, 'wget', '-q', '-O', '/dev/null',
-        'http://127.0.0.1:9000/minio/health/live');
-      return;
+      const response = await fetch(`http://127.0.0.1:${port()}/minio/health/live`, {
+        signal: AbortSignal.timeout(3000),
+      });
+      if (response.ok) return;
     } catch {
-      await delay(250);
+      // The endpoint can disappear briefly when the fixture restarts.
     }
+    await delay(250);
   }
   throw new Error('MinIO did not become ready within 30 seconds');
 }
@@ -43,36 +48,43 @@ async function main() {
       '--env', `MINIO_ROOT_PASSWORD=${secretKey}`,
       image, 'server', '/data', '--console-address', ':9001');
     await ready();
-    const options = {
-      endPoint: '127.0.0.1',
-      port: port(),
-      useSSL: false,
-      accessKey,
-      secretKey,
-    };
-    let client = new Client(options);
-    await assert.rejects(new Client({ ...options, secretKey: 'incorrect-password' }).listBuckets(),
-      { code: 'SignatureDoesNotMatch' });
-    const bucket = 'orbit-smoke';
-    const key = 'folder/sample.txt';
-    const content = Buffer.from('Orbit storage compatibility check');
-    await client.makeBucket(bucket, 'us-east-1');
-    await client.putObject(bucket, key, content, content.length, { 'Content-Type': 'text/plain' });
-    const stat = await client.statObject(bucket, key);
-    assert.equal(stat.size, content.length);
-    assert.equal(stat.metaData['content-type'], 'text/plain');
+    const newClient = (secretAccessKey = secretKey) => new S3Client({
+      endpoint: `http://127.0.0.1:${port()}`,
+      forcePathStyle: true,
+      region: 'us-east-1',
+      requestChecksumCalculation: 'WHEN_REQUIRED',
+      responseChecksumValidation: 'WHEN_REQUIRED',
+      credentials: { accessKeyId: accessKey, secretAccessKey },
+    });
+    let client = newClient();
+    await assert.rejects(newClient('incorrect-password').send(new ListBucketsCommand({})),
+      { name: 'SignatureDoesNotMatch' });
+    const Bucket = 'orbit-smoke';
+    const Key = 'folder/sample.txt';
+    const Body = Buffer.from('Orbit storage compatibility check');
+    await client.send(new CreateBucketCommand({ Bucket }));
+    await client.send(new PutObjectCommand({
+      Bucket, Key, Body, ContentLength: Body.length, ContentType: 'text/plain',
+    }));
+    const stat = await client.send(new HeadObjectCommand({ Bucket, Key }));
+    assert.equal(stat.ContentLength, Body.length);
+    assert.equal(stat.ContentType, 'text/plain');
     const objects = [];
-    for await (const object of client.listObjectsV2(bucket, '', true)) objects.push(object.name);
-    assert.deepEqual(objects, [key]);
+    for await (const page of paginateListObjectsV2({ client }, { Bucket })) {
+      objects.push(...(page.Contents || []).map((object) => object.Key));
+    }
+    assert.deepEqual(objects, [Key]);
     docker('restart', container);
     await ready();
-    client = new Client({ ...options, port: port() });
-    const chunks = [];
-    for await (const chunk of await client.getObject(bucket, key)) chunks.push(chunk);
-    assert.deepEqual(Buffer.concat(chunks), content);
-    await client.removeObject(bucket, key);
-    await assert.rejects(client.statObject(bucket, key), { code: 'NotFound' });
-    await client.removeBucket(bucket);
+    client.destroy();
+    client = newClient();
+    const downloaded = await client.send(new GetObjectCommand({ Bucket, Key }));
+    assert.deepEqual(Buffer.from(await downloaded.Body.transformToByteArray()), Body);
+    await client.send(new DeleteObjectCommand({ Bucket, Key }));
+    await assert.rejects(client.send(new HeadObjectCommand({ Bucket, Key })),
+      (error) => error.$metadata?.httpStatusCode === 404);
+    await client.send(new DeleteBucketCommand({ Bucket }));
+    client.destroy();
     console.log('MinIO authentication, S3 operations and persistence checks passed.');
   } finally {
     docker('rm', '--force', '--volumes', container);

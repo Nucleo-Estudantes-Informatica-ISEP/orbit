@@ -14,6 +14,8 @@ services:
       - PORT=3000
       - APP_URL=http://localhost:3090
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/orbit?schema=public
+      - JWT_SECRET=${JWT_SECRET:-}
+      - REFRESH_TOKEN_SECRET=${REFRESH_TOKEN_SECRET:-}
       - MINIO_ENDPOINT=minio
       - MINIO_PORT=9000
       - MINIO_USE_SSL=false
@@ -29,6 +31,8 @@ services:
       - ACCESS_EXECUTOR_ENABLED=${ACCESS_EXECUTOR_ENABLED:-false}
       - ACCESS_EXECUTOR_DRY_RUN=${ACCESS_EXECUTOR_DRY_RUN:-true}
       - ACCESS_FORMS_URL=${ACCESS_FORMS_URL:-}
+      - ACCESS_FORMS_ID=${ACCESS_FORMS_ID:-}
+      - ACCESS_FORMS_FIELDS=${ACCESS_FORMS_FIELDS:-}
       - ACCESS_SHEETS_ID=${ACCESS_SHEETS_ID:-}
       - ACCESS_SHEETS_RANGE=${ACCESS_SHEETS_RANGE:-}
       - ACCESS_SHEETS_COLUMNS=${ACCESS_SHEETS_COLUMNS:-}

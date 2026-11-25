@@ -10,10 +10,9 @@ import {
 import {
   API_BASE,
   AUTH_SESSION_EVENT,
-  ApiError,
   apiFetch,
-  clearStoredSession,
   hasStoredSession,
+  getBrowserSession,
   revokeStoredSession,
   storeSession,
 } from "@/lib/api";
@@ -31,7 +30,7 @@ interface AuthContextType {
   token: string | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   isAuthenticated: boolean;
 }
@@ -43,72 +42,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Restore token and user from localStorage on mount
   useEffect(() => {
-    const storedToken = localStorage.getItem("auth_token");
-    const storedUser = localStorage.getItem("auth_user");
+    let active = true;
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("auth_user");
 
-    const restoreSession = async () => {
-      if (!storedToken && !hasStoredSession()) {
-        clearStoredSession();
+    const syncSession = () => {
+      const session = getBrowserSession();
+      if (session || !hasStoredSession()) {
+        setToken(session?.access_token ?? null);
+        setUser((session?.user as User | undefined) ?? null);
         setIsLoading(false);
         return;
       }
 
-      if (storedToken) setToken(storedToken);
-
-      try {
-        const freshUser = await apiFetch<User>("/auth/me");
-        localStorage.setItem("auth_user", JSON.stringify(freshUser));
-        setToken(localStorage.getItem("auth_token"));
-        setUser(freshUser);
-      } catch (error) {
-        // Only a transport failure may temporarily retain cached identity.
-        // HTTP errors and invalid JSON must never restore stale permissions.
-        if (
-          error instanceof TypeError &&
-          localStorage.getItem("auth_token") &&
-          storedUser
-        ) {
-          try {
-            setUser(JSON.parse(storedUser) as User);
-          } catch {
-            clearStoredSession();
+      setIsLoading(true);
+      void apiFetch<User>("/auth/me")
+        .then((profile) => {
+          const current = getBrowserSession();
+          if (active && current) {
+            setToken(current.access_token);
+            setUser(profile);
+          }
+        })
+        .catch(() => {
+          if (active && !getBrowserSession()) {
             setToken(null);
             setUser(null);
           }
-        } else if (error instanceof ApiError && error.status >= 500) {
-          // Server failure is not proof that credentials are invalid. Keep the
-          // session marker/token but fail closed on cached permissions.
-          setToken(localStorage.getItem("auth_token"));
-          setUser(null);
-        } else {
-          clearStoredSession();
-          setToken(null);
-          setUser(null);
-        }
-      } finally {
-        setIsLoading(false);
-      }
+        })
+        .finally(() => {
+          if (active) setIsLoading(false);
+        });
     };
 
-    void restoreSession();
-
-    const syncSession = () => {
-      const currentToken = localStorage.getItem("auth_token");
-      const currentUser = localStorage.getItem("auth_user");
-      setToken(currentToken);
-      try {
-        setUser(currentUser ? (JSON.parse(currentUser) as User) : null);
-      } catch {
-        clearStoredSession();
-        setToken(null);
-        setUser(null);
-      }
-    };
+    syncSession();
     window.addEventListener(AUTH_SESSION_EVENT, syncSession);
     window.addEventListener("storage", syncSession);
     return () => {
+      active = false;
       window.removeEventListener(AUTH_SESSION_EVENT, syncSession);
       window.removeEventListener("storage", syncSession);
     };
@@ -131,7 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await response.json();
       const { user: userData, access_token } = data;
 
-      storeSession({ access_token, user: userData });
+      storeSession({ access_token, user: userData }, true);
 
       setToken(access_token);
       setUser(userData);
@@ -140,16 +112,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = () => {
-    revokeStoredSession();
-    setToken(null);
-    setUser(null);
+  const logout = async () => {
+    await revokeStoredSession();
   };
 
   const refreshProfile = async () => {
     const freshUser = await apiFetch<User>("/auth/me");
-    localStorage.setItem("auth_user", JSON.stringify(freshUser));
-    setUser(freshUser);
+    const current = getBrowserSession();
+    if (current) storeSession({ access_token: current.access_token, user: freshUser });
   };
 
   return (

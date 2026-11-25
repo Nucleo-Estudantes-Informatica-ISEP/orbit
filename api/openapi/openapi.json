@@ -22,6 +22,16 @@
           "intakeConfigured": {
             "type": "boolean"
           },
+          "intakeSources": {
+            "items": {
+              "enum": [
+                "FORMS",
+                "SHEETS"
+              ],
+              "type": "string"
+            },
+            "type": "array"
+          },
           "permissions": {
             "items": {
               "type": "string"
@@ -49,6 +59,7 @@
           "departments",
           "permissions",
           "intakeConfigured",
+          "intakeSources",
           "executorEnabled",
           "dryRun"
         ],
@@ -805,26 +816,6 @@
         ],
         "type": "object"
       },
-      "CreateAuditLogDto": {
-        "additionalProperties": false,
-        "properties": {
-          "action": {
-            "type": "string"
-          },
-          "entity": {
-            "type": "string"
-          },
-          "entityId": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "action",
-          "entity",
-          "entityId"
-        ],
-        "type": "object"
-      },
       "CreateBoardDto": {
         "additionalProperties": false,
         "properties": {
@@ -1120,9 +1111,16 @@
         "additionalProperties": false,
         "properties": {
           "intakeKey": {
-            "description": "Hash of an existing Forms response in the configured Sheets range",
+            "description": "Hash of a response from the selected Forms or manual Sheets origin",
             "maxLength": 64,
             "minLength": 64,
+            "type": "string"
+          },
+          "intakeSource": {
+            "enum": [
+              "FORMS",
+              "SHEETS"
+            ],
             "type": "string"
           },
           "kind": {
@@ -1409,7 +1407,9 @@
                 "INCIDENTS_READ",
                 "INCIDENTS_UPDATE",
                 "INCIDENTS_DELETE",
-                "CAN_BE_DELETED"
+                "CAN_BE_DELETED",
+                "USERS_MANAGE_CREDENTIALS",
+                "ROLES_ASSIGN"
               ],
               "type": "string"
             },
@@ -1487,10 +1487,6 @@
           "name": {
             "type": "string"
           },
-          "password": {
-            "minLength": 8,
-            "type": "string"
-          },
           "roles": {
             "items": {
               "type": "string"
@@ -1509,7 +1505,6 @@
         "required": [
           "name",
           "email",
-          "password",
           "departmentId"
         ],
         "type": "object"
@@ -1947,9 +1942,21 @@
               "type": "string"
             },
             "type": "array"
+          },
+          "source": {
+            "enum": [
+              "FORMS",
+              "SHEETS"
+            ],
+            "type": "string"
+          },
+          "submittedAt": {
+            "format": "date-time",
+            "type": "string"
           }
         },
         "required": [
+          "source",
           "key",
           "name",
           "email",
@@ -2650,6 +2657,12 @@
             "maxLength": 254,
             "type": "string"
           },
+          "accountUsername": {
+            "description": "Discord/GitHub username. Preferred for new clients; distinguishes numeric usernames from legacy providerUserId IDs.",
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
           "action": {
             "enum": [
               "GRANT",
@@ -2664,7 +2677,8 @@
             "type": "string"
           },
           "providerUserId": {
-            "maxLength": 200,
+            "description": "Discord/GitHub username or Google account email. Legacy numeric account/permission IDs remain accepted. Orbit resolves and verifies remote identities.",
+            "maxLength": 254,
             "minLength": 1,
             "type": "string"
           },
@@ -2673,6 +2687,7 @@
             "type": "string"
           },
           "verificationNote": {
+            "description": "Optional operator context. Automatic identity verification is performed by Orbit, not asserted by this text.",
             "maxLength": 1000,
             "minLength": 5,
             "type": "string"
@@ -3523,7 +3538,9 @@
                 "INCIDENTS_READ",
                 "INCIDENTS_UPDATE",
                 "INCIDENTS_DELETE",
-                "CAN_BE_DELETED"
+                "CAN_BE_DELETED",
+                "USERS_MANAGE_CREDENTIALS",
+                "ROLES_ASSIGN"
               ],
               "type": "string"
             },
@@ -3897,6 +3914,19 @@
         "operationId": "Lifecycle_intake",
         "parameters": [
           {
+            "description": "Intake origin; defaults to Forms when configured, otherwise Sheets.",
+            "in": "query",
+            "name": "intakeSource",
+            "required": false,
+            "schema": {
+              "enum": [
+                "FORMS",
+                "SHEETS"
+              ],
+              "type": "string"
+            }
+          },
+          {
             "in": "query",
             "name": "query",
             "required": false,
@@ -3940,11 +3970,13 @@
             }
           },
           {
+            "description": "Search external accounts by declared username/email or a legacy numeric ID.",
             "in": "query",
             "name": "providerUserId",
             "required": false,
             "schema": {
-              "maxLength": 200,
+              "maxLength": 254,
+              "minLength": 3,
               "type": "string"
             }
           },
@@ -4018,6 +4050,16 @@
             "description": ""
           },
           "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "503": {
             "content": {
               "application/json": {
                 "schema": {
@@ -4311,6 +4353,19 @@
         "operationId": "Lifecycle_list",
         "parameters": [
           {
+            "description": "Intake origin; defaults to Forms when configured, otherwise Sheets.",
+            "in": "query",
+            "name": "intakeSource",
+            "required": false,
+            "schema": {
+              "enum": [
+                "FORMS",
+                "SHEETS"
+              ],
+              "type": "string"
+            }
+          },
+          {
             "in": "query",
             "name": "query",
             "required": false,
@@ -4354,11 +4409,13 @@
             }
           },
           {
+            "description": "Search external accounts by declared username/email or a legacy numeric ID.",
             "in": "query",
             "name": "providerUserId",
             "required": false,
             "schema": {
-              "maxLength": 200,
+              "maxLength": 254,
+              "minLength": 3,
               "type": "string"
             }
           },
@@ -4516,6 +4573,16 @@
             "description": ""
           },
           "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "503": {
             "content": {
               "application/json": {
                 "schema": {
@@ -5357,6 +5424,16 @@
               }
             },
             "description": ""
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
           }
         },
         "security": [
@@ -5445,6 +5522,16 @@
             "description": ""
           },
           "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "503": {
             "content": {
               "application/json": {
                 "schema": {
@@ -6337,90 +6424,6 @@
         "tags": [
           "audit-logs"
         ]
-      },
-      "post": {
-        "operationId": "AuditLogs_create",
-        "parameters": [],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateAuditLogDto"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AuditLogResponseDto"
-                }
-              }
-            },
-            "description": ""
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
-                }
-              }
-            },
-            "description": ""
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
-                }
-              }
-            },
-            "description": ""
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
-                }
-              }
-            },
-            "description": ""
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
-                }
-              }
-            },
-            "description": ""
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDto"
-                }
-              }
-            },
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "audit-logs"
-        ]
       }
     },
     "/auth/change-password": {
@@ -6513,6 +6516,26 @@
               }
             },
             "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
           }
         },
         "tags": [
@@ -6572,6 +6595,26 @@
               }
             },
             "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
           }
         },
         "tags": [
@@ -6601,6 +6644,26 @@
                 }
               }
             }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
           }
         },
         "security": [
@@ -6735,6 +6798,26 @@
               }
             },
             "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
           }
         },
         "security": [
@@ -6773,6 +6856,26 @@
             "description": ""
           },
           "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "429": {
             "content": {
               "application/json": {
                 "schema": {
@@ -9107,6 +9210,19 @@
         "parameters": [
           {
             "in": "query",
+            "name": "filter",
+            "required": false,
+            "schema": {
+              "enum": [
+                "ALL",
+                "UPCOMING",
+                "PAST"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
             "name": "page",
             "required": false,
             "schema": {
@@ -9122,19 +9238,6 @@
               "maximum": 1000,
               "minimum": 1,
               "type": "number"
-            }
-          },
-          {
-            "in": "query",
-            "name": "filter",
-            "required": false,
-            "schema": {
-              "enum": [
-                "ALL",
-                "UPCOMING",
-                "PAST"
-              ],
-              "type": "string"
             }
           }
         ],
@@ -9912,6 +10015,16 @@
             "description": ""
           },
           "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "413": {
             "content": {
               "application/json": {
                 "schema": {
@@ -12591,6 +12704,22 @@
         "parameters": [
           {
             "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
             "name": "page",
             "required": false,
             "schema": {
@@ -12606,22 +12735,6 @@
               "maximum": 1000,
               "minimum": 1,
               "type": "number"
-            }
-          },
-          {
-            "in": "query",
-            "name": "category",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "search",
-            "required": false,
-            "schema": {
-              "type": "string"
             }
           }
         ],

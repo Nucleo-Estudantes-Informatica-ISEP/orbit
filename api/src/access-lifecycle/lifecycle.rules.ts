@@ -27,14 +27,10 @@ export function assertDecision(
 export function assertOperationIdentity(
   action: string,
   remoteId?: string | null,
-  verification?: string | null,
 ) {
-  if (
-    action === 'REVOKE' &&
-    (!remoteId?.trim() || !verification || verification.trim().length < 5)
-  ) {
+  if (action === 'REVOKE' && !remoteId?.trim()) {
     throw new BadRequestException(
-      'Revogação exige ID remoto e evidência de identidade verificada',
+      'Revogação exige username, email ou ID remoto da conta',
     );
   }
 }

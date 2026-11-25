@@ -129,20 +129,6 @@ export class UpdateBoardDto {
   departmentIds?: string[];
 }
 
-export class CreateAuditLogDto {
-  @IsString()
-  @IsNotEmpty()
-  action: string;
-
-  @IsString()
-  @IsNotEmpty()
-  entity: string;
-
-  @IsString()
-  @IsNotEmpty()
-  entityId: string;
-}
-
 export class CreateDebtDto {
   @IsString()
   @IsNotEmpty()

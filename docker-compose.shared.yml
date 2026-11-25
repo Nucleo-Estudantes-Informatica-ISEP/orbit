@@ -52,7 +52,10 @@ services:
       PORT: "3000"
       APP_URL: ${APP_URL:-https://orbit.nei-isep.org}
       DATABASE_URL: ${DATABASE_URL:?Configure the restricted runtime DATABASE_URL}
-      JWT_SECRET: ${SERVICE_BASE64_64_JWT}
+      JWT_SECRET: ${SERVICE_BASE64_64_JWT:?Configure the Orbit JWT signing key}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:?Configure a separate Orbit token fingerprint key}
+      AUTH_TRUST_PROXY_HOPS: ${AUTH_TRUST_PROXY_HOPS:?Set the verified trusted proxy hop count}
+      FILE_LEGACY_ORIGINS: ${FILE_LEGACY_ORIGINS:-}
       CORS_ORIGIN: ${APP_URL:-https://orbit.nei-isep.org}
       MINIO_ENDPOINT: ${MINIO_ENDPOINT:?Configure shared MinIO hostname}
       MINIO_PORT: ${MINIO_PORT:-9000}
@@ -60,6 +63,7 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?Configure Orbit bucket access key}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?Configure Orbit bucket secret key}
       MINIO_BUCKET: ${MINIO_BUCKET:?Configure Orbit bucket}
+      MINIO_REGION: ${MINIO_REGION:-us-east-1}
       SMTP_HOST: ${SMTP_HOST:?Configure SMTP_HOST in Coolify}
       SMTP_PORT: "465"
       SMTP_SECURE: "true"
@@ -69,6 +73,8 @@ services:
       ACCESS_EXECUTOR_ENABLED: ${ACCESS_EXECUTOR_ENABLED:-false}
       ACCESS_EXECUTOR_DRY_RUN: ${ACCESS_EXECUTOR_DRY_RUN:-true}
       ACCESS_FORMS_URL: ${ACCESS_FORMS_URL:-}
+      ACCESS_FORMS_ID: ${ACCESS_FORMS_ID:-}
+      ACCESS_FORMS_FIELDS: ${ACCESS_FORMS_FIELDS:-}
       ACCESS_SHEETS_ID: ${ACCESS_SHEETS_ID:-}
       ACCESS_SHEETS_RANGE: ${ACCESS_SHEETS_RANGE:-}
       ACCESS_SHEETS_COLUMNS: ${ACCESS_SHEETS_COLUMNS:-}

@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../src/auth/jwt-auth.guard';
 import { PermissionsGuard } from '../src/auth/permissions.guard';
 import { TasksController } from '../src/tasks/tasks.controller';
 import { TasksService } from '../src/tasks/tasks.service';
+import { CreateUserDto } from '../src/users/dto/create-user.dto';
 import { createValidationPipe } from '../src/validation';
 import { InventoryController } from '../src/inventory/inventory.controller';
 import { InventoryService } from '../src/inventory/inventory.service';
@@ -145,5 +146,21 @@ describe('API contract validation (e2e)', () => {
 
   afterAll(async () => {
     await app.close();
+  });
+  it('rejects a supplied password during activation-link account creation', async () => {
+    const pipe = createValidationPipe();
+    const body = {
+      name: 'Fixture User',
+      email: 'fixture@example.test',
+      departmentId: id,
+    };
+    const metadata = { type: 'body' as const, metatype: CreateUserDto };
+    await expect(pipe.transform(body, metadata)).resolves.toMatchObject(body);
+    await expect(
+      pipe.transform({ ...body, password: 'synthetic-secret' }, metadata),
+    ).rejects.toMatchObject({
+      status: 400,
+      response: { message: ['property password should not exist'] },
+    });
   });
 });
