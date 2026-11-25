@@ -4,10 +4,11 @@ import { AppModule } from './app.module';
 import { SwaggerModule } from '@nestjs/swagger';
 import { createOpenApiDocument } from './openapi';
 import { createValidationPipe } from './validation';
-import { browserOrigins } from './config/auth.config';
+import { browserOrigins, passwordRecoveryOrigin } from './config/auth.config';
 import { PrismaService } from './prisma.service';
 
 async function bootstrap() {
+  if (process.env.NODE_ENV === 'production') passwordRecoveryOrigin();
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const trustedProxyHops = Number(process.env.AUTH_TRUST_PROXY_HOPS ?? 0);
   if (!Number.isInteger(trustedProxyHops) || trustedProxyHops < 0) {

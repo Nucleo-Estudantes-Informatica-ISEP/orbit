@@ -34,11 +34,12 @@ function legacyPrefixes() {
   ]);
 }
 
-export function attachmentKey(value: string | null | undefined) {
+export function attachmentKey(
+  value: string | null | undefined,
+  prefixes = legacyPrefixes(),
+) {
   if (!value) return null;
-  const prefix = legacyPrefixes().find((candidate) =>
-    value.startsWith(candidate),
-  );
+  const prefix = prefixes.find((candidate) => value.startsWith(candidate));
   if (!prefix && /^https?:\/\//i.test(value)) return null;
   const key = prefix ? value.slice(prefix.length).split(/[?#]/u, 1)[0] : value;
   let decoded: string;
@@ -56,9 +57,12 @@ export function attachmentKey(value: string | null | undefined) {
   return decoded;
 }
 
-export function safeStoredAttachment(value: string | null | undefined) {
+export function safeStoredAttachment(
+  value: string | null | undefined,
+  prefixes?: string[],
+) {
   try {
-    return attachmentKey(value) ?? value;
+    return attachmentKey(value, prefixes) ?? value;
   } catch {
     return null;
   }
@@ -111,58 +115,54 @@ export async function requireOwnedAttachments(
 export async function attachmentPermissions(
   tx: Prisma.TransactionClient,
   keys: string[],
+  { fullInventory = false } = {},
 ) {
   const permissions = new Map<string, Set<SystemPermission>>();
   if (!keys.length) return permissions;
-  const add = (key: string | null, permission: SystemPermission) => {
-    if (!key) return;
+  const requested = new Set(keys);
+  const add = (
+    key: string | null | undefined,
+    permission: SystemPermission,
+  ) => {
+    if (!key || !requested.has(key)) return;
     const set = permissions.get(key) ?? new Set();
     set.add(permission);
     permissions.set(key, set);
   };
-  const urls = keys.flatMap((key) =>
-    legacyPrefixes().flatMap((prefix) => [
-      prefix + key,
-      prefix + key.split('/').map(encodeURIComponent).join('/'),
-      prefix + encodeURIComponent(key),
-    ]),
-  );
-  const urlFilters: Prisma.StringFilter[] = urls.flatMap((url) => [
-    { equals: url },
-    { startsWith: url + '?' },
-    { startsWith: url + '#' },
-  ]);
+  // Resolve legacy URLs with the same decoder for single files and listings.
+  const prefixes = legacyPrefixes();
+  const urlFilters = [
+    { in: keys },
+    ...prefixes.map((startsWith) => ({ startsWith })),
+  ];
   const [debts, incidents, inventory, plans, candidates, resources] =
     await Promise.all([
       tx.debt.findMany({
-        where: { fileKeys: { hasSome: keys } },
+        where: fullInventory ? undefined : { fileKeys: { hasSome: keys } },
         select: { fileKeys: true },
       }),
       tx.incident.findMany({
-        where: { fileKeys: { hasSome: keys } },
+        where: fullInventory ? undefined : { fileKeys: { hasSome: keys } },
         select: { fileKeys: true },
       }),
       tx.inventoryItem.findMany({
-        where: { photoKey: { in: keys } },
+        where: { photoKey: fullInventory ? { not: null } : { in: keys } },
         select: { photoKey: true },
       }),
       tx.plan.findMany({
-        where: { fileKey: { in: keys } },
+        where: { fileKey: fullInventory ? { not: null } : { in: keys } },
         select: { fileKey: true },
       }),
       tx.candidate.findMany({
-        where: {
-          OR: [
-            { cvUrl: { in: keys } },
-            ...urlFilters.map((cvUrl) => ({ cvUrl })),
-          ],
-        },
+        where: fullInventory
+          ? { cvUrl: { not: null } }
+          : { OR: urlFilters.map((cvUrl) => ({ cvUrl })) },
         select: { cvUrl: true },
       }),
       tx.resource.findMany({
-        where: {
-          OR: [{ url: { in: keys } }, ...urlFilters.map((url) => ({ url }))],
-        },
+        where: fullInventory
+          ? undefined
+          : { OR: urlFilters.map((url) => ({ url })) },
         select: { url: true },
       }),
     ]);
@@ -173,14 +173,21 @@ export async function attachmentPermissions(
   for (const row of inventory) add(row.photoKey, 'INVENTORY_READ');
   for (const row of plans) add(row.fileKey, 'PLANS_READ');
   for (const row of candidates)
-    add(attachmentKey(row.cvUrl), 'RECRUITMENT_READ');
-  for (const row of resources) add(attachmentKey(row.url), 'RESOURCES_READ');
+    add(safeStoredAttachment(row.cvUrl, prefixes), 'RECRUITMENT_READ');
+  for (const row of resources)
+    add(safeStoredAttachment(row.url, prefixes), 'RESOURCES_READ');
   return permissions;
 }
 
 export function canReadFile(
   actor: AuthenticatedUser,
-  file: { uploadedById: string | null; deletedAt: Date | null } | undefined,
+  file:
+    | {
+        uploadedById: string | null;
+        attached: boolean;
+        deletedAt: Date | null;
+      }
+    | undefined,
   required: Set<SystemPermission> | undefined,
 ) {
   if (file?.deletedAt) return false;
@@ -188,7 +195,7 @@ export function canReadFile(
     return [...required].some((permission) =>
       actor.permissions.includes(permission),
     );
-  return file
-    ? file.uploadedById === actor.userId
-    : actor.permissions.includes('FILES_VIEW');
+  if (!file || (file.attached && file.uploadedById === null))
+    return actor.permissions.includes('FILES_VIEW');
+  return file.uploadedById === actor.userId;
 }

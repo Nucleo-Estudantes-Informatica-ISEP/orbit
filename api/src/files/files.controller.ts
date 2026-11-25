@@ -148,13 +148,23 @@ export class FilesController {
     actor: AuthenticatedUser,
   ) {
     const visible: typeof all = [];
-    for (let start = 0; start < all.length; start += 50) {
-      const batch = all.slice(start, start + 50);
+    const permissions = await attachmentPermissions(
+      tx,
+      all.map(({ name }) => name),
+      { fullInventory: true },
+    );
+    for (let start = 0; start < all.length; start += 500) {
+      const batch = all.slice(start, start + 500);
       const keys = batch.map((object) => object.name);
-      const [files, permissions] = await Promise.all([
-        tx.uploadedFile.findMany({ where: { key: { in: keys } } }),
-        attachmentPermissions(tx, keys),
-      ]);
+      const files = await tx.uploadedFile.findMany({
+        where: { key: { in: keys } },
+        select: {
+          key: true,
+          uploadedById: true,
+          attached: true,
+          deletedAt: true,
+        },
+      });
       const byKey = new Map(files.map((file) => [file.key, file]));
       visible.push(
         ...batch.filter(({ name }) =>

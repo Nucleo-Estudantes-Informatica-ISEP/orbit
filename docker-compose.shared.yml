@@ -54,7 +54,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:?Configure the restricted runtime DATABASE_URL}
       JWT_SECRET: ${SERVICE_BASE64_64_JWT:?Configure the Orbit JWT signing key}
       REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:?Configure a separate Orbit token fingerprint key}
-      AUTH_TRUST_PROXY_HOPS: ${AUTH_TRUST_PROXY_HOPS:-0}
+      AUTH_TRUST_PROXY_HOPS: ${AUTH_TRUST_PROXY_HOPS:?Set the verified trusted proxy hop count}
       FILE_LEGACY_ORIGINS: ${FILE_LEGACY_ORIGINS:-}
       CORS_ORIGIN: ${APP_URL:-https://orbit.nei-isep.org}
       MINIO_ENDPOINT: ${MINIO_ENDPOINT:?Configure shared MinIO hostname}

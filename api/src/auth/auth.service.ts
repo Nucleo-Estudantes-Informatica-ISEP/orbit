@@ -9,7 +9,7 @@ import { MailService } from '../mail/mail.service';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import type { Prisma } from '@prisma/client';
-import { authSecrets } from '../config/auth.config';
+import { authSecrets, passwordRecoveryOrigin } from '../config/auth.config';
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 const ACCESS_TOKEN_TTL = '15m';
@@ -360,10 +360,7 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user || user.status !== 'ACTIVE') return;
 
-    const origin = new URL(process.env.APP_URL || 'http://localhost:3090');
-    if (process.env.NODE_ENV === 'production' && origin.protocol !== 'https:') {
-      throw new Error('Password recovery requires an HTTPS APP_URL.');
-    }
+    const origin = passwordRecoveryOrigin();
 
     const rawToken = crypto.randomBytes(32).toString('hex');
     const issued = await this.prisma.$transaction(async (tx) => {

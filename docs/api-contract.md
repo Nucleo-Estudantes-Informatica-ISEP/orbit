@@ -17,9 +17,14 @@ Request DTOs validate bodies, query strings, and path parameters. Global validat
 
 Swagger UI is served at `/docs`; raw JSON is served at `/openapi.json`.
 
-Auth requests use the in-house issuer. Access tokens are bound to a live session and current local permissions. Browser authentication writes require a trusted Origin when the browser supplies one and can return 429 when limited. User creation sends an activation link for active accounts. A password field in the create request returns 400. Credential updates and role assignments require explicit local permissions.
+Auth requests use the in-house issuer. Access tokens are bound to a live session and current local permissions. Browser authentication writes require a trusted Origin when the browser supplies one and can return 429 when limited. Credential updates and role assignments require explicit local permissions.
 
-The file API records the authenticated uploader. New references can adopt an upload owned by the caller. An existing attachment requires the parent feature's read permission. After the last reference is removed, an owned upload is private to its uploader and can be attached again. Ownerless legacy attachments stay restricted. Only the file API can delete an unreferenced object. A file still linked to a record returns 409 on deletion. Audit records are written by the server and exposed through `GET /audit-logs`.
+The file API records the authenticated uploader. New references can adopt an upload owned by the caller. An existing attachment requires the parent feature's read permission. After the last reference is removed, an owned upload is private to its uploader and can be attached again. Detached ownerless legacy files can be read with `FILES_VIEW`. Only the file API can delete an unreferenced object. A file still linked to a record returns 409 on deletion.
+
+## Breaking changes from the security audit
+
+- `POST /users` returns 400 if the payload includes `password`. Omit the field and use the activation link emailed to active accounts.
+- `POST /audit-logs` was removed. Orbit writes audit records from authenticated actions. Clients with audit access can read them through `GET /audit-logs`.
 
 The authenticated `/access-lifecycle/configuration` response includes `executorEnabled` and `dryRun`, reporting the effective execution mode without exposing deployment variables or provider credentials.
 

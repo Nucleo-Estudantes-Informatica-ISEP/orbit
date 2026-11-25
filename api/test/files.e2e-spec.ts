@@ -128,6 +128,39 @@ describe('File downloads (e2e)', () => {
     expect(minio.getObjectStat).not.toHaveBeenCalled();
   });
 
+  it('allows library reads of detached ownerless files and preserves existing ownership restrictions', async () => {
+    const ownerless = { uploadedById: null, attached: true, deletedAt: null };
+    prisma.uploadedFile.findUnique.mockResolvedValueOnce(ownerless);
+    await request(app.getHttpServer()).get('/files/legacy.pdf').expect(200);
+
+    prisma.uploadedFile.findUnique.mockResolvedValueOnce(ownerless);
+    prisma.debt.findMany.mockResolvedValueOnce([{ fileKeys: ['legacy.pdf'] }]);
+    await request(app.getHttpServer()).get('/files/legacy.pdf').expect(404);
+
+    prisma.uploadedFile.findUnique.mockResolvedValueOnce(ownerless);
+    prisma.candidate.findMany.mockResolvedValueOnce([
+      { cvUrl: '/api/files/folder%2flegacy.pdf?download=1' },
+    ]);
+    await request(app.getHttpServer())
+      .get('/files/folder/legacy.pdf')
+      .expect(404);
+
+    prisma.uploadedFile.findUnique.mockResolvedValueOnce({
+      uploadedById: 'other-user',
+      attached: false,
+      deletedAt: null,
+    });
+    await request(app.getHttpServer()).get('/files/private.pdf').expect(404);
+
+    prisma.uploadedFile.findUnique.mockResolvedValueOnce({
+      ...ownerless,
+      attached: false,
+    });
+    await request(app.getHttpServer())
+      .get('/files/deleted-owner.pdf')
+      .expect(404);
+  });
+
   it('preserves the object while a parent still references it', async () => {
     prisma.debt.findMany.mockResolvedValueOnce([
       { fileKeys: ['attached.pdf'] },
@@ -179,6 +212,37 @@ describe('File downloads (e2e)', () => {
       .post('/files/upload')
       .attach('file', Buffer.alloc(10 * 1024 * 1024 + 1), 'fixture.pdf')
       .expect(413);
+  });
+
+  it('indexes parent references once across inventory batches, including encoded legacy URLs', async () => {
+    const legacy = {
+      name: 'folder/my file.pdf',
+      size: 4,
+      lastModified: new Date(2),
+    };
+    minio.listObjects.mockResolvedValueOnce([
+      legacy,
+      ...Array.from({ length: 500 }, (_, id) => ({
+        ...legacy,
+        name: `file-${id}.pdf`,
+        lastModified: new Date(1),
+      })),
+    ]);
+    prisma.candidate.findMany
+      .mockClear()
+      .mockResolvedValueOnce([
+        { cvUrl: '/api/files/folder%2Fmy%20file.pdf?download=1' },
+      ]);
+    await request(app.getHttpServer())
+      .get('/files?pageSize=1')
+      .expect(200)
+      .expect(({ body }) =>
+        expect(body).toMatchObject({
+          total: 500,
+          items: [{ name: 'file-0.pdf' }],
+        }),
+      );
+    expect(prisma.candidate.findMany).toHaveBeenCalledTimes(1);
   });
 
   afterAll(async () => {

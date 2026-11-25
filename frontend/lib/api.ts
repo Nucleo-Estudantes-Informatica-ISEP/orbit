@@ -74,13 +74,25 @@ function clearAuthAndRedirect(): never {
 export async function revokeStoredSession() {
   const marker = localStorage.getItem(SESSION_MARKER);
   try {
-    if (marker) {
-      const res = await fetch(`${API_BASE}/auth/logout`, {
-        method: "POST",
-        credentials: "include",
-        keepalive: true,
-      });
-      if (!res.ok) throw new ApiError("Logout failed", res.status);
+    if (!marker) return;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const res = await fetch(`${API_BASE}/auth/logout`, {
+          method: "POST",
+          credentials: "include",
+          keepalive: true,
+        });
+        if (!res.ok) throw new ApiError("Logout failed", res.status);
+        return;
+      } catch (error) {
+        if (
+          attempt === 1 ||
+          localStorage.getItem(SESSION_MARKER) !== marker ||
+          (error instanceof ApiError && error.status < 500)
+        ) {
+          throw error;
+        }
+      }
     }
   } finally {
     if (localStorage.getItem(SESSION_MARKER) === marker) clearStoredSession();

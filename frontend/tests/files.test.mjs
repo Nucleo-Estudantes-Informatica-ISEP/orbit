@@ -151,12 +151,39 @@ test('authenticated files', async (t) => {
     reset();
     const fetch = t.mock.method(globalThis, 'fetch', async () => new Response(null, { status: 503 }));
     await assert.rejects(revokeStoredSession(), (error) => error.status === 503);
+    assert.equal(fetch.mock.callCount(), 2);
     assert.equal(getBrowserSession(), null);
     assert.equal(storage.size, 0);
     fetch.mock.mockImplementation(async () => new Response(null, { status: 200 }));
     await revokeStoredSession();
     assert.equal(getBrowserSession(), null);
     assert.equal(storage.size, 0);
+  });
+
+  await t.test('logout retries a network failure before clearing the session', async (t) => {
+    reset();
+    let calls = 0;
+    t.mock.method(globalThis, 'fetch', async (url, options) => {
+      assert.equal(url, `${API_BASE}/auth/logout`);
+      assert.equal(options.credentials, 'include');
+      assert.equal(storage.get('auth_session'), 'session-marker');
+      if (++calls === 1) throw new TypeError('offline');
+      return new Response(null, { status: 200 });
+    });
+    await revokeStoredSession();
+    assert.equal(calls, 2);
+    assert.equal(storage.size, 0);
+  });
+
+  await t.test('logout does not retry with a replacement session cookie', async (t) => {
+    reset();
+    const fetch = t.mock.method(globalThis, 'fetch', async () => {
+      storeSession({ access_token: 'replacement', user: {} }, true);
+      return new Response(null, { status: 503 });
+    });
+    await assert.rejects(revokeStoredSession(), (error) => error.status === 503);
+    assert.equal(fetch.mock.callCount(), 1);
+    assert.equal(getBrowserSession().access_token, 'replacement');
   });
 
   await t.test('logout wins over an in-flight refresh response', async (t) => {
