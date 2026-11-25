@@ -25,12 +25,14 @@ npm audit --omit=dev
 
 The lockfile resolves `proxy-addr` to 2.0.8 to fix
 [GHSA-jqcg-44mw-7w3h](https://github.com/advisories/GHSA-jqcg-44mw-7w3h).
-After dependency updates, run `npm audit --omit=dev --audit-level=critical`
+After dependency updates, run `npm audit --omit=dev --audit-level=high`
 to reproduce the CI security gate.
 
 
-Prefer TDD for client session handling and behavior regressions. The session tests cover single-flight refresh, persisted rotating tokens, invalid-session clearing, and retry behavior. Add focused behavior tests instead of asserting implementation details.
+Prefer TDD for client session handling and behavior regressions. The session tests cover single-flight refresh, invalid-session clearing, and retry behavior. Add focused behavior tests instead of asserting implementation details.
 
 ## Deployment
 
-The production path is the non-root Docker image orchestrated by `../docker-compose.coolify.yml`, not Vercel starter deployment. Coolify exposes the frontend and keeps API/PostgreSQL/MinIO internal. After deployment verify the deployed SHA, the frontend root, API `/health`, and the affected login/refresh/profile/logout flow.
+The production path is the non-root Docker image orchestrated by `../docker-compose.coolify.yml`, not Vercel starter deployment. Coolify exposes the frontend and connects to the internal API, which uses PostgreSQL and a private S3-compatible bucket. After deployment verify the deployed SHA, the frontend root, API `/health`, and the affected login/refresh/profile/logout flow.
+
+The browser stores a non-secret session marker and keeps the access token and profile in memory. On reload it obtains a fresh access token through the HTTP-only refresh cookie. Logout clears the browser session after server revocation succeeds.

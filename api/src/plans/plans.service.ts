@@ -4,7 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
-import { MinioService } from '../files/minio.service';
+import { requireOwnedAttachments } from '../files/file-access';
 import { MailService } from '../mail/mail.service';
 import { CreatePlanDto } from './dto/create-plan.dto';
 import { UpdatePlanDto } from './dto/update-plan.dto';
@@ -14,7 +14,6 @@ import { PlanStatus } from '@prisma/client';
 export class PlansService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly minio: MinioService,
     private readonly mailService: MailService,
   ) {}
 
@@ -26,13 +25,16 @@ export class PlansService {
 
   async create(dto: CreatePlanDto, actorId: string) {
     const { deadline, ...rest } = dto;
-    return this.prisma.plan.create({
-      data: {
-        ...rest,
-        createdById: actorId,
-        ...(deadline ? { deadline: new Date(deadline) } : {}),
-      },
-      include: this.include,
+    return this.prisma.$transaction(async (tx) => {
+      await requireOwnedAttachments(tx, actorId, [dto.fileKey]);
+      return tx.plan.create({
+        data: {
+          ...rest,
+          createdById: actorId,
+          ...(deadline ? { deadline: new Date(deadline) } : {}),
+        },
+        include: this.include,
+      });
     });
   }
 
@@ -53,15 +55,29 @@ export class PlansService {
     return plan;
   }
 
-  async update(id: string, dto: UpdatePlanDto) {
+  async update(id: string, dto: UpdatePlanDto, actorId: string) {
     const { deadline, ...rest } = dto;
-    return this.prisma.plan.update({
-      where: { id },
-      data: {
-        ...rest,
-        ...(deadline ? { deadline: new Date(deadline) } : {}),
-      },
-      include: this.include,
+    return this.prisma.$transaction(async (tx) => {
+      if (dto.fileKey !== undefined) {
+        const previous = await tx.plan.findUnique({
+          where: { id },
+          select: { fileKey: true },
+        });
+        await requireOwnedAttachments(
+          tx,
+          actorId,
+          [dto.fileKey],
+          [previous?.fileKey],
+        );
+      }
+      return tx.plan.update({
+        where: { id },
+        data: {
+          ...rest,
+          ...(deadline ? { deadline: new Date(deadline) } : {}),
+        },
+        include: this.include,
+      });
     });
   }
 
@@ -114,9 +130,6 @@ export class PlansService {
   async remove(id: string) {
     const plan = await this.prisma.plan.findUnique({ where: { id } });
     if (!plan) throw new NotFoundException('Plano não encontrado');
-    if (plan.fileKey) {
-      await this.minio.deleteObject(plan.fileKey).catch(() => {});
-    }
     return this.prisma.plan.delete({ where: { id } });
   }
 

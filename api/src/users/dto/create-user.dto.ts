@@ -6,7 +6,6 @@ import {
   IsOptional,
   IsString,
   IsUUID,
-  MinLength,
 } from 'class-validator';
 import { UserStatus } from '@prisma/client';
 
@@ -17,10 +16,6 @@ export class CreateUserDto {
 
   @IsEmail()
   email: string;
-
-  @IsString()
-  @MinLength(8)
-  password: string;
 
   @IsUUID()
   departmentId: string;

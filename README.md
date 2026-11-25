@@ -12,7 +12,7 @@ Sistema interno da **NEI-ISEP** (Núcleo de Estudantes de Informática do ISEP) 
 |--------|-----------|
 | Backend | NestJS 11 · Prisma 6 · PostgreSQL 16 |
 | Frontend | Next.js 16 · React 19 · Tailwind CSS 4 · shadcn/ui |
-| Ficheiros | MinIO (armazenamento interno) |
+| Ficheiros | Armazenamento privado compatível com S3 |
 | Auth | Access JWT (15 min) + Refresh Token opaco rotativo (30 dias) · bcrypt · RBAC por permissões |
 | Drag & Drop | @dnd-kit |
 | Editor de texto | Tiptap |
@@ -46,7 +46,8 @@ Abre **http://localhost:3090** no browser.
 
 ```env
 DATABASE_URL="postgresql://postgres:postgres@db:5432/orbit?schema=public"
-JWT_SECRET="mude-isto-em-producao"
+JWT_SECRET=
+REFRESH_TOKEN_SECRET=
 PORT=3000
 CORS_ORIGIN="http://localhost:3090,http://localhost:3000"
 MINIO_ENDPOINT=minio
@@ -87,9 +88,9 @@ docker compose exec api npx prisma db seed
 
 ### Compatibilidade de sessões
 
-Ao publicar o novo formato, os access tokens anteriores sem `token_use` são rejeitados no próximo pedido autenticado, mesmo que ainda não tenham expirado. Os refresh tokens JWT anteriores também são rejeitados: os refresh tokens passam a ser valores opacos num cookie `HttpOnly`, `SameSite=Strict`, cuja fingerprint HMAC-SHA-256 é guardada em `AuthSession`. Os utilizadores com sessões antigas terão de iniciar sessão novamente; não existe uma janela de transição de 15 minutos.
+Os access tokens têm uma validade de 15 minutos. A API verifica a sessão e carrega as permissões atuais do membro em cada pedido autenticado. O frontend mantém o access token em memória e usa o cookie de refresh para retomar a sessão.
 
-Os access tokens têm uma validade de 15 minutos. Cada refresh token tem validade de 30 dias, roda em cada utilização e não pode ser reutilizado. A reutilização de um token já rodado revoga a respetiva família de sessão. Logout, reposição ou alteração da palavra-passe revogam os refresh tokens aplicáveis. Apenas access tokens já emitidos continuam válidos até à sua expiração.
+O refresh token opaco é válido por 30 dias e roda em cada utilização. Logout, alteração de credenciais e inativação revogam as sessões correspondentes. A atualização para este formato exige um novo login e novos links de reposição.
 
 ### Seed de produção
 
@@ -113,7 +114,7 @@ O seed falha antes de escrever na base se as credenciais explícitas estiverem a
 
 A produção usa `docker-compose.coolify.yml`. O serviço `migrator` executa `prisma migrate deploy` e tem de terminar com sucesso antes da API arrancar. A API corre separadamente como utilizador não-root e expõe `GET /health`; o frontend só fica pronto depois da API. Configure `SMTP_PASS` como segredo do Coolify — nunca no compose ou no Git.
 
-O MinIO é compilado da release `RELEASE.2025-10-15T17-29-55Z` em `minio/Dockerfile`, pois as imagens oficiais deixaram de estar disponíveis nos registos públicos. O volume `minio-data` mantém os dados entre builds. O CI verifica autenticação, operações S3 e persistência após reinício com `node scripts/check-minio-image.cjs orbit-minio-check` (requer `npm ci --ignore-scripts --prefix api`).
+Configure chaves distintas em `SERVICE_BASE64_64_JWT` e `REFRESH_TOKEN_SECRET`, credenciais PostgreSQL separadas para a API e para o migrador, e um bucket privado num serviço S3 atualizado. Migre e verifique os objetos do volume antigo antes de atualizar o Compose de produção. Consulte o [guia de migração](docs/shared-data.md).
 
 ---
 
@@ -183,12 +184,13 @@ docker compose exec api npx prisma migrate reset
 
 ---
 
-## Armazenamento de ficheiros (MinIO)
+## Armazenamento de ficheiros
 
-Ficheiros (fotos de inventário, CVs, documentos de planos, recursos) são armazenados no **MinIO** — compatível com S3, corre internamente sem portas expostas ao exterior.
+Ficheiros são armazenados num bucket privado compatível com S3. A API verifica as permissões do registo associado antes de servir um anexo.
 
 - Upload: `POST /files/upload` (multipart, campo `file`, máx. 10MB)
-- Download: `GET /files/:key` — o backend faz proxy
+- Download: `GET /files/:key` — o backend verifica o acesso e serve o ficheiro
+- Eliminação: `DELETE /files/:key` com `FILES_DELETE`, após remover as referências ao ficheiro
 - O frontend acede sempre via `/api/files/<key>` (proxy)
 
 ---
@@ -224,10 +226,10 @@ orbit/
 ## Notas de segurança
 
 - Apenas a porta `3090` (frontend) está exposta publicamente no Docker.
-- API, base de dados e MinIO comunicam exclusivamente pela rede interna Docker.
-- O access JWT armazena permissões e identidade. O refresh recarrega o perfil/permissões atuais e roda os tokens; alterações deixam de exigir um login completo.
+- A API usa identidades restritas para a base de dados e para o bucket privado.
+- O access JWT identifica o membro e a sessão. A API consulta o estado e as permissões atuais antes de autorizar cada pedido.
 - Refresh tokens opacos ficam num cookie `HttpOnly`, `SameSite=Strict`; o servidor guarda apenas fingerprints HMAC-SHA-256, roda-os em cada utilização e revoga-os no logout e em alterações de password.
-- Seguimento de segurança: adicionar rate limiting a `/auth/login` e `/auth/refresh`, tendo em conta o proxy Next.js e eventuais réplicas da API. Ainda não existe limitação de pedidos nestes endpoints.
+- A API limita pedidos de autenticação por instância. Configure `AUTH_TRUST_PROXY_HOPS` para a topologia garantida pelo proxy e aplique limites partilhados no ingress quando houver várias réplicas.
 
 ---
 
@@ -235,7 +237,8 @@ orbit/
 
 For shared PostgreSQL and MinIO deployments, use [`docker-compose.shared.yml`](./docker-compose.shared.yml) and follow the [shared-data migration guide](./docs/shared-data.md). Keep the existing Compose location until the data copy and cutover are verified.
 
-The embedded MinIO service builds the pinned server source `RELEASE.2025-10-15T17-29-55Z` through [`minio/Dockerfile`](./minio/Dockerfile), keeps the existing `/data` volume and checks `/minio/health/live`. CI builds this image alongside the API and frontend and verifies authentication, bucket/object operations and persistence after restart with [`scripts/check-minio-image.cjs`](./scripts/check-minio-image.cjs). The shared-data deployment uses the separately managed MinIO service.
+CI uses a disposable MinIO image only as a compatibility fixture for the S3 client. Production requires a separately maintained storage endpoint.
+
 
 Leia [`AGENTS.md`](./AGENTS.md) antes de alterar o repositório. Para correções, prefira TDD: reproduza primeiro o erro num teste focado, implemente a menor correção e refatore com a suite verde.
 

@@ -1,6 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
+import { sanitizeAnnouncementHtml } from '../announcements/announcement-html';
+
+function escapeHtml(text: string) {
+  return text
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
 
 @Injectable()
 export class MailService {
@@ -9,10 +19,13 @@ export class MailService {
 
   constructor() {
     const host = process.env.SMTP_HOST;
+    const user = process.env.SMTP_USER;
+    const pass = process.env.SMTP_PASS;
+    if (process.env.NODE_ENV === 'production' && (!host || !user || !pass)) {
+      throw new Error('Production requires authenticated SMTP configuration.');
+    }
     if (!host) {
-      this.logger.warn(
-        'SMTP_HOST not configured — emails will be logged to the console instead of sent.',
-      );
+      this.logger.warn('SMTP_HOST is unset. Outgoing mail is disabled.');
       return;
     }
 
@@ -20,61 +33,15 @@ export class MailService {
       host,
       port: Number(process.env.SMTP_PORT ?? 587),
       secure: process.env.SMTP_SECURE === 'true',
-      auth:
-        process.env.SMTP_USER && process.env.SMTP_PASS
-          ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
-          : undefined,
+      requireTLS: process.env.NODE_ENV === 'production',
+      disableFileAccess: true,
+      disableUrlAccess: true,
+      auth: user && pass ? { user, pass } : undefined,
     });
   }
 
   private get from() {
     return process.env.SMTP_FROM || 'ORBIT <no-reply@nei-isep.org>';
-  }
-
-  async sendWelcomeEmail(to: string, name: string, password: string) {
-    const subject = 'Bem-vindo ao ORBIT — as tuas credenciais de acesso';
-    const text = [
-      `Olá ${name},`,
-      '',
-      'A tua conta ORBIT foi criada com sucesso.',
-      '',
-      `Email: ${to}`,
-      `Password: ${password}`,
-      '',
-      'Recomendamos que alteres a tua palavra-passe após o primeiro login.',
-      'Acede em: https://orbit.nei-isep.org',
-    ].join('\n');
-
-    const html = `
-      <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto; color: #111;">
-        <h2 style="font-size: 18px;">Bem-vindo ao ORBIT</h2>
-        <p>Olá <strong>${name}</strong>,</p>
-        <p>A tua conta ORBIT foi criada com sucesso.</p>
-        <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
-          <tr><td style="padding: 6px 12px; color: #555;">Email</td><td style="padding: 6px 12px; font-weight: 600;">${to}</td></tr>
-          <tr><td style="padding: 6px 12px; color: #555;">Password</td><td style="padding: 6px 12px; font-weight: 600;">${password}</td></tr>
-        </table>
-        <p style="font-size: 13px; color: #777;">Recomendamos que alteres a tua palavra-passe após o primeiro login.</p>
-        <a href="https://orbit.nei-isep.org" style="display: inline-block; padding: 10px 18px; background: #111; color: #fff; text-decoration: none; border-radius: 6px;">
-          Aceder ao ORBIT
-        </a>
-      </div>
-    `;
-
-    if (!this.transporter) {
-      this.logger.log(
-        `[DEV] Welcome email for ${name} <${to}> — password: ${password}`,
-      );
-      return;
-    }
-
-    await this.transporter.sendMail({
-      from: this.from,
-      to,
-      subject,
-      text,
-      html,
-    });
   }
 
   async sendAnnouncementNotification(
@@ -99,11 +66,11 @@ export class MailService {
 
     const html = `
       <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto; color: #111;">
-        <p style="font-size: 14px; color: #555;">Olá <strong>${userName}</strong>,</p>
-        <p style="font-size: 13px; color: #777;">Foi publicado um novo anúncio (${origin}):</p>
+        <p style="font-size: 14px; color: #555;">Olá <strong>${escapeHtml(userName)}</strong>,</p>
+        <p style="font-size: 13px; color: #777;">Foi publicado um novo anúncio (${escapeHtml(origin)}):</p>
         <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin: 12px 0;">
-          <h3 style="margin: 0 0 8px; font-size: 15px;">${title}</h3>
-          <p style="margin: 0; font-size: 13px; color: #555; white-space: pre-wrap;">${content}</p>
+          <h3 style="margin: 0 0 8px; font-size: 15px;">${escapeHtml(title)}</h3>
+          <div style="margin: 0; font-size: 13px; color: #555;">${sanitizeAnnouncementHtml(content)}</div>
         </div>
         <a href="https://orbit.nei-isep.org/dashboard/announcements" style="display: inline-block; padding: 10px 18px; background: #111; color: #fff; text-decoration: none; border-radius: 6px;">
           Ver no ORBIT
@@ -146,10 +113,10 @@ export class MailService {
 
     const html = `
       <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto; color: #111;">
-        <p style="font-size: 14px; color: #555;">Olá <strong>${userName}</strong>,</p>
-        <p style="font-size: 13px; color: #777;">Foi-te atribuída uma task${where}:</p>
+        <p style="font-size: 14px; color: #555;">Olá <strong>${escapeHtml(userName)}</strong>,</p>
+        <p style="font-size: 13px; color: #777;">Foi-te atribuída uma task${escapeHtml(where)}:</p>
         <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin: 12px 0;">
-          <p style="margin: 0; font-size: 14px; font-weight: 600;">${taskTitle}</p>
+          <p style="margin: 0; font-size: 14px; font-weight: 600;">${escapeHtml(taskTitle)}</p>
         </div>
         <a href="https://orbit.nei-isep.org/dashboard/tasks" style="display: inline-block; padding: 10px 18px; background: #111; color: #fff; text-decoration: none; border-radius: 6px;">
           Ver no ORBIT
@@ -197,11 +164,11 @@ export class MailService {
 
     const html = `
       <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto; color: #111;">
-        <p style="font-size: 14px; color: #555;">Olá <strong>${userName}</strong>,</p>
-        <p style="font-size: 13px; color: #777;">O teu plano foi <strong>${statusLabel}</strong>:</p>
+        <p style="font-size: 14px; color: #555;">Olá <strong>${escapeHtml(userName)}</strong>,</p>
+        <p style="font-size: 13px; color: #777;">O teu plano foi <strong>${escapeHtml(statusLabel)}</strong>:</p>
         <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin: 12px 0;">
-          <p style="margin: 0; font-size: 14px; font-weight: 600;">${planName}</p>
-          ${rejectionNote ? `<p style="margin: 8px 0 0; font-size: 13px; color: #dc2626;">Motivo: ${rejectionNote}</p>` : ''}
+          <p style="margin: 0; font-size: 14px; font-weight: 600;">${escapeHtml(planName)}</p>
+          ${rejectionNote ? `<p style="margin: 8px 0 0; font-size: 13px; color: #dc2626;">Motivo: ${escapeHtml(rejectionNote)}</p>` : ''}
         </div>
         <a href="https://orbit.nei-isep.org/dashboard/plans" style="display: inline-block; padding: 10px 18px; background: #111; color: #fff; text-decoration: none; border-radius: 6px;">
           Ver no ORBIT
@@ -240,19 +207,16 @@ export class MailService {
         <h2 style="font-size: 18px;">Repor palavra-passe</h2>
         <p>Recebemos um pedido para repor a palavra-passe da tua conta ORBIT.</p>
         <p>
-          <a href="${resetUrl}" style="display: inline-block; padding: 10px 18px; background: #111; color: #fff; text-decoration: none; border-radius: 6px;">
+          <a href="${escapeHtml(resetUrl)}" style="display: inline-block; padding: 10px 18px; background: #111; color: #fff; text-decoration: none; border-radius: 6px;">
             Definir nova palavra-passe
           </a>
         </p>
         <p style="font-size: 13px; color: #555;">Este link é válido por 1 hora. Se não foste tu a fazer este pedido, ignora este email.</p>
-        <p style="font-size: 12px; color: #888; word-break: break-all;">${resetUrl}</p>
+        <p style="font-size: 12px; color: #888; word-break: break-all;">${escapeHtml(resetUrl)}</p>
       </div>
     `;
 
-    if (!this.transporter) {
-      this.logger.log(`[DEV] Password reset link for ${to}: ${resetUrl}`);
-      return;
-    }
+    if (!this.transporter) return;
 
     await this.transporter.sendMail({
       from: this.from,
@@ -278,7 +242,7 @@ export class MailService {
     const html = `
       <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto; color: #111;">
         <h2 style="font-size: 18px;">Palavra-passe alterada</h2>
-        <p>Olá <strong>${userName}</strong>,</p>
+        <p>Olá <strong>${escapeHtml(userName)}</strong>,</p>
         <p>A palavra-passe da tua conta ORBIT foi alterada com sucesso.</p>
         <div style="border: 1px solid #fbbf24; background: #fffbeb; border-radius: 8px; padding: 16px; margin: 16px 0;">
           <p style="margin: 0; font-size: 13px; color: #92400e;">

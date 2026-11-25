@@ -89,15 +89,15 @@ export class AnnouncementsController {
   @Get(':id')
   @Permissions('ANNOUNCEMENTS_READ')
   @ApiOkResponse({ type: AnnouncementResponseDto })
-  findOne(@Param() params: IdParamDto) {
-    return this.svc.findOne(params.id);
+  findOne(@Param() params: IdParamDto, @CurrentUser('userId') userId: string) {
+    return this.svc.findOne(params.id, userId);
   }
 
   @Put(':id/read')
   @Permissions('ANNOUNCEMENTS_READ')
   @ApiOkResponse({ type: AnnouncementResponseDto })
-  markRead(@Param() params: IdParamDto) {
-    return this.svc.markRead(params.id);
+  markRead(@Param() params: IdParamDto, @CurrentUser('userId') userId: string) {
+    return this.svc.markRead(params.id, userId);
   }
 
   @Put(':id')

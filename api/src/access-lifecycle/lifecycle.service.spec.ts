@@ -35,6 +35,7 @@ describe('LifecycleService', () => {
       count: jest.fn(),
     },
     processApproval: { create: jest.fn() },
+    auditLog: { create: jest.fn() },
     operationEvidence: { create: jest.fn() },
     $transaction: jest.fn(),
     $queryRaw: jest.fn(),

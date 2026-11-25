@@ -563,6 +563,14 @@ export class LifecycleService {
           ) as Prisma.InputJsonValue,
         },
       });
+      await tx.auditLog.create({
+        data: {
+          performedById: actorId,
+          action: dto.approved ? 'APPROVE' : 'REJECT',
+          entity: 'LifecycleProcess',
+          entityId: id,
+        },
+      });
       for (const op of process.operations) {
         await tx.accessOperation.update({
           where: { id: op.id },

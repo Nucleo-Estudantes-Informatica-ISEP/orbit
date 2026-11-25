@@ -1,4 +1,13 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  UseGuards,
+} from '@nestjs/common';
 import { RolesService } from './roles.service';
 import { CreateRoleDto } from './create-role.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -9,6 +18,7 @@ import { IdParamDto, TransferRoleDto } from '../contracts/request.dto';
 import { CountResponseDto, RoleResponseDto } from '../contracts/response.dto';
 import { ApiProtectedController } from '../contracts/openapi.decorators';
 import { UpdateRoleDto } from './update-role.dto';
+import { CurrentUser } from '../auth/current-user.decorator';
 
 @ApiTags('roles')
 @ApiProtectedController()
@@ -20,8 +30,8 @@ export class RolesController {
   @Post()
   @Permissions('ROLES_CREATE')
   @ApiCreatedResponse({ type: RoleResponseDto })
-  create(@Body() dto: CreateRoleDto) {
-    return this.svc.create(dto);
+  create(@Body() dto: CreateRoleDto, @CurrentUser('userId') actorId: string) {
+    return this.svc.create(dto, actorId);
   }
 
   @Get()
@@ -41,15 +51,19 @@ export class RolesController {
   @Put(':id')
   @Permissions('ROLES_UPDATE')
   @ApiOkResponse({ type: RoleResponseDto })
-  update(@Param() params: IdParamDto, @Body() dto: UpdateRoleDto) {
-    return this.svc.update(params.id, dto);
+  update(
+    @Param() params: IdParamDto,
+    @Body() dto: UpdateRoleDto,
+    @CurrentUser('userId') actorId: string,
+  ) {
+    return this.svc.update(params.id, dto, actorId);
   }
 
   @Delete(':id')
   @Permissions('ROLES_DELETE')
   @ApiOkResponse({ type: RoleResponseDto })
-  remove(@Param() params: IdParamDto) {
-    return this.svc.remove(params.id);
+  remove(@Param() params: IdParamDto, @CurrentUser('userId') actorId: string) {
+    return this.svc.remove(params.id, actorId);
   }
 
   @Get(':id/users/count')
@@ -62,7 +76,15 @@ export class RolesController {
   @Post(':id/transfer-and-delete')
   @Permissions('ROLES_DELETE')
   @ApiCreatedResponse({ type: RoleResponseDto })
-  transferAndDelete(@Param() params: IdParamDto, @Body() body: TransferRoleDto) {
-    return this.svc.transferAndDelete(params.id, body.destinationRoleId);
+  transferAndDelete(
+    @Param() params: IdParamDto,
+    @Body() body: TransferRoleDto,
+    @CurrentUser('userId') actorId: string,
+  ) {
+    return this.svc.transferAndDelete(
+      params.id,
+      body.destinationRoleId,
+      actorId,
+    );
   }
 }

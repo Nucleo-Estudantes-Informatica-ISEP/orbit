@@ -1,7 +1,8 @@
 node_modules
 dist
 npm-debug.log*
-.env
+.env*
+!.env.example
 .DS_Store
 .git
 .vscode

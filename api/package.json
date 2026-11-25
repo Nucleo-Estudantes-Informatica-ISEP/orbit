@@ -21,13 +21,14 @@
     "start:prod": "node dist/src/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:cov": "jest --coverage",
-    "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:watch": "npm test -- --watch",
+    "test:cov": "npm test -- --coverage",
+    "test:debug": "node --experimental-vm-modules --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
+    "test:e2e": "npm test -- --config ./test/jest-e2e.json"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1172.0",
     "@nestjs/common": "^11.2.11",
     "@nestjs/core": "^11.2.11",
     "@nestjs/jwt": "^11.0.2",
@@ -38,13 +39,13 @@
     "bcryptjs": "^3.0.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
-    "minio": "^8.0.7",
     "nodemailer": "^10.6.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pdfkit": "^0.20.2",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "sanitize-html": "^2.18.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.7",
@@ -59,6 +60,7 @@
     "@types/node": "^26.6.6",
     "@types/passport-jwt": "^4.0.1",
     "@types/pdfkit": "^0.17.7",
+    "@types/sanitize-html": "^2.16.2",
     "@types/supertest": "^7.2.1",
     "eslint": "^10.15.0",
     "eslint-config-prettier": "^10.0.1",
@@ -96,7 +98,11 @@
   "overrides": {
     "deepmerge-ts": "8.0.2",
     "js-yaml": "4.3.2",
-    "multer": "2.3.0"
+    "multer": "2.5.0",
+    "body-parser": "2.4.0",
+    "@prisma/config": {
+      "effect": "3.22.1"
+    }
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"

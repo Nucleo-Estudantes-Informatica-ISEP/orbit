@@ -120,8 +120,9 @@ export default function SettingsPage() {
       setPasswordForm({ current: '', next: '', confirm: '' });
       setPasswordMsg(t('settings.passwordSuccess'));
       window.setTimeout(() => {
-        logout();
-        window.location.assign(new URL('/login', window.location.origin));
+        void logout().finally(() => {
+          window.location.assign(new URL('/login', window.location.origin));
+        }).catch(() => {});
       }, 750);
     } catch (error: unknown) { setPasswordMsg(error instanceof Error ? error.message : t('settings.passwordError')); }
   };

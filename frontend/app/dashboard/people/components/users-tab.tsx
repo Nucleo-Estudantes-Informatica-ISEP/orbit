@@ -56,6 +56,8 @@ export default function UsersTab() {
   const canCreateUsers = usePermission('USERS_CREATE');
   const canUpdateUsers = usePermission('USERS_UPDATE');
   const canDeleteUsers = usePermission('USERS_DELETE');
+  const canAssignRoles = usePermission('ROLES_ASSIGN');
+  const canManageCredentials = usePermission('USERS_MANAGE_CREDENTIALS');
 
   const { page, pageSize, setPage, setPageSize, paginate } = usePagination(10);
 
@@ -124,13 +126,12 @@ export default function UsersTab() {
     const payload = {
       name: updatedData.name,
       email: updatedData.email,
-      password: updatedData.password,
       departmentId: updatedData.departmentId,
       roles: updatedData.roles,
       status: updatedData.active === false ? 'INACTIVE' : 'ACTIVE',
     };
     if (isEditing) {
-      await api.put(`/users/${selectedUser.id}`, payload);
+      await api.put(`/users/${selectedUser.id}`, { ...payload, password: updatedData.password });
     } else {
       await api.post('/users', payload);
     }
@@ -272,6 +273,8 @@ export default function UsersTab() {
         onSave={handleSaveUser}
         roles={roles}
         departments={departments}
+        canAssignRoles={canAssignRoles}
+        canManageCredentials={canManageCredentials}
       />
 
       {canDeleteUsers && (

@@ -1,3 +1,4 @@
+import { CurrentUser } from '../auth/current-user.decorator';
 import {
   Controller,
   Get,
@@ -40,8 +41,11 @@ export class ResourcesController {
   @Post()
   @Permissions('RESOURCES_CREATE')
   @ApiCreatedResponse({ type: ResourceResponseDto })
-  create(@Body() dto: CreateResourceDto) {
-    return this.svc.create(dto);
+  create(
+    @Body() dto: CreateResourceDto,
+    @CurrentUser('userId') actorId: string,
+  ) {
+    return this.svc.create(dto, actorId);
   }
 
   @Get()
@@ -71,8 +75,12 @@ export class ResourcesController {
   @Put(':id')
   @Permissions('RESOURCES_UPDATE')
   @ApiOkResponse({ type: ResourceResponseDto })
-  update(@Param() params: IdParamDto, @Body() body: UpdateResourceDto) {
-    return this.svc.update(params.id, body);
+  update(
+    @Param() params: IdParamDto,
+    @Body() body: UpdateResourceDto,
+    @CurrentUser('userId') actorId: string,
+  ) {
+    return this.svc.update(params.id, body, actorId);
   }
 
   @Delete(':id')

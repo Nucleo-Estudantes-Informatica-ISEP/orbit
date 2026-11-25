@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AuthController } from './auth.controller';
 import type { AuthService } from './auth.service';
@@ -11,10 +12,12 @@ describe('AuthController refresh cookie', () => {
   const authenticate = jest.fn().mockResolvedValue(session);
   const refreshToken = jest.fn().mockResolvedValue(session);
   const logout = jest.fn().mockResolvedValue({ message: 'Sessão terminada.' });
+  const requestPasswordReset = jest.fn();
   const authService = {
     authenticate,
     refreshToken,
     logout,
+    requestPasswordReset,
   } as unknown as AuthService;
   const controller = new AuthController(authService);
 
@@ -88,5 +91,27 @@ describe('AuthController refresh cookie', () => {
         path: '/',
       }),
     );
+  });
+  it('returns the generic recovery response and logs a sanitized failure', async () => {
+    const email = 'member@example.test';
+    requestPasswordReset.mockRejectedValueOnce(
+      new Error(`SMTP failed for ${email}`),
+    );
+    const error = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => {});
+    try {
+      expect(controller.forgotPassword({ email })).toEqual(
+        expect.objectContaining({
+          message: expect.any(String) as string,
+        }),
+      );
+      await Promise.resolve();
+      expect(error).toHaveBeenCalledWith(
+        'Password setup or recovery request failed',
+      );
+    } finally {
+      error.mockRestore();
+    }
   });
 });

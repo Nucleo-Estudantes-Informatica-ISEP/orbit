@@ -8,6 +8,7 @@ interface SessionResponse {
 }
 
 const SESSION_MARKER = "auth_session";
+let browserSession: (SessionResponse & { marker: string }) | null = null;
 
 export class ApiError extends Error {
   readonly status: number;
@@ -19,9 +20,13 @@ export class ApiError extends Error {
   }
 }
 
-function getToken(): string | null {
+export function getBrowserSession() {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem("auth_token");
+  return browserSession?.marker === localStorage.getItem(SESSION_MARKER) ? browserSession : null;
+}
+
+function getToken(): string | null {
+  return getBrowserSession()?.access_token ?? null;
 }
 
 export function hasStoredSession(): boolean {
@@ -37,19 +42,20 @@ function notifySessionChange() {
 
 export function clearStoredSession() {
   if (typeof window === "undefined") return;
+  browserSession = null;
   localStorage.removeItem("auth_token");
   localStorage.removeItem("auth_user");
   localStorage.removeItem(SESSION_MARKER);
   notifySessionChange();
 }
 
-export function storeSession(session: SessionResponse) {
+export function storeSession(session: SessionResponse, replaceSession = false) {
   if (typeof window === "undefined") return;
-  localStorage.setItem("auth_token", session.access_token);
-  localStorage.setItem("auth_user", JSON.stringify(session.user));
-  if (!localStorage.getItem(SESSION_MARKER)) {
-    localStorage.setItem(SESSION_MARKER, crypto.randomUUID());
-  }
+  const marker = (!replaceSession && localStorage.getItem(SESSION_MARKER)) || crypto.randomUUID();
+  localStorage.removeItem("auth_token");
+  localStorage.removeItem("auth_user");
+  localStorage.setItem(SESSION_MARKER, marker);
+  browserSession = { ...session, marker };
   notifySessionChange();
 }
 
@@ -65,15 +71,20 @@ function clearAuthAndRedirect(): never {
   throw new Error("Sessão expirada. Por favor, faz login novamente.");
 }
 
-export function revokeStoredSession() {
-  if (hasStoredSession()) {
-    void fetch(`${API_BASE}/auth/logout`, {
-      method: "POST",
-      credentials: "include",
-      keepalive: true,
-    }).catch(() => {});
+export async function revokeStoredSession() {
+  const marker = localStorage.getItem(SESSION_MARKER);
+  try {
+    if (marker) {
+      const res = await fetch(`${API_BASE}/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+        keepalive: true,
+      });
+      if (!res.ok) throw new ApiError("Logout failed", res.status);
+    }
+  } finally {
+    if (localStorage.getItem(SESSION_MARKER) === marker) clearStoredSession();
   }
-  clearStoredSession();
 }
 
 let refreshPromise: Promise<string> | null = null;
@@ -86,7 +97,7 @@ async function exchangeRefreshToken(
     clearAuthAndRedirect();
   }
 
-  // Another tab may have completed rotation while this one waited for the lock.
+  // Another request in this tab may have refreshed while waiting for the lock.
   const currentAccessToken = getToken();
   if (currentAccessToken && currentAccessToken !== observedAccessToken) {
     return currentAccessToken;
@@ -120,7 +131,7 @@ async function exchangeRefreshToken(
 /**
  * Rotate the long-lived refresh token and obtain a new access token.
  * A shared promise deduplicates requests in this tab; Web Locks deduplicate
- * rotation across tabs that share the same localStorage session.
+ * rotation across tabs. Only a non-secret session marker is shared.
  */
 export async function refreshAccessToken(): Promise<string> {
   if (typeof window === "undefined") {
@@ -198,13 +209,24 @@ export function resolveFileUrl(
   value: string | null | undefined,
 ): string | undefined {
   if (!value) return undefined;
-  const filePrefix = `${API_BASE}/files/`;
-  if (value.startsWith(filePrefix)) {
-    const key = value.slice(filePrefix.length).split("?")[0].split("#")[0];
-    return getFileUrl(key);
+  const currentOrigin = typeof window === "undefined" ? "" : window.location.origin;
+  const prefix = [
+    `${API_BASE}/files/`,
+    "/api/files/",
+    "/files/",
+    `${currentOrigin}/api/files/`,
+    `${currentOrigin}/files/`,
+  ].find((candidate) => value.startsWith(candidate));
+  if (prefix) {
+    const key = value.slice(prefix.length).split(/[?#]/, 1)[0];
+    try {
+      return getFileUrl(decodeURIComponent(key));
+    } catch {
+      return undefined;
+    }
   }
-  if (!/^https?:\/\//i.test(value)) return getFileUrl(value);
-  return value;
+  if (/^https?:\/\//i.test(value)) return value;
+  return /^[a-z][a-z0-9+.-]*:/i.test(value) || value.startsWith("/") ? undefined : getFileUrl(value);
 }
 
 export async function fetchFileBlob(

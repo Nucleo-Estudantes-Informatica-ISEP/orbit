@@ -2,6 +2,12 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { MailService } from '../mail/mail.service';
 import { CreateAnnouncementDto } from './dto/create-announcement.dto';
+import type { UpdateAnnouncementDto } from './dto/update-announcement.dto';
+import type { Prisma, Visibility } from '@prisma/client';
+import {
+  sanitizeAnnouncementHtml,
+  safeAnnouncement,
+} from './announcement-html';
 
 @Injectable()
 export class AnnouncementsService {
@@ -46,7 +52,9 @@ export class AnnouncementsService {
       ...announcementData
     } = data;
 
-    const resolvedContent = content ?? description ?? '';
+    const resolvedContent = sanitizeAnnouncementHtml(
+      content ?? description ?? '',
+    );
     const title =
       (announcementData as any).title || resolvedContent.slice(0, 80);
 
@@ -151,47 +159,57 @@ export class AnnouncementsService {
     );
   }
 
-  async findAll(
+  private async audience(
     userId: string,
-    filters?: { page?: number; pageSize?: number; visibility?: string },
-  ) {
+  ): Promise<Prisma.AnnouncementWhereInput> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { departmentId: true },
     });
+    return {
+      OR: [
+        { visibility: 'PUBLIC' },
+        ...(user
+          ? [
+              {
+                visibility: 'DEPARTMENT' as const,
+                announcementDepartments: {
+                  some: { departmentId: user.departmentId },
+                },
+              },
+            ]
+          : []),
+        { visibility: 'PRIVATE', targetUserId: userId, type: 'ANNOUNCEMENT' },
+        { visibility: 'PRIVATE', createdById: userId, type: 'ANNOUNCEMENT' },
+      ],
+    };
+  }
+
+  private listWhere(
+    audience: Prisma.AnnouncementWhereInput,
+    visibility?: string,
+  ) {
+    return {
+      ...audience,
+      ...(visibility && visibility !== 'ALL'
+        ? { visibility: visibility as Visibility }
+        : {}),
+    };
+  }
+
+  async findAll(
+    userId: string,
+    filters?: { page?: number; pageSize?: number; visibility?: string },
+  ) {
     const page = Math.max(1, Number(filters?.page ?? 1) || 1);
     const pageSize = Math.max(
       1,
       Math.min(100, Number(filters?.pageSize ?? 6) || 6),
     );
-    const where: any = {
-      AND: [
-        {
-          OR: [
-            { visibility: 'PUBLIC' },
-            {
-              visibility: 'DEPARTMENT',
-              announcementDepartments: {
-                some: { departmentId: user?.departmentId ?? '' },
-              },
-            },
-            {
-              visibility: 'PRIVATE',
-              targetUserId: userId,
-              type: 'ANNOUNCEMENT',
-            },
-            {
-              visibility: 'PRIVATE',
-              createdById: userId,
-              type: 'ANNOUNCEMENT',
-            },
-          ],
-        },
-        ...(filters?.visibility && filters.visibility !== 'ALL'
-          ? [{ visibility: filters.visibility }]
-          : []),
-      ],
-    };
+    const where = this.listWhere(
+      await this.audience(userId),
+      filters?.visibility,
+    );
     const [total, items] = await Promise.all([
       this.prisma.announcement.count({ where }),
       this.prisma.announcement.findMany({
@@ -202,33 +220,16 @@ export class AnnouncementsService {
         take: pageSize,
       }),
     ]);
-    return { items, total, page, pageSize };
+    return { items: items.map(safeAnnouncement), total, page, pageSize };
   }
 
   async findAllRaw(userId: string, visibility?: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { departmentId: true },
-    });
-    const where: any = {
-      OR: [
-        { visibility: 'PUBLIC' },
-        {
-          visibility: 'DEPARTMENT',
-          announcementDepartments: {
-            some: { departmentId: user?.departmentId ?? '' },
-          },
-        },
-        { visibility: 'PRIVATE', targetUserId: userId, type: 'ANNOUNCEMENT' },
-        { visibility: 'PRIVATE', createdById: userId, type: 'ANNOUNCEMENT' },
-      ],
-      ...(visibility && visibility !== 'ALL' ? { visibility } : {}),
-    };
-    return this.prisma.announcement.findMany({
-      where,
+    const rows = await this.prisma.announcement.findMany({
+      where: this.listWhere(await this.audience(userId), visibility),
       orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
       include: this.include,
     });
+    return rows.map(safeAnnouncement);
   }
 
   createManyForUsers(
@@ -287,28 +288,31 @@ export class AnnouncementsService {
       );
   }
 
-  async findOne(id: string) {
-    const a = await this.prisma.announcement.findUnique({
-      where: { id },
+  async findOne(id: string, userId: string) {
+    const row = await this.prisma.announcement.findFirst({
+      where: { id, ...(await this.audience(userId)) },
       include: this.include,
     });
-    if (!a) throw new NotFoundException('Announcement not found');
-    return a;
+    if (!row) throw new NotFoundException('Announcement not found');
+    return safeAnnouncement(row);
   }
 
-  findAllForUser(userId: string) {
-    return this.prisma.announcement.findMany({
+  async findAllForUser(userId: string) {
+    const rows = await this.prisma.announcement.findMany({
       where: { targetUserId: userId },
       orderBy: { createdAt: 'desc' },
       include: this.include,
     });
+    return rows.map(safeAnnouncement);
   }
 
-  markRead(id: string) {
-    return this.prisma.announcement.update({
-      where: { id },
+  async markRead(id: string, userId: string) {
+    const [row] = await this.prisma.announcement.updateManyAndReturn({
+      where: { id, targetUserId: userId },
       data: { read: true },
     });
+    if (!row) throw new NotFoundException('Announcement not found');
+    return safeAnnouncement(row);
   }
 
   markAllRead(userId: string) {
@@ -318,9 +322,20 @@ export class AnnouncementsService {
     });
   }
 
-  async update(id: string, data: any) {
-    const { departmentIds, targetUserIds, ...updateData } = data;
-    return this.prisma.$transaction(async (tx) => {
+  async update(id: string, data: UpdateAnnouncementDto) {
+    const {
+      departmentIds,
+      content,
+      description,
+      title,
+      targetUserId,
+      type,
+      visibility,
+      pinned,
+      date,
+    } = data;
+    const rawContent = content ?? description;
+    const updated = await this.prisma.$transaction(async (tx) => {
       if (departmentIds !== undefined) {
         await tx.announcementDepartment.deleteMany({
           where: { announcementId: id },
@@ -329,7 +344,15 @@ export class AnnouncementsService {
       return tx.announcement.update({
         where: { id },
         data: {
-          ...updateData,
+          title,
+          targetUserId,
+          type,
+          visibility,
+          pinned,
+          ...(date ? { createdAt: date } : {}),
+          ...(rawContent !== undefined
+            ? { content: sanitizeAnnouncementHtml(rawContent) }
+            : {}),
           ...(Array.isArray(departmentIds) && departmentIds.length > 0
             ? {
                 announcementDepartments: {
@@ -343,10 +366,13 @@ export class AnnouncementsService {
         include: this.include,
       });
     });
+    return safeAnnouncement(updated);
   }
 
-  remove(id: string) {
-    return this.prisma.announcement.delete({ where: { id } });
+  async remove(id: string) {
+    return safeAnnouncement(
+      await this.prisma.announcement.delete({ where: { id } }),
+    );
   }
 
   async togglePin(id: string) {
@@ -355,9 +381,11 @@ export class AnnouncementsService {
       select: { pinned: true },
     });
     if (!a) throw new NotFoundException('Announcement not found');
-    return this.prisma.announcement.update({
-      where: { id },
-      data: { pinned: !a.pinned },
-    });
+    return safeAnnouncement(
+      await this.prisma.announcement.update({
+        where: { id },
+        data: { pinned: !a.pinned },
+      }),
+    );
   }
 }

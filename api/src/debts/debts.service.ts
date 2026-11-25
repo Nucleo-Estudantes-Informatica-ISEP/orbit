@@ -4,31 +4,31 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
-import { MinioService } from '../files/minio.service';
+import { requireOwnedAttachments } from '../files/file-access';
 import { DebtStatus, DebtType, type Prisma } from '@prisma/client';
 
 export type CreateDebtInput = Omit<
   Prisma.DebtUncheckedCreateInput,
-  'occurredAt' | 'status' | 'completedAt'
+  'occurredAt' | 'status' | 'completedAt' | 'fileKeys' | 'createdById'
 > & {
+  createdById: string;
   occurredAt?: Date | string;
+  fileKeys?: string[];
 };
 
 export type UpdateDebtInput = Omit<
   Prisma.DebtUncheckedUpdateInput,
-  'occurredAt' | 'status' | 'completedAt'
+  'occurredAt' | 'status' | 'completedAt' | 'fileKeys'
 > & {
   occurredAt?: Date | string;
+  fileKeys?: string[];
   status?: DebtStatus;
   completedAt?: Date | null;
 };
 
 @Injectable()
 export class DebtsService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly minio: MinioService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   private readonly include = {
     createdBy: { select: { id: true, name: true } },
@@ -43,13 +43,16 @@ export class DebtsService {
     ) {
       rest.occurredAt = new Date(rest.occurredAt);
     }
-    return this.prisma.debt.create({
-      data: {
-        ...rest,
-        status: 'PENDING',
-        completedAt: null,
-      },
-      include: this.include,
+    return this.prisma.$transaction(async (tx) => {
+      await requireOwnedAttachments(tx, data.createdById, data.fileKeys ?? []);
+      return tx.debt.create({
+        data: {
+          ...rest,
+          status: 'PENDING',
+          completedAt: null,
+        },
+        include: this.include,
+      });
     });
   }
 
@@ -70,34 +73,42 @@ export class DebtsService {
     return d;
   }
 
-  async update(id: string, data: UpdateDebtInput) {
-    const existing = await this.prisma.debt.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException('Dívida não encontrada');
-    if (existing.status === 'COMPLETED') {
-      throw new BadRequestException(
-        'Não é possível editar uma dívida concluída',
+  async update(id: string, data: UpdateDebtInput, actorId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await tx.debt.findUnique({ where: { id } });
+      if (!existing) throw new NotFoundException('Dívida não encontrada');
+      if (existing.status === 'COMPLETED') {
+        throw new BadRequestException(
+          'Não é possível editar uma dívida concluída',
+        );
+      }
+      await requireOwnedAttachments(
+        tx,
+        actorId,
+        data.fileKeys ?? [],
+        existing.fileKeys,
       );
-    }
-    const rest = data;
-    if (
-      rest.occurredAt &&
-      typeof rest.occurredAt === 'string' &&
-      rest.occurredAt.length === 10
-    ) {
-      rest.occurredAt = new Date(rest.occurredAt);
-    }
-    const nextStatus = rest.status;
-    return this.prisma.debt.update({
-      where: { id },
-      data: {
-        ...rest,
-        ...(nextStatus === 'COMPLETED'
-          ? { completedAt: rest.completedAt ?? new Date() }
-          : nextStatus === 'PENDING'
-            ? { completedAt: null }
-            : {}),
-      },
-      include: this.include,
+      const rest = data;
+      if (
+        rest.occurredAt &&
+        typeof rest.occurredAt === 'string' &&
+        rest.occurredAt.length === 10
+      ) {
+        rest.occurredAt = new Date(rest.occurredAt);
+      }
+      const nextStatus = rest.status;
+      return tx.debt.update({
+        where: { id },
+        data: {
+          ...rest,
+          ...(nextStatus === 'COMPLETED'
+            ? { completedAt: rest.completedAt ?? new Date() }
+            : nextStatus === 'PENDING'
+              ? { completedAt: null }
+              : {}),
+        },
+        include: this.include,
+      });
     });
   }
 
@@ -144,13 +155,6 @@ export class DebtsService {
     if (d.status === 'COMPLETED') {
       throw new BadRequestException(
         'Não é possível eliminar uma dívida concluída',
-      );
-    }
-    if (d.fileKeys?.length) {
-      await Promise.all(
-        d.fileKeys.map((key: string) =>
-          this.minio.deleteObject(key).catch(() => {}),
-        ),
       );
     }
     return this.prisma.debt.delete({ where: { id } });
