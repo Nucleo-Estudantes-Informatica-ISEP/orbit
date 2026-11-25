@@ -164,6 +164,7 @@ jobs:
           docker image inspect orbit-api >/dev/null
       - name: Validate shared-data Compose
         env:
+          AUTH_TRUST_PROXY_HOPS: "1"
           DATABASE_URL: postgresql://orbit_runtime:ci-only@shared-postgres:5432/orbit_test?schema=orbit
           MIGRATION_DATABASE_URL: postgresql://orbit_migrator:ci-only@shared-postgres:5432/orbit_test?schema=orbit
           REFRESH_TOKEN_SECRET: ci-only-refresh-fingerprint

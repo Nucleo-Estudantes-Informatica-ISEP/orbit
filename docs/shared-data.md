@@ -2,7 +2,7 @@
 
 Both production Compose files require a separately maintained S3-compatible store. Use `docker-compose.coolify.yml` for the embedded PostgreSQL service or `docker-compose.shared.yml` for shared PostgreSQL. Preserve the previous configuration and volumes until the cutover is verified.
 
-Set `AUTH_TRUST_PROXY_HOPS` for Coolify before deployment. Verify the forwarded client IP through the public frontend and ensure the API has no direct public route. Use the hop count that reaches the client in this verified chain. Shared Compose keeps an untrusted-proxy default for direct deployments.
+Both production Compose files require `AUTH_TRUST_PROXY_HOPS`. For proxied deployments, verify the forwarded client IP through the public frontend and confirm that the API has no direct public route. Set the hop count that reaches the client in this verified chain. Set `0` for a direct deployment where proxy headers are untrusted.
 
 ## Required Coolify variables
 

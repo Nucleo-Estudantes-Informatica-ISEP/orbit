@@ -20,8 +20,8 @@ Provide the variables documented by the root compose/configuration, including `D
 - Access JWTs expire after 15 minutes. The API checks the issuer, audience, token type, active session and current local permissions.
 - Refresh sessions expire after 30 days. Opaque refresh tokens rotate on every use, live in a strict HTTP-only cookie and are stored server-side as keyed fingerprints. The current browser session keeps its access token in memory.
 - Logout, password changes and credential administration revoke affected sessions. Password reset consumes its token atomically. Active new accounts receive a one-time link to choose a password.
-- Production requires separate signing and token-fingerprint keys of at least 32 bytes and encrypted, authenticated SMTP. Configure `CORS_ORIGIN` with the browser origins.
-- Authentication and recovery routes check browser origin and limit requests per API instance. Leave `AUTH_TRUST_PROXY_HOPS` at zero unless the configured proxy chain is the only way to reach the API. Apply shared throttling at the ingress for replicated deployments.
+- Production requires separate signing and token-fingerprint keys of at least 32 bytes, encrypted authenticated SMTP, and an HTTPS `APP_URL` for activation and recovery links. Configure `CORS_ORIGIN` with the browser origins.
+- Authentication and recovery routes check browser origin and limit requests per API instance. Both production Compose files require an explicit `AUTH_TRUST_PROXY_HOPS`. Use zero for direct access, or the verified hop count when traffic must traverse the configured proxy chain. Apply shared throttling at the ingress for replicated deployments.
 - Requests to assign roles or change credentials require the respective `ROLES_ASSIGN` or `USERS_MANAGE_CREDENTIALS` permission. An administrator cannot delegate permissions they lack.
 - The server records authoritative audit events. The public audit API exposes read access.
 

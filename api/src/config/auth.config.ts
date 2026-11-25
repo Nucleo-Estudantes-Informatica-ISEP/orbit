@@ -44,3 +44,17 @@ export function browserOrigins() {
         ])
   );
 }
+
+export function passwordRecoveryOrigin(env = process.env) {
+  const origin = URL.parse(env.APP_URL || 'http://localhost:3090');
+  if (
+    env.NODE_ENV === 'production' &&
+    (origin?.protocol !== 'https:' || origin.username || origin.password)
+  ) {
+    throw new Error(
+      'Production requires an HTTPS APP_URL without credentials.',
+    );
+  }
+  if (!origin) throw new Error('APP_URL must be a valid URL.');
+  return origin;
+}
