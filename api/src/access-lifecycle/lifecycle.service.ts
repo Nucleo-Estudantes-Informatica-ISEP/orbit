@@ -571,14 +571,17 @@ export class LifecycleService {
         },
       });
       for (const op of process.operations) {
+        const unresolvedUsername =
+          ['DISCORD', 'GITHUB'].includes(op.provider) &&
+          !/^\d+$/.test(op.providerUserId || '');
         await tx.accessOperation.update({
           where: { id: op.id },
           data: {
             status: !dto.approved
               ? 'CANCELLED'
-              : !op.automatic
+              : !op.automatic || (unresolvedUsername && op.action === 'REVOKE')
                 ? 'AWAITING_MANUAL'
-                : !op.providerUserId
+                : !op.providerUserId || unresolvedUsername
                   ? 'AWAITING_ACCOUNT'
                   : 'PENDING',
           },

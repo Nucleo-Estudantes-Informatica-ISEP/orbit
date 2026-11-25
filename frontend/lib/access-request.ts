@@ -6,6 +6,13 @@ import type {
   SelectedOperation,
 } from "./access-lifecycle";
 
+function isProviderAccountId(provider: Provider | undefined, value: string) {
+  return (
+    (provider === "DISCORD" && /^\d{15,22}$/.test(value)) ||
+    (provider === "GITHUB" && /^\d+$/.test(value))
+  );
+}
+
 export function reuseAccessOperations(
   previous: AccessOperation[],
   resources: AccessResource[],
@@ -15,22 +22,24 @@ export function reuseAccessOperations(
       (resource) => resource.id === op.resourceSnapshot.id && resource.enabled,
     );
     if (!resource) return [];
+    const principal = op.result?.remoteId || op.providerUserId;
+    const accountUsername =
+      (resource.provider === "DISCORD" || resource.provider === "GITHUB") &&
+      !isProviderAccountId(resource.provider, principal || "")
+        ? op.result?.accountName
+        : undefined;
     return [
       changeAccessAction(
         {
           resourceId: resource.id,
           action: "VERIFY",
-          ...(["DISCORD", "GITHUB"].includes(resource.provider) &&
-          op.result?.accountName
-            ? { accountUsername: op.result.accountName }
-            : {}),
+          accountUsername,
           providerUserId:
             resource.provider === "GOOGLE_DRIVE"
-              ? op.accountEmail || op.result?.remoteId || op.providerUserId
-              : ["DISCORD", "GITHUB"].includes(resource.provider) &&
-                  op.result?.accountName
+              ? op.accountEmail || principal
+              : accountUsername
                 ? undefined
-                : op.result?.remoteId || op.providerUserId,
+                : principal,
           accountEmail: op.accountEmail,
         },
         resource.provider,
@@ -75,13 +84,20 @@ export function changeRemoteIdentity(
   value: string,
   provider?: Provider,
 ): SelectedOperation {
+  const identity = value.trim();
+  const isAccountId = isProviderAccountId(provider, identity);
+  const isUsername =
+    (provider === "DISCORD" || provider === "GITHUB") &&
+    !isAccountId;
+  const providerUserId = isUsername ? undefined : (isAccountId ? identity : value);
+  const accountUsername = isUsername ? value : undefined;
   return {
     ...operation,
-    ...(["DISCORD", "GITHUB"].includes(provider || "")
-      ? { accountUsername: value, providerUserId: undefined }
-      : { providerUserId: value }),
+    accountUsername,
+    providerUserId,
     verificationNote:
-      operation.providerUserId === value
+      operation.providerUserId === providerUserId &&
+      operation.accountUsername === accountUsername
         ? operation.verificationNote
         : undefined,
   };

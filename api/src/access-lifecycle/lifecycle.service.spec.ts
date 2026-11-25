@@ -327,6 +327,52 @@ describe('LifecycleService', () => {
     });
   });
 
+  it.each(['DISCORD', 'GITHUB'] as const)(
+    'classifies approved %s operations by whether the account was bound',
+    async (provider) => {
+      const operation = { ...process().operations[0], provider };
+      prisma.lifecycleProcess.findFirst.mockResolvedValue({
+        ...process(),
+        operations: [
+          {
+            ...operation,
+            id: 'grant',
+            action: 'GRANT',
+            providerUserId: '@person',
+          },
+          {
+            ...operation,
+            id: 'verify',
+            action: 'VERIFY',
+            providerUserId: '@person',
+          },
+          {
+            ...operation,
+            id: 'revoke',
+            action: 'REVOKE',
+            providerUserId: '@person',
+          },
+          {
+            ...operation,
+            id: 'bound',
+            action: 'GRANT',
+            providerUserId: '123456789012345678',
+          },
+        ],
+      });
+      await service.decide('actor', 'process', {
+        approved: true,
+        note: 'Checked all operations',
+      });
+      expect(prisma.accessOperation.update.mock.calls).toEqual([
+        [{ where: { id: 'grant' }, data: { status: 'AWAITING_ACCOUNT' } }],
+        [{ where: { id: 'verify' }, data: { status: 'AWAITING_ACCOUNT' } }],
+        [{ where: { id: 'revoke' }, data: { status: 'AWAITING_MANUAL' } }],
+        [{ where: { id: 'bound' }, data: { status: 'PENDING' } }],
+      ]);
+    },
+  );
+
   it('does not let a coordinator approve a justified cross-department exception', async () => {
     prisma.user.findUnique.mockResolvedValue(
       actor(['ACCESS_READ', 'ACCESS_CREATE', 'ACCESS_EXECUTE']),

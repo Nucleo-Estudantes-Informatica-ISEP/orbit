@@ -334,20 +334,45 @@ test("an Alumni policy from another department does not turn a revocation into a
   );
 });
 
-test("a reused resolved GitHub/Discord operation displays its original username", () => {
-  for (const provider of ["DISCORD", "GITHUB"]) {
-    const resource = { id: "role", provider, enabled: true };
-    const [operation] = reuseAccessOperations(
-      [
-        {
-          resourceSnapshot: resource,
-          providerUserId: "123456",
-          result: { remoteId: "123456", accountName: "person.name" },
-        },
-      ],
-      [resource],
-    );
-    assert.equal(operation.accountUsername, "person.name");
-    assert.equal(operation.action, "VERIFY");
+test("reuse keeps stable provider IDs even when the result contains an account name", () => {
+  for (const [provider, id] of [
+    ["DISCORD", "123456789012345678"],
+    ["GITHUB", "123456"],
+  ]) {
+    for (const accountName of [id, "person-name", "987654"]) {
+      const resource = { id: "role", provider, enabled: true };
+      const [operation] = reuseAccessOperations(
+        [
+          {
+            resourceSnapshot: resource,
+            providerUserId: id,
+            result: { accountName },
+          },
+        ],
+        [resource],
+      );
+      assert.equal(operation.providerUserId, id);
+      assert.equal(operation.accountUsername, undefined);
+      assert.equal(operation.action, "VERIFY");
+    }
+  }
+});
+
+test("provider identity entry distinguishes IDs from explicit numeric usernames", () => {
+  for (const [provider, id] of [
+    ["DISCORD", "123456789012345678"],
+    ["GITHUB", "123456"],
+  ]) {
+    const operation = {
+      resourceId: "role",
+      action: "VERIFY",
+      accountUsername: "person",
+    };
+    const numeric = changeRemoteIdentity(operation, ` ${id} `, provider);
+    assert.equal(numeric.providerUserId, id);
+    assert.equal(numeric.accountUsername, undefined);
+    const username = changeRemoteIdentity(numeric, `@${id}`, provider);
+    assert.equal(username.accountUsername, `@${id}`);
+    assert.equal(username.providerUserId, undefined);
   }
 });

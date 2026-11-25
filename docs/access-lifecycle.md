@@ -49,7 +49,9 @@ No Drive, indicar apenas o email Google: o conector encontra e valida internamen
 
 Os dados do Forms são declarados pela pessoa. A confirmação técnica da conta e do resultado automático pertence ao Orbit; não se pede ao operador uma frase de verificação para desbloquear o executor. Isto não constitui prova de identidade civil. Serviços manuais são confirmados após execução com evidência atribuída ao operador.
 
-Se uma revogação Discord/GitHub por username não conseguir identificar a conta, o resultado é `AWAITING_MANUAL`: uma pesquisa sem resultados não prova que a pessoa saiu ou que perdeu acesso. Um executor autorizado confirma a conta aprovada e a ausência/revogação do acesso, registando evidência no processo já aprovado. Quando existe um ID Discord estável aprovado e a consulta à guild verificada confirma ausência de membro, a revogação pode concluir sem escrita. A consulta de inventário pode resolver nomes para observação sem modificar a identidade aprovada. No Drive, revogar/consultar exige email Google válido ou ID numérico de permissão legado; texto livre inválido falha antes das chamadas remotas.
+Quando a conta Discord/GitHub não é identificada, a aprovação deixa concessões e verificações em `AWAITING_ACCOUNT` e revogações em `AWAITING_MANUAL`. Um executor autorizado confirma a conta aprovada e a ausência/revogação do acesso, registando evidência no processo já aprovado. Quando existe um ID Discord estável aprovado e a consulta à guild verificada confirma ausência de membro, a revogação pode concluir sem escrita. A consulta de inventário pode resolver nomes para observação sem modificar a identidade aprovada. No Drive, revogar/consultar exige email Google válido ou ID numérico de permissão legado; texto livre inválido falha antes das chamadas remotas.
+
+O formulário aceita IDs de conta Discord/GitHub. Para introduzir um username numérico, prefixar com `@`. Ao reutilizar uma operação com ID estável, o formulário preenche esse ID.
 
 Quando o registo selecionado declara Discord, GitHub ou Google, a API bloqueia uma conta diferente antes de guardar o pedido, incluindo nas revogações. Discord/GitHub permitem comparar o mesmo ID estável para compatibilidade com IDs históricos ou usernames alterados. O aprovador vê o username/email, o ID resolvido de Discord/GitHub e a origem da associação: correspondência com Forms, Sheets ou indicação do operador sem conta declarada na fonte. A origem fica no snapshot e é preservada pelo executor. Erros de conta inválida/ambígua ou divergente devolvem HTTP 400; configuração indisponível, limites do fornecedor e falhas remotas devolvem 503 com código saneado. Nesse caso não há rascunho parcial: corrigir a conta/configuração ou voltar a tentar quando o fornecedor recuperar.
 
@@ -126,6 +128,8 @@ Inclui Discord Members/departamento/cargos, Drive Geral/Direção/Presidência, 
 Figma, Coda e Freedcamp são teams com convite manual: abrir a gestão de membros da team, convidar o email indicado, registar envio como AWAITING_ACCOUNT e só concluir após confirmar aceitação. No offboarding remover da team e confirmar. Coda/Freedcamp continuam visíveis sem links; o operador contacta o responsável do serviço. Drive da Presidência sem pasta configurada mantém um passo manual explícito para um responsável da Presidência. cPanel instrui criar/atualizar ou suspender a caixa aprovada, preservando conteúdo e sem recolher credenciais.
 
 ## Conectores e execução persistente
+
+A administração pode manter um recurso ativo com destino `CONFIGURE_ME` para incluir as suas instruções nos pedidos. Esses pedidos guardam o passo como manual, mesmo quando o recurso está configurado para passar a automático após receber um destino válido.
 
 | Integração | Comportamento |
 | --- | --- |
